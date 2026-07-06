@@ -137,6 +137,67 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
     );
   }
 
+  async function toggleChromeTabGroups() {
+    if (!workspace) return;
+    const nextState = {
+      ...workspace.chromeTabGroups,
+      enabled: !workspace.chromeTabGroups.enabled,
+    };
+    const response = await sendExtensionMessage<AppResult<ActiveWorkspaceState['chromeTabGroups']>>({
+      type: 'chrome-tab-groups:sync',
+      groups,
+      state: nextState,
+    });
+    if (response.ok) {
+      setWorkspace(await updateActiveWorkspaceState({ chromeTabGroups: response.data }));
+      onStatus('success', response.data.enabled ? 'Chrome tab groups enabled.' : 'Chrome tab groups disabled.');
+      return;
+    }
+    onStatus('error', response.error.message);
+  }
+
+  async function importExistingChromeGroups() {
+    if (!workspace) return;
+    const response = await sendExtensionMessage<
+      AppResult<{
+        manualGroups: ActiveWorkspaceState['manualGroups'];
+        chromeTabGroups: ActiveWorkspaceState['chromeTabGroups'];
+      }>
+    >({
+      type: 'chrome-tab-groups:import',
+      tabs,
+      manualGroups: workspace.manualGroups,
+      state: workspace.chromeTabGroups,
+    });
+    if (response.ok) {
+      setWorkspace(
+        await updateActiveWorkspaceState({
+          manualGroups: response.data.manualGroups,
+          chromeTabGroups: response.data.chromeTabGroups,
+        }),
+      );
+      onStatus('success', 'Imported Chrome tab groups.');
+      return;
+    }
+    onStatus('error', response.error.message);
+  }
+
+  async function collapseCurrentWindowGroups() {
+    const windowId = tabs.find((tab) => tab.active && typeof tab.windowId === 'number')?.windowId
+      ?? tabs.find((tab) => typeof tab.windowId === 'number')?.windowId;
+    if (typeof windowId !== 'number') return;
+
+    const response = await sendExtensionMessage<AppResult<{ collapsed: true; groupCount: number }>>({
+      type: 'chrome-tab-groups:collapse-window',
+      windowId,
+    });
+    if (response.ok) {
+      onStatus('success', `Collapsed ${response.data.groupCount} Chrome groups.`);
+      return;
+    }
+    onStatus('error', response.error.message);
+  }
+
   return (
     <section className="active-workspace" aria-labelledby="active-tabs-title">
       <div className="section-header">
@@ -154,6 +215,25 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
         >
           <Archive size={16} aria-hidden="true" />
           Stow this window
+        </button>
+      </div>
+
+      <div className="active-workspace-controls">
+        <label className="toggle-row">
+          <input
+            checked={Boolean(workspace?.chromeTabGroups.enabled)}
+            onChange={() => void toggleChromeTabGroups()}
+            type="checkbox"
+          />
+          <span>Sync manual groups to Chrome tab groups</span>
+        </label>
+        <button type="button" className="secondary-button" onClick={() => void collapseCurrentWindowGroups()}>
+          <Layers size={16} aria-hidden="true" />
+          Collapse Chrome groups
+        </button>
+        <button type="button" className="secondary-button" onClick={() => void importExistingChromeGroups()}>
+          <Layers size={16} aria-hidden="true" />
+          Import Chrome groups
         </button>
       </div>
 

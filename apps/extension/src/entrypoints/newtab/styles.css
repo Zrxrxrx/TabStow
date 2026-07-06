@@ -205,6 +205,18 @@ button:disabled {
   gap: 16px;
 }
 
+.active-workspace-controls,
+.toggle-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.toggle-row {
+  font-size: 0.92rem;
+}
+
 .active-workspace-hint {
   align-items: center;
   background: var(--surface, #ffffff);

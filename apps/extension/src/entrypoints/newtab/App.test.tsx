@@ -4,7 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveBrowserTab, ManualGroupsState } from '@/features/active-tabs/types';
 import type { AppResult } from '@/lib/errors';
-import type { StowResult } from '@/lib/messages';
+import type { ExtensionMessage, StowResult } from '@/lib/messages';
 import { App } from './App';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -94,11 +94,17 @@ describe('App', () => {
     getActiveWorkspaceState.mockReset();
     updateActiveWorkspaceState.mockReset();
     getActiveWorkspaceState.mockResolvedValue(defaultWorkspace());
-    updateActiveWorkspaceState.mockImplementation(async (state: { manualGroups?: ManualGroupsState }) => ({
-      ...defaultWorkspace(),
-      ...state,
-      manualGroups: state.manualGroups ?? defaultWorkspace().manualGroups,
-    }));
+    updateActiveWorkspaceState.mockImplementation(
+      async (state: {
+        manualGroups?: ManualGroupsState;
+        chromeTabGroups?: ReturnType<typeof defaultWorkspace>['chromeTabGroups'];
+      }) => ({
+        ...defaultWorkspace(),
+        ...state,
+        manualGroups: state.manualGroups ?? defaultWorkspace().manualGroups,
+        chromeTabGroups: state.chromeTabGroups ?? defaultWorkspace().chromeTabGroups,
+      }),
+    );
     promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
   });
 
@@ -230,6 +236,70 @@ describe('App', () => {
         groups: [],
         assignments: {},
       },
+    });
+  });
+
+  it('toggles Chrome tab group sync from the active workspace controls', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+    await click(screen().getByText('Sync manual groups to Chrome tab groups'));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'chrome-tab-groups:sync',
+      groups: expect.any(Array),
+      state: {
+        enabled: true,
+        mappings: [],
+      },
+    });
+    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
+      chromeTabGroups: {
+        enabled: true,
+        mappings: [],
+      },
+    });
+  });
+
+  it('imports existing Chrome tab groups into the active workspace state', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+    await click(screen().getByText('Import Chrome groups'));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'chrome-tab-groups:import',
+      tabs: [UNIQUE_TAB],
+      manualGroups: {
+        groups: [],
+        assignments: {},
+      },
+      state: {
+        enabled: false,
+        mappings: [],
+      },
+    });
+    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
+      manualGroups: {
+        groups: [],
+        assignments: {},
+      },
+      chromeTabGroups: {
+        enabled: false,
+        mappings: [],
+      },
+    });
+  });
+
+  it('collapses Chrome groups for the active window', async () => {
+    mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
+
+    await renderApp();
+    await click(screen().getByText('Collapse Chrome groups'));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'chrome-tab-groups:collapse-window',
+      windowId: 3,
     });
   });
 
@@ -414,7 +484,7 @@ function defaultWorkspace() {
 }
 
 function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveBrowserTab[]; sessions?: TabSession[] }) {
-  sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+  sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
     if (message.type === 'active-tabs:list') {
       return { ok: true, data: activeTabs };
     }
@@ -429,6 +499,24 @@ function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveB
 
     if (message.type === 'active-tabs:focus') {
       return { ok: true, data: { focused: true } };
+    }
+
+    if (message.type === 'chrome-tab-groups:sync') {
+      return { ok: true, data: message.state };
+    }
+
+    if (message.type === 'chrome-tab-groups:import') {
+      return {
+        ok: true,
+        data: {
+          manualGroups: message.manualGroups,
+          chromeTabGroups: message.state,
+        },
+      };
+    }
+
+    if (message.type === 'chrome-tab-groups:collapse-window') {
+      return { ok: true, data: { collapsed: true, groupCount: 1 } };
     }
 
     if (message.type === 'sessions:stow-current-window') {
