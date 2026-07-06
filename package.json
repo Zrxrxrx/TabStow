@@ -7,11 +7,11 @@
     "packages/*"
   ],
   "scripts": {
-    "dev": "bun --cwd apps/extension run dev",
-    "build": "bun --cwd packages/core run build && bun --cwd apps/extension run build",
-    "zip": "bun --cwd apps/extension run zip",
-    "typecheck": "bun --cwd packages/core run typecheck && bun --cwd apps/extension run typecheck",
-    "test": "bun --cwd packages/core run test && bun --cwd apps/extension run test"
+    "dev": "(cd apps/extension && bun run dev)",
+    "build": "(cd packages/core && bun run build) && (cd apps/extension && bun run build)",
+    "zip": "(cd apps/extension && bun run zip)",
+    "typecheck": "(cd packages/core && bun run typecheck) && (cd apps/extension && bun run typecheck)",
+    "test": "(cd packages/core && bun run test) && (cd apps/extension && bun run test)"
   },
   "devDependencies": {
     "typescript": "latest",
