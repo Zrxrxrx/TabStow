@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
@@ -16,6 +16,7 @@ export function App() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
+  const busyActionRef = useRef<string | null>(null);
 
   async function loadSessions() {
     const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
@@ -37,20 +38,26 @@ export function App() {
     action: () => Promise<AppResult<T>>,
     success: (data: T) => string,
   ) {
-    if (busyAction !== null) return;
+    if (busyActionRef.current !== null) return;
+    busyActionRef.current = actionId;
     setBusyAction(actionId);
     setStatus({ tone: 'info', message: null });
-    const response = await action();
-    setBusyAction(null);
 
-    if (response.ok) {
-      setStatus({ tone: 'success', message: success(response.data) });
-      await loadSessions();
-      setActiveWorkspaceRefreshKey((value) => value + 1);
-      return;
+    try {
+      const response = await action();
+
+      if (response.ok) {
+        setStatus({ tone: 'success', message: success(response.data) });
+        await loadSessions();
+        setActiveWorkspaceRefreshKey((value) => value + 1);
+        return;
+      }
+
+      setStatus({ tone: 'error', message: response.error.message });
+    } finally {
+      busyActionRef.current = null;
+      setBusyAction(null);
     }
-
-    setStatus({ tone: 'error', message: response.error.message });
   }
 
   function openOptions() {

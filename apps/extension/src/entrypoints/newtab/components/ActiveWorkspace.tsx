@@ -126,9 +126,13 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
 
   async function removeTabFromManualGroup(tab: ActiveBrowserTab) {
     if (!workspace || typeof tab.id !== 'number') return;
+    const openTabIds = tabs
+      .map((openTab) => openTab.id)
+      .filter((id): id is number => typeof id === 'number');
+    const manualGroups = pruneManualGroups(clearTabManualGroup(workspace.manualGroups, tab.id), openTabIds);
     setWorkspace(
       await updateActiveWorkspaceState({
-        manualGroups: clearTabManualGroup(workspace.manualGroups, tab.id),
+        manualGroups,
       }),
     );
   }

@@ -227,7 +227,7 @@ describe('App', () => {
 
     expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
       manualGroups: {
-        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
+        groups: [],
         assignments: {},
       },
     });
@@ -295,6 +295,54 @@ describe('App', () => {
     await click(screen().getByText('Stow current window'));
 
     expect(screen().getByText('Stow this window')).toHaveProperty('disabled', true);
+
+    pendingStow.resolve({
+      ok: true,
+      data: {
+        session: {
+          id: 'session-1',
+          title: 'Session 1',
+          tabs: [],
+          createdAt: '2026-07-07T00:00:00.000Z',
+          updatedAt: '2026-07-07T00:00:00.000Z',
+          deviceId: 'device-1',
+        },
+        savedTabCount: 1,
+        closedTabCount: 1,
+      },
+    });
+    await act(async () => {
+      await pendingStow.promise;
+    });
+  });
+
+  it('guards same-frame stow reentry and only sends one stow message', async () => {
+    const pendingStow = deferred<AppResult<StowResult>>();
+    sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:list') {
+        return { ok: true, data: [UNIQUE_TAB] };
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'sessions:stow-current-window') {
+        return pendingStow.promise;
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    const stowButton = screen().getByText('Stow current window');
+
+    await act(async () => {
+      stowButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      stowButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(sentMessageTypes().filter((type) => type === 'sessions:stow-current-window')).toHaveLength(1);
 
     pendingStow.resolve({
       ok: true,
