@@ -44,6 +44,39 @@ button:disabled {
   padding: 26px 0;
 }
 
+.dashboard-shell {
+  display: grid;
+  gap: 24px;
+}
+
+.dashboard-topbar {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 420px);
+}
+
+.dashboard-search {
+  align-items: center;
+  background: var(--surface, #ffffff);
+  border: 1px solid var(--border, #d7dde6);
+  border-radius: 8px;
+  display: flex;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.dashboard-search input {
+  background: transparent;
+  border: 0;
+  color: inherit;
+  flex: 1;
+  font: inherit;
+  min-width: 0;
+  outline: 0;
+}
+
 .newtab-header {
   display: grid;
   grid-template-columns: minmax(220px, 1fr) auto;
@@ -170,6 +203,10 @@ button:disabled {
 }
 
 @media (max-width: 760px) {
+  .dashboard-topbar {
+    grid-template-columns: 1fr;
+  }
+
   .newtab-header,
   .session-row {
     grid-template-columns: 1fr;
