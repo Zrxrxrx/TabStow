@@ -20,18 +20,126 @@ select {
   font: inherit;
 }
 
+button {
+  border: 0;
+  border-radius: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+input,
+select {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 6px;
+  border: 1px solid #cbd3dd;
+  border-radius: 8px;
+  padding: 0 10px;
+  background: #fff;
+  color: #1e242c;
+}
+
 .options-shell {
-  width: min(820px, calc(100vw - 32px));
+  width: min(840px, calc(100vw - 32px));
   margin: 0 auto;
   padding: 32px 0;
 }
 
-.options-shell h1 {
+.options-header {
+  padding-bottom: 18px;
+  border-bottom: 1px solid #d8dde5;
+}
+
+.options-header h1 {
   margin: 0;
   font-size: 28px;
 }
 
-.options-shell p {
+.options-header p {
   margin: 8px 0 0;
   color: #596474;
+}
+
+.settings-section {
+  display: grid;
+  gap: 14px;
+  padding: 22px 0;
+  border-bottom: 1px solid #d8dde5;
+}
+
+.settings-section h2 {
+  margin: 0;
+  font-size: 17px;
+}
+
+.settings-section label {
+  display: block;
+  color: #344255;
+}
+
+.checkbox-row {
+  display: flex !important;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-row input {
+  width: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.device-id {
+  margin: 0;
+  color: #596474;
+  overflow-wrap: anywhere;
+}
+
+.options-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 22px;
+}
+
+.primary-button {
+  background: #234a7c;
+  color: #fff;
+}
+
+.secondary-button {
+  background: #e8edf4;
+  color: #243246;
+}
+
+.status-message {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.status-message--info {
+  background: #e8edf4;
+  color: #243246;
+}
+
+.status-message--success {
+  background: #e2f2e8;
+  color: #235b35;
+}
+
+.status-message--error {
+  background: #f5e5e5;
+  color: #8f2424;
 }
