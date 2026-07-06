@@ -51,6 +51,13 @@ const sessionServiceMocks = vi.hoisted(() => ({
   saveCurrentWindowAsSession: vi.fn(),
 }));
 
+const activeTabsMocks = vi.hoisted(() => ({
+  closeActiveTabs: vi.fn(),
+  focusActiveTab: vi.fn(),
+  listActiveTabs: vi.fn(),
+  runDefaultSearch: vi.fn(),
+}));
+
 vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
@@ -61,6 +68,7 @@ vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
 vi.mock('@/features/sync/sync-service', () => syncMocks);
 vi.mock('@/features/tabs/session-service', () => sessionServiceMocks);
+vi.mock('@/features/active-tabs/active-tabs-service', () => activeTabsMocks);
 
 describe('background message routing', () => {
   beforeEach(() => {
@@ -129,5 +137,19 @@ describe('background message routing', () => {
     await listener?.({} as chrome.tabs.Tab);
 
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(undefined);
+  });
+
+  it('routes active tab close messages', async () => {
+    activeTabsMocks.closeActiveTabs.mockResolvedValue({
+      ok: true,
+      data: { closed: true, tabCount: 2 },
+    });
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+    await listener?.({ type: 'active-tabs:close', tabIds: [11, 12] }, {});
+
+    expect(activeTabsMocks.closeActiveTabs).toHaveBeenCalledWith([11, 12]);
   });
 });

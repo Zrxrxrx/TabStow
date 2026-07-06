@@ -1,4 +1,5 @@
 import type { ExtensionSettings, TabSession } from '@tabstow/core';
+import type { ActiveBrowserTab } from '@/features/active-tabs/types';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
 
@@ -21,6 +22,10 @@ export type ExtensionMessage =
   | { type: 'sessions:stow-current-window' }
   | { type: 'sessions:restore'; sessionId: string; mode: RestoreMode }
   | { type: 'sessions:delete'; sessionId: string }
+  | { type: 'active-tabs:list' }
+  | { type: 'active-tabs:focus'; tabId: number; windowId: number }
+  | { type: 'active-tabs:close'; tabIds: number[] }
+  | { type: 'active-tabs:search'; query: string }
   | { type: 'settings:get' }
   | { type: 'settings:update'; settings: Partial<ExtensionSettings> }
   | { type: 'sync:push' }
@@ -30,9 +35,13 @@ export type ExtensionMessageResponse =
   | AppResult<TabSession[]>
   | AppResult<TabSession>
   | AppResult<StowResult>
+  | AppResult<ActiveBrowserTab[]>
   | AppResult<ExtensionSettings>
   | AppResult<SyncResult>
   | AppResult<{ deleted: true }>
+  | AppResult<{ focused: true }>
+  | AppResult<{ closed: true; tabCount: number }>
+  | AppResult<{ searched: true }>
   | AppResult<{ restored: true; tabCount: number }>;
 
 export async function sendExtensionMessage<T extends ExtensionMessageResponse = ExtensionMessageResponse>(

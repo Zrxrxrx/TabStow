@@ -3,6 +3,12 @@ import {
   registerContextMenu,
   registerContextMenuClickHandler,
 } from '@/features/context-menu/context-menu';
+import {
+  closeActiveTabs,
+  focusActiveTab,
+  listActiveTabs,
+  runDefaultSearch,
+} from '@/features/active-tabs/active-tabs-service';
 import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
@@ -26,6 +32,14 @@ async function handleMessage(
       case 'sessions:delete':
         await deleteSession(message.sessionId);
         return ok({ deleted: true });
+      case 'active-tabs:list':
+        return listActiveTabs();
+      case 'active-tabs:focus':
+        return focusActiveTab(message.tabId, message.windowId);
+      case 'active-tabs:close':
+        return closeActiveTabs(message.tabIds);
+      case 'active-tabs:search':
+        return runDefaultSearch(message.query);
       case 'settings:get':
         return ok(await getSettings());
       case 'settings:update':
