@@ -16,10 +16,6 @@ export type ImportedChromeGroupsResult = {
   chromeTabGroups: ChromeTabGroupsState;
 };
 
-function getTabIds(group: ActiveTabGroup): number[] {
-  return group.tabs.map((tab) => tab.id).filter((id): id is number => typeof id === 'number');
-}
-
 function getTabsByWindow(group: ActiveTabGroup): Array<{ windowId: number; tabIds: number[] }> {
   const tabIdsByWindow = new Map<number, number[]>();
 
@@ -36,6 +32,10 @@ function getTabsByWindow(group: ActiveTabGroup): Array<{ windowId: number; tabId
   return Array.from(tabIdsByWindow.entries()).map(([windowId, tabIds]) => ({ windowId, tabIds }));
 }
 
+function isMissingChromeGroupError(error: unknown): boolean {
+  return /no group with id/i.test(toErrorMessage(error));
+}
+
 async function groupTabsIntoChromeGroup(
   tabIds: number[],
   existingChromeGroupId?: number,
@@ -47,7 +47,11 @@ async function groupTabsIntoChromeGroup(
   try {
     await browser.tabs.group({ groupId: existingChromeGroupId, tabIds });
     return existingChromeGroupId;
-  } catch {
+  } catch (error) {
+    if (!isMissingChromeGroupError(error)) {
+      throw error;
+    }
+
     return browser.tabs.group({ tabIds });
   }
 }

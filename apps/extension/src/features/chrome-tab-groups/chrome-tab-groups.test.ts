@@ -115,6 +115,27 @@ describe('chrome tab groups', () => {
     });
   });
 
+  it('does not recover non-stale native group failures during sync', async () => {
+    browserMocks.tabs.group.mockRejectedValueOnce(new Error('Tabs cannot be edited right now'));
+
+    const { syncChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await syncChromeTabGroups(groups, {
+      enabled: true,
+      mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 88 }],
+    });
+
+    expect(browserMocks.tabs.group).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabs.group).toHaveBeenCalledWith({ groupId: 88, tabIds: [10, 11] });
+    expect(browserMocks.tabGroups.update).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'chrome-tabs-error',
+        message: 'Tabs cannot be edited right now',
+      },
+    });
+  });
+
   it('collapses all groups in a window', async () => {
     browserMocks.tabGroups.query.mockResolvedValue([{ id: 3, windowId: 7 }, { id: 4, windowId: 8 }]);
 

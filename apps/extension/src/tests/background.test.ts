@@ -203,4 +203,18 @@ describe('background message routing', () => {
       payload.state,
     );
   });
+
+  it('routes chrome tab group collapse messages', async () => {
+    chromeTabGroupMocks.collapseChromeTabGroups.mockResolvedValue({
+      ok: true,
+      data: { collapsed: true, groupCount: 2 },
+    });
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+    await listener?.({ type: 'chrome-tab-groups:collapse-window', windowId: 17 }, {});
+
+    expect(chromeTabGroupMocks.collapseChromeTabGroups).toHaveBeenCalledWith(17);
+  });
 });
