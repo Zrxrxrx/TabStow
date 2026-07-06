@@ -16,6 +16,8 @@ export type ImportedChromeGroupsResult = {
   chromeTabGroups: ChromeTabGroupsState;
 };
 
+type GroupableTabIds = number | [number, ...number[]];
+
 function getTabsByWindow(group: ActiveTabGroup): Array<{ windowId: number; tabIds: number[] }> {
   const tabIdsByWindow = new Map<number, number[]>();
 
@@ -36,19 +38,40 @@ function isMissingChromeGroupError(error: unknown): boolean {
   return /no group with id/i.test(toErrorMessage(error));
 }
 
+function toGroupableTabIds(tabIds: number[]): GroupableTabIds | null {
+  const [first, ...rest] = tabIds;
+  if (typeof first !== 'number') {
+    return null;
+  }
+
+  return rest.length === 0 ? first : [first, ...rest];
+}
+
+async function createChromeGroup(tabIds: GroupableTabIds): Promise<number> {
+  return await (browser.tabs.group({ tabIds }) as Promise<number>);
+}
+
 async function groupTabsIntoChromeGroup(
   tabIds: number[],
   existingChromeGroupId?: number,
 ): Promise<{ chromeGroupId: number; reusedExistingGroup: boolean }> {
+  const groupableTabIds = toGroupableTabIds(tabIds);
+  if (groupableTabIds === null) {
+    throw new Error('Cannot create a Chrome tab group without tabs');
+  }
+
   if (typeof existingChromeGroupId !== 'number') {
     return {
-      chromeGroupId: await browser.tabs.group({ tabIds }),
+      chromeGroupId: await createChromeGroup(groupableTabIds),
       reusedExistingGroup: false,
     };
   }
 
   try {
-    await browser.tabs.group({ groupId: existingChromeGroupId, tabIds });
+    await (browser.tabs.group({
+      groupId: existingChromeGroupId,
+      tabIds: groupableTabIds,
+    }) as Promise<number> | void);
     return {
       chromeGroupId: existingChromeGroupId,
       reusedExistingGroup: true,
@@ -59,7 +82,7 @@ async function groupTabsIntoChromeGroup(
     }
 
     return {
-      chromeGroupId: await browser.tabs.group({ tabIds }),
+      chromeGroupId: await createChromeGroup(groupableTabIds),
       reusedExistingGroup: false,
     };
   }
@@ -92,9 +115,10 @@ export async function syncChromeTabGroups(
           const extraTabIds = currentTabs
             .map((tab) => tab.id)
             .filter((tabId): tabId is number => typeof tabId === 'number' && !desiredTabIds.has(tabId));
+          const groupableExtraTabIds = toGroupableTabIds(extraTabIds);
 
-          if (extraTabIds.length > 0) {
-            await browser.tabs.ungroup(extraTabIds);
+          if (groupableExtraTabIds !== null) {
+            await browser.tabs.ungroup(groupableExtraTabIds);
           }
         }
 

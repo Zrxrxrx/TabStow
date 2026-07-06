@@ -21,6 +21,12 @@ export type ActiveWorkspaceState = {
   chromeTabGroups: ChromeTabGroupsState;
 };
 
+type ChromeTabGroupMappingCandidate = {
+  virtualGroupKey?: unknown;
+  windowId?: unknown;
+  chromeGroupId?: unknown;
+};
+
 function normalizeOrder(input: Partial<ActiveWorkspaceOrderState> | undefined): ActiveWorkspaceOrderState {
   const dedupe = (values: unknown[]): string[] => {
     const seen = new Set<string>();
@@ -54,31 +60,22 @@ function normalizeOrder(input: Partial<ActiveWorkspaceOrderState> | undefined): 
 }
 
 function normalizeChromeGroups(input: Partial<ChromeTabGroupsState> | undefined): ChromeTabGroupsState {
+  const mappings = Array.isArray(input?.mappings) ? (input.mappings as unknown[]) : [];
+
   return {
     enabled: Boolean(input?.enabled),
-    mappings: Array.isArray(input?.mappings)
-      ? input.mappings
-          .filter(
-            (
-              mapping,
-            ): mapping is {
-              virtualGroupKey: unknown;
-              windowId: unknown;
-              chromeGroupId: unknown;
-            } => Boolean(mapping && typeof mapping === 'object'),
-          )
-          .filter(
-            (mapping) =>
-              Boolean(mapping.virtualGroupKey) &&
-              Number.isInteger(mapping.windowId) &&
-              Number.isInteger(mapping.chromeGroupId),
-          )
-          .map((mapping) => ({
-            virtualGroupKey: String(mapping.virtualGroupKey),
-            windowId: Number(mapping.windowId),
-            chromeGroupId: Number(mapping.chromeGroupId),
-          }))
-      : [],
+    mappings: mappings
+      .filter(
+        (mapping): mapping is ChromeTabGroupMappingCandidate =>
+          Boolean(mapping && typeof mapping === 'object'),
+      )
+      .filter(
+        (mapping): mapping is ChromeTabGroupMapping =>
+          typeof mapping.virtualGroupKey === 'string' &&
+          mapping.virtualGroupKey.length > 0 &&
+          Number.isInteger(mapping.windowId) &&
+          Number.isInteger(mapping.chromeGroupId),
+      ),
   };
 }
 

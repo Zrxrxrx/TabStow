@@ -24,8 +24,8 @@ const groups: ActiveTabGroup[] = [
     title: 'Launch',
     pinned: false,
     tabs: [
-      { id: 10, windowId: 2, index: 0, active: false, pinned: false, url: 'https://example.com/a' },
-      { id: 11, windowId: 2, index: 1, active: false, pinned: false, url: 'https://example.com/b' },
+      { id: 10, windowId: 2, groupId: -1, index: 0, active: false, pinned: false, url: 'https://example.com/a' },
+      { id: 11, windowId: 2, groupId: -1, index: 1, active: false, pinned: false, url: 'https://example.com/b' },
     ],
   },
 ];
@@ -37,10 +37,10 @@ const crossWindowGroups: ActiveTabGroup[] = [
     title: 'Launch',
     pinned: false,
     tabs: [
-      { id: 10, windowId: 2, index: 0, active: false, pinned: false, url: 'https://example.com/a' },
-      { id: 11, windowId: 2, index: 1, active: false, pinned: false, url: 'https://example.com/b' },
-      { id: 21, windowId: 3, index: 0, active: false, pinned: false, url: 'https://example.com/c' },
-      { id: 22, windowId: 3, index: 1, active: false, pinned: false, url: 'https://example.com/d' },
+      { id: 10, windowId: 2, groupId: -1, index: 0, active: false, pinned: false, url: 'https://example.com/a' },
+      { id: 11, windowId: 2, groupId: -1, index: 1, active: false, pinned: false, url: 'https://example.com/b' },
+      { id: 21, windowId: 3, groupId: -1, index: 0, active: false, pinned: false, url: 'https://example.com/c' },
+      { id: 22, windowId: 3, groupId: -1, index: 1, active: false, pinned: false, url: 'https://example.com/d' },
     ],
   },
 ];
@@ -133,7 +133,7 @@ describe('chrome tab groups', () => {
 
     expect(browserMocks.tabs.group).toHaveBeenCalledWith({ groupId: 88, tabIds: [10, 11] });
     expect(browserMocks.tabs.query).toHaveBeenCalledWith({ groupId: 88 });
-    expect(browserMocks.tabs.ungroup).toHaveBeenCalledWith([12]);
+    expect(browserMocks.tabs.ungroup).toHaveBeenCalledWith(12);
     expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(88, { title: 'Launch', collapsed: true });
     expect(result).toEqual({
       ok: true,

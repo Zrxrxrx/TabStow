@@ -77,7 +77,8 @@ export function isLandingPage(url: string | undefined): boolean {
       if ('rejectHashPrefixes' in rule) {
         return !rule.rejectHashPrefixes.some((prefix) => parsed.hash.includes(prefix));
       }
-      return rule.paths.includes(parsed.pathname);
+      const paths: readonly string[] = 'paths' in rule ? rule.paths : [];
+      return paths.includes(parsed.pathname);
     });
   } catch {
     return false;

@@ -4,17 +4,17 @@ import { getTabLabel, isLandingPage } from './tab-labels';
 import type { ActiveBrowserTab } from './types';
 
 const tabs: ActiveBrowserTab[] = [
-  { id: 1, windowId: 7, index: 0, active: false, pinned: false, title: 'GitHub', url: 'https://github.com/' },
-  { id: 2, windowId: 7, index: 1, active: true, pinned: false, title: 'openai/tabstow PR #4 · GitHub', url: 'https://github.com/openai/tabstow/pull/4' },
-  { id: 3, windowId: 7, index: 2, active: false, pinned: false, title: 'Mail', url: 'https://mail.google.com/mail/u/0/#inbox' },
-  { id: 4, windowId: 7, index: 3, active: false, pinned: false, title: 'Duplicate', url: 'https://example.com/a' },
-  { id: 5, windowId: 7, index: 4, active: false, pinned: false, title: 'Duplicate 2', url: 'https://example.com/a' },
+  { id: 1, windowId: 7, groupId: -1, index: 0, active: false, pinned: false, title: 'GitHub', url: 'https://github.com/' },
+  { id: 2, windowId: 7, groupId: -1, index: 1, active: true, pinned: false, title: 'openai/tabstow PR #4 · GitHub', url: 'https://github.com/openai/tabstow/pull/4' },
+  { id: 3, windowId: 7, groupId: -1, index: 2, active: false, pinned: false, title: 'Mail', url: 'https://mail.google.com/mail/u/0/#inbox' },
+  { id: 4, windowId: 7, groupId: -1, index: 3, active: false, pinned: false, title: 'Duplicate', url: 'https://example.com/a' },
+  { id: 5, windowId: 7, groupId: -1, index: 4, active: false, pinned: false, title: 'Duplicate 2', url: 'https://example.com/a' },
 ];
 
 const multiWindowTabs: ActiveBrowserTab[] = [
-  { id: 10, windowId: 2, index: 3, active: false, pinned: false, title: 'Example A', url: 'https://example.com/a' },
-  { id: 11, windowId: 1, index: 8, active: false, pinned: false, title: 'Example A copy', url: 'https://example.com/a' },
-  { id: 12, windowId: 1, index: 9, active: false, pinned: false, title: 'Example B', url: 'https://example.com/b' },
+  { id: 10, windowId: 2, groupId: -1, index: 3, active: false, pinned: false, title: 'Example A', url: 'https://example.com/a' },
+  { id: 11, windowId: 1, groupId: -1, index: 8, active: false, pinned: false, title: 'Example A copy', url: 'https://example.com/a' },
+  { id: 12, windowId: 1, groupId: -1, index: 9, active: false, pinned: false, title: 'Example B', url: 'https://example.com/b' },
 ];
 
 describe('active tab labels', () => {
