@@ -29,6 +29,21 @@ const groups: ActiveTabGroup[] = [
   },
 ];
 
+const crossWindowGroups: ActiveTabGroup[] = [
+  {
+    key: 'manual:launch',
+    kind: 'manual',
+    title: 'Launch',
+    pinned: false,
+    tabs: [
+      { id: 10, windowId: 2, index: 0, active: false, pinned: false, url: 'https://example.com/a' },
+      { id: 11, windowId: 2, index: 1, active: false, pinned: false, url: 'https://example.com/b' },
+      { id: 21, windowId: 3, index: 0, active: false, pinned: false, url: 'https://example.com/c' },
+      { id: 22, windowId: 3, index: 1, active: false, pinned: false, url: 'https://example.com/d' },
+    ],
+  },
+];
+
 describe('chrome tab groups', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -54,6 +69,30 @@ describe('chrome tab groups', () => {
 
     expect(browserMocks.tabs.group).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true, data: { enabled: false, mappings: [] } });
+  });
+
+  it('syncs manual groups separately per window', async () => {
+    browserMocks.tabs.group
+      .mockResolvedValueOnce(99)
+      .mockResolvedValueOnce(199);
+
+    const { syncChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await syncChromeTabGroups(crossWindowGroups, { enabled: true, mappings: [] });
+
+    expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(1, { tabIds: [10, 11] });
+    expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(2, { tabIds: [21, 22] });
+    expect(browserMocks.tabGroups.update).toHaveBeenNthCalledWith(1, 99, { title: 'Launch', collapsed: true });
+    expect(browserMocks.tabGroups.update).toHaveBeenNthCalledWith(2, 199, { title: 'Launch', collapsed: true });
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        enabled: true,
+        mappings: [
+          { virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 99 },
+          { virtualGroupKey: 'manual:launch', windowId: 3, chromeGroupId: 199 },
+        ],
+      },
+    });
   });
 
   it('collapses all groups in a window', async () => {
@@ -90,6 +129,37 @@ describe('chrome tab groups', () => {
         chromeTabGroups: {
           enabled: true,
           mappings: [{ virtualGroupKey: 'manual:manual-31', windowId: 7, chromeGroupId: 31 }],
+        },
+      },
+    });
+  });
+
+  it('replaces stale mappings when importing into a recreated manual group', async () => {
+    browserMocks.tabGroups.query.mockResolvedValue([{ id: 31, windowId: 7, title: 'Reading' }]);
+
+    const { importChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await importChromeTabGroups(
+      [
+        { id: 1, windowId: 7, groupId: 31, index: 0, active: false, pinned: false, url: 'https://example.com' },
+      ],
+      { groups: [], assignments: {} },
+      {
+        enabled: true,
+        mappings: [{ virtualGroupKey: 'manual:missing-group', windowId: 1, chromeGroupId: 31 }],
+      },
+      () => 'replacement-group',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        manualGroups: {
+          groups: [{ id: 'replacement-group', name: 'Reading', createdAt: expect.any(String) }],
+          assignments: { '1': 'replacement-group' },
+        },
+        chromeTabGroups: {
+          enabled: true,
+          mappings: [{ virtualGroupKey: 'manual:replacement-group', windowId: 7, chromeGroupId: 31 }],
         },
       },
     });

@@ -20,6 +20,22 @@ function getTabIds(group: ActiveTabGroup): number[] {
   return group.tabs.map((tab) => tab.id).filter((id): id is number => typeof id === 'number');
 }
 
+function getTabsByWindow(group: ActiveTabGroup): Array<{ windowId: number; tabIds: number[] }> {
+  const tabIdsByWindow = new Map<number, number[]>();
+
+  for (const tab of group.tabs) {
+    if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') {
+      continue;
+    }
+
+    const tabIds = tabIdsByWindow.get(tab.windowId) ?? [];
+    tabIds.push(tab.id);
+    tabIdsByWindow.set(tab.windowId, tabIds);
+  }
+
+  return Array.from(tabIdsByWindow.entries()).map(([windowId, tabIds]) => ({ windowId, tabIds }));
+}
+
 export async function syncChromeTabGroups(
   groups: ActiveTabGroup[],
   state: ChromeTabGroupsState,
@@ -32,28 +48,23 @@ export async function syncChromeTabGroups(
     const nextMappings: ChromeTabGroupsState['mappings'] = [];
 
     for (const group of groups.filter((item) => item.kind === 'manual')) {
-      const tabIds = getTabIds(group);
-      const firstWindowId = group.tabs.find((tab) => typeof tab.windowId === 'number')?.windowId;
+      for (const { windowId, tabIds } of getTabsByWindow(group)) {
+        const existing = state.mappings.find(
+          (mapping) => mapping.virtualGroupKey === group.key && mapping.windowId === windowId,
+        );
+        const chromeGroupId = existing?.chromeGroupId ?? await browser.tabs.group({ tabIds });
 
-      if (tabIds.length === 0 || typeof firstWindowId !== 'number') {
-        continue;
+        if (existing) {
+          await browser.tabs.group({ groupId: chromeGroupId, tabIds });
+        }
+
+        await browser.tabGroups.update(chromeGroupId, { title: group.title, collapsed: true });
+        nextMappings.push({
+          virtualGroupKey: group.key,
+          windowId,
+          chromeGroupId,
+        });
       }
-
-      const existing = state.mappings.find(
-        (mapping) => mapping.virtualGroupKey === group.key && mapping.windowId === firstWindowId,
-      );
-      const chromeGroupId = existing?.chromeGroupId ?? await browser.tabs.group({ tabIds });
-
-      if (existing) {
-        await browser.tabs.group({ groupId: chromeGroupId, tabIds });
-      }
-
-      await browser.tabGroups.update(chromeGroupId, { title: group.title, collapsed: true });
-      nextMappings.push({
-        virtualGroupKey: group.key,
-        windowId: firstWindowId,
-        chromeGroupId,
-      });
     }
 
     return ok({ enabled: true, mappings: nextMappings });
@@ -120,6 +131,9 @@ export async function importChromeTabGroups(
           windowId: chromeGroup.windowId,
           chromeGroupId: chromeGroup.id,
         });
+      } else {
+        existingMapping.virtualGroupKey = `manual:${manualGroupId}`;
+        existingMapping.windowId = chromeGroup.windowId;
       }
     }
 
