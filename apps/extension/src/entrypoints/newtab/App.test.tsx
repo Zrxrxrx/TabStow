@@ -136,6 +136,47 @@ describe('App', () => {
     });
   });
 
+  it('disables active workspace close controls and guards close reentry while a close is pending', async () => {
+    const pendingClose = deferred<AppResult<{ closed: true; tabCount: number }>>();
+    sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:list') {
+        return { ok: true, data: DUPLICATE_TABS };
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'active-tabs:close') {
+        return pendingClose.promise;
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Close 2 duplicates' }));
+
+    const duplicateClose = screen().getByRole('button', { name: 'Close 2 duplicates' });
+    const groupClose = screen().getByLabelText('Close github com tabs');
+    const singleClose = screen().getByLabelText('Close openai/tabstow Issue #10');
+
+    expect(duplicateClose).toHaveProperty('disabled', true);
+    expect(groupClose).toHaveProperty('disabled', true);
+    expect(singleClose).toHaveProperty('disabled', true);
+    expect(closeCalls()).toHaveLength(1);
+
+    await click(groupClose);
+    await click(singleClose);
+
+    expect(closeCalls()).toHaveLength(1);
+
+    pendingClose.resolve({ ok: true, data: { closed: true, tabCount: 2 } });
+    await act(async () => {
+      await pendingClose.promise;
+    });
+  });
+
   it('focuses a tab in its original window', async () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
@@ -274,6 +315,46 @@ describe('App', () => {
       await pendingStow.promise;
     });
   });
+
+  it('keeps only the latest active workspace refresh result when refreshes race', async () => {
+    const firstRefresh = deferred<AppResult<ActiveBrowserTab[]>>();
+    const secondRefresh = deferred<AppResult<ActiveBrowserTab[]>>();
+    let refreshCount = 0;
+
+    sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:list') {
+        refreshCount += 1;
+        return refreshCount === 1 ? firstRefresh.promise : secondRefresh.promise;
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'sessions:stow-current-window') {
+        return { ok: true, data: { sessionId: 'session-1', savedTabCount: 1, closedTabCount: 1 } };
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    await click(screen().getByText('Stow current window'));
+
+    secondRefresh.resolve({ ok: true, data: [] });
+    await act(async () => {
+      await secondRefresh.promise;
+    });
+    expect(screen().getByText('0 open')).not.toBeNull();
+
+    firstRefresh.resolve({ ok: true, data: [UNIQUE_TAB] });
+    await act(async () => {
+      await firstRefresh.promise;
+    });
+
+    expect(screen().getByText('0 open')).not.toBeNull();
+    expect(container.textContent).not.toContain('1 open');
+  });
 });
 
 function defaultWorkspace() {
@@ -324,6 +405,10 @@ async function click(element: HTMLElement) {
 
 function sentMessageTypes() {
   return sendExtensionMessage.mock.calls.map((call) => (call[0] as { type: string }).type);
+}
+
+function closeCalls() {
+  return sendExtensionMessage.mock.calls.filter((call) => call[0]?.type === 'active-tabs:close');
 }
 
 function screen() {

@@ -31,13 +31,19 @@ type Props = {
 export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKey }: Props) {
   const [tabs, setTabs] = useState<ActiveBrowserTab[]>([]);
   const [workspace, setWorkspace] = useState<ActiveWorkspaceState | null>(null);
+  const [closePending, setClosePending] = useState(false);
   const groupRefs = useRef(new Map<string, HTMLElement>());
+  const closePendingRef = useRef(false);
+  const refreshTokenRef = useRef(0);
 
   async function refresh() {
+    const refreshToken = ++refreshTokenRef.current;
     const [tabsResponse, state] = await Promise.all([
       sendExtensionMessage<AppResult<ActiveBrowserTab[]>>({ type: 'active-tabs:list' }),
       getActiveWorkspaceState(),
     ]);
+
+    if (refreshToken !== refreshTokenRef.current) return;
 
     if (!tabsResponse.ok) {
       onStatus('error', tabsResponse.error.message);
@@ -52,6 +58,8 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
       JSON.stringify(prunedManualGroups) === JSON.stringify(state.manualGroups)
         ? state
         : await updateActiveWorkspaceState({ manualGroups: prunedManualGroups });
+
+    if (refreshToken !== refreshTokenRef.current) return;
 
     setTabs(tabsResponse.data);
     setWorkspace(nextState);
@@ -68,17 +76,29 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
   const duplicateGroups = useMemo(() => findDuplicateTabGroups(tabs), [tabs]);
 
   async function closeTabs(tabIds: number[]) {
-    const response = await sendExtensionMessage<AppResult<{ closed: true; tabCount: number }>>({
-      type: 'active-tabs:close',
-      tabIds,
-    });
-    if (response.ok) {
-      onStatus('success', `Closed ${response.data.tabCount} tabs.`);
-      await refresh();
-      return;
+    if (busy || closePendingRef.current || tabIds.length === 0) return;
+
+    closePendingRef.current = true;
+    setClosePending(true);
+
+    try {
+      const response = await sendExtensionMessage<AppResult<{ closed: true; tabCount: number }>>({
+        type: 'active-tabs:close',
+        tabIds,
+      });
+      if (response.ok) {
+        onStatus('success', `Closed ${response.data.tabCount} tabs.`);
+        await refresh();
+        return;
+      }
+      onStatus('error', response.error.message);
+    } finally {
+      closePendingRef.current = false;
+      setClosePending(false);
     }
-    onStatus('error', response.error.message);
   }
+
+  const closeDisabled = busy || closePending;
 
   async function focusTab(tab: ActiveBrowserTab) {
     if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') return;
@@ -145,6 +165,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
           type="button"
           className="secondary-button"
           onClick={() => void closeTabs(duplicateGroups.flatMap((group) => group.duplicateTabIds))}
+          disabled={closeDisabled}
         >
           <Layers size={16} aria-hidden="true" />
           Close {duplicateGroups.reduce((count, group) => count + group.duplicateTabIds.length, 0)}{' '}
@@ -179,6 +200,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
                       .filter((id): id is number => typeof id === 'number'),
                   )
                 }
+                disabled={closeDisabled}
               >
                 <X size={16} aria-hidden="true" />
               </button>
@@ -213,6 +235,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
                     className="icon-button"
                     aria-label={`Close ${getTabLabel(tab)}`}
                     onClick={() => typeof tab.id === 'number' && void closeTabs([tab.id])}
+                    disabled={closeDisabled}
                   >
                     <Trash2 size={14} aria-hidden="true" />
                   </button>
