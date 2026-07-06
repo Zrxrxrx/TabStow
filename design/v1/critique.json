@@ -1,0 +1,26 @@
+{
+  "kind": "critique-panel",
+  "score": 4,
+  "axes": {
+    "philosophy": {
+      "score": 4,
+      "notes": "Keeps the utilitarian Chrome extension dashboard posture while supporting a white light mode and Agentic dark mode."
+    },
+    "hierarchy": {
+      "score": 4,
+      "notes": "Quick links sit above the two primary columns; active tabs and saved sessions have clear counts and actions."
+    },
+    "execution": {
+      "score": 4,
+      "notes": "Dark and light exports are nonblank, aligned, and readable; JS syntax check passes."
+    },
+    "specificity": {
+      "score": 4,
+      "notes": "Copy, constraints, and interactions are drawn from Tabstow components, tests, and service behavior."
+    },
+    "restraint": {
+      "score": 4,
+      "notes": "Accent use is limited to primary action and selected group state; the light mode uses a plain white canvas."
+    }
+  }
+}

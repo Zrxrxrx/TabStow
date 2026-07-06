@@ -1,0 +1,1443 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tabstow New Tab</title>
+  <script>
+    try {
+      document.documentElement.dataset.theme = localStorage.getItem("tabstow:theme") === "light" ? "light" : "dark";
+    } catch (_) {
+      document.documentElement.dataset.theme = "dark";
+    }
+  </script>
+  <style>
+    :root {
+      --bg: #0b1020;
+      --surface: #131b2f;
+      --surface-warm: #182343;
+      --fg: #f8fafc;
+      --fg-2: #cbd5e1;
+      --muted: #8ea0b8;
+      --meta: #60a5fa;
+      --border: #293653;
+      --border-soft: #1e2a43;
+      --accent: #60a5fa;
+      --accent-on: #06111f;
+      --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+      --success: #22c55e;
+      --warn: #fbbf24;
+      --danger: #fb7185;
+      --font-display: Inter, system-ui, sans-serif;
+      --font-body: Inter, system-ui, sans-serif;
+      --font-mono: "JetBrains Mono", ui-monospace, Menlo, monospace;
+      --text-xs: 12px;
+      --text-sm: 13px;
+      --text-base: 15px;
+      --text-lg: 17px;
+      --text-xl: 22px;
+      --text-2xl: 32px;
+      --text-3xl: 48px;
+      --text-4xl: 66px;
+      --leading-body: 1.55;
+      --leading-tight: 1.06;
+      --tracking-display: -0.02em;
+      --space-1: 4px;
+      --space-2: 8px;
+      --space-3: 12px;
+      --space-4: 16px;
+      --space-5: 20px;
+      --space-6: 24px;
+      --space-8: 32px;
+      --space-12: 48px;
+      --section-y-desktop: 96px;
+      --section-y-tablet: 68px;
+      --section-y-phone: 48px;
+      --radius-sm: 8px;
+      --radius-md: 12px;
+      --radius-lg: 20px;
+      --radius-pill: 9999px;
+      --elev-flat: none;
+      --elev-ring: 0 0 0 1px var(--border);
+      --elev-raised: 0 24px 72px rgba(0, 0, 0, 0.36);
+      --focus-ring: 0 0 0 4px rgba(96, 165, 250, 0.28);
+      --motion-fast: 130ms;
+      --motion-base: 220ms;
+      --ease-standard: cubic-bezier(0.2, 0, 0, 1);
+      --container-max: 1200px;
+      --container-gutter-desktop: 36px;
+      --container-gutter-tablet: 24px;
+      --container-gutter-phone: 16px;
+    }
+
+    :root[data-theme="light"] {
+      --bg: #ffffff;
+      --surface: #ffffff;
+      --surface-warm: #f6f8fb;
+      --fg: #111827;
+      --fg-2: #334155;
+      --muted: #64748b;
+      --meta: #2563eb;
+      --border: #d8e0ec;
+      --border-soft: #e7ecf4;
+      --accent: #2563eb;
+      --accent-on: #ffffff;
+      --accent-hover: color-mix(in oklab, var(--accent), black 8%);
+      --accent-active: color-mix(in oklab, var(--accent), black 14%);
+      --success: #16a34a;
+      --warn: #d97706;
+      --danger: #dc2626;
+      --elev-ring: 0 0 0 1px var(--border);
+      --elev-raised: 0 24px 72px rgba(15, 23, 42, 0.16);
+      --focus-ring: 0 0 0 4px rgba(37, 99, 235, 0.22);
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    html {
+      min-width: 320px;
+      background: var(--bg);
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      color: var(--fg);
+      font: var(--text-base)/var(--leading-body) var(--font-body);
+      background:
+        radial-gradient(circle at top left, color-mix(in oklab, var(--accent), transparent 82%), transparent 32%),
+        radial-gradient(circle at 82% 12%, color-mix(in oklab, var(--surface-warm), transparent 26%), transparent 30%),
+        var(--bg);
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    :root[data-theme="light"] body {
+      background: var(--bg);
+    }
+
+    button,
+    input,
+    select {
+      font: inherit;
+    }
+
+    button {
+      min-height: 38px;
+      border: 0;
+      border-radius: var(--radius-md);
+      padding: 0 12px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 7px;
+      color: inherit;
+      cursor: pointer;
+      transition: transform var(--motion-fast) var(--ease-standard), background var(--motion-fast) var(--ease-standard), border-color var(--motion-fast) var(--ease-standard);
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button:disabled {
+      cursor: not-allowed;
+      opacity: 0.55;
+      transform: none;
+    }
+
+    .page-shell {
+      width: min(100%, 1440px);
+      min-height: 100vh;
+      margin: 0 auto;
+      padding: clamp(16px, 2.4vw, 32px);
+      display: grid;
+      gap: 18px;
+    }
+
+    .topbar {
+      display: grid;
+      grid-template-columns: minmax(220px, 1fr) minmax(260px, 440px) auto;
+      gap: 16px;
+      align-items: center;
+    }
+
+    .brand-lockup {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      min-width: 0;
+    }
+
+    .mark {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+      display: grid;
+      place-items: center;
+      color: var(--accent-on);
+      background: var(--accent);
+      font: 590 18px/1 var(--font-display);
+      letter-spacing: var(--tracking-display);
+      box-shadow: var(--elev-ring);
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(var(--text-2xl), 3.2vw, var(--text-3xl));
+      line-height: var(--leading-tight);
+      letter-spacing: var(--tracking-display);
+      font-weight: 600;
+    }
+
+    h2 {
+      font-family: var(--font-display);
+      font-size: var(--text-xl);
+      line-height: 1.2;
+      letter-spacing: -0.01em;
+      font-weight: 590;
+    }
+
+    h3 {
+      font-size: var(--text-base);
+      line-height: 1.25;
+      font-weight: 590;
+    }
+
+    .subtle {
+      color: var(--muted);
+      font-size: var(--text-sm);
+    }
+
+    .search {
+      min-height: 44px;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      padding: 0 12px;
+      background: color-mix(in oklab, var(--surface), transparent 4%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+    }
+
+    .search input {
+      width: 100%;
+      min-width: 0;
+      border: 0;
+      outline: 0;
+      background: transparent;
+      color: inherit;
+    }
+
+    .kbd {
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 2px 6px;
+      color: var(--muted);
+      font: 12px/1.3 var(--font-mono);
+      background: var(--bg);
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      justify-content: flex-end;
+    }
+
+    .primary-button {
+      background: var(--accent);
+      color: var(--accent-on);
+    }
+
+    .secondary-button,
+    .icon-button {
+      background: var(--surface);
+      border: 1px solid var(--border);
+    }
+
+    .danger-button {
+      color: var(--danger);
+      background: color-mix(in oklab, var(--danger), transparent 84%);
+      border: 1px solid color-mix(in oklab, var(--danger), var(--border) 70%);
+    }
+
+    .icon-button {
+      width: 38px;
+      padding: 0;
+    }
+
+    .panel {
+      background: color-mix(in oklab, var(--surface), var(--bg) 14%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: var(--elev-ring);
+    }
+
+    .quick-links-panel {
+      padding: 14px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 14px;
+    }
+
+    .quick-link-grid {
+      display: grid;
+      grid-template-columns: repeat(8, minmax(90px, 1fr));
+      gap: 8px;
+    }
+
+    .quick-link-card {
+      min-width: 0;
+      min-height: 78px;
+      padding: 10px;
+      display: grid;
+      gap: 7px;
+      align-content: center;
+      justify-items: center;
+      text-decoration: none;
+      color: inherit;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+
+    .quick-link-card:hover {
+      border-color: var(--accent);
+      background: color-mix(in oklab, var(--accent), transparent 88%);
+    }
+
+    .favicon {
+      width: 30px;
+      height: 30px;
+      border-radius: 9px;
+      display: grid;
+      place-items: center;
+      color: var(--accent-on);
+      font: 590 13px/1 var(--font-display);
+      letter-spacing: 0.01em;
+      background: var(--meta);
+      box-shadow: var(--elev-ring);
+      flex: 0 0 auto;
+    }
+
+    .tone-red { background: var(--danger); }
+    .tone-green { background: var(--success); }
+    .tone-blue { background: var(--accent); }
+    .tone-gold { background: var(--warn); }
+    .tone-slate { background: var(--fg-2); }
+
+    .quick-link-label {
+      width: 100%;
+      overflow: hidden;
+      color: var(--fg);
+      font-size: var(--text-sm);
+      font-weight: 510;
+      letter-spacing: 0;
+      text-align: center;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .workspace-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1.05fr) minmax(360px, 0.95fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .column {
+      min-width: 0;
+      display: grid;
+      gap: 12px;
+      padding: 14px;
+    }
+
+    .meta-row,
+    .tabs-toolbar,
+    .session-toolbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+
+    .meta-pill,
+    .group-filter,
+    .status-pill {
+      min-height: 30px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border-radius: var(--radius-pill);
+      padding: 0 10px;
+      color: var(--muted);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      font-size: var(--text-xs);
+      font-weight: 510;
+      letter-spacing: 0.01em;
+    }
+
+    .group-filter {
+      cursor: pointer;
+    }
+
+    .group-filter[aria-pressed="true"] {
+      color: var(--accent-on);
+      background: var(--accent);
+      border-color: var(--accent);
+    }
+
+    .tab-groups {
+      display: grid;
+      gap: 10px;
+    }
+
+    .tab-group {
+      display: grid;
+      gap: 8px;
+      padding: 11px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+
+    .tab-group header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .tab-list {
+      display: grid;
+      gap: 7px;
+    }
+
+    .tab-row {
+      min-height: 50px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 10px;
+      padding: 8px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: color-mix(in oklab, var(--surface-warm), var(--surface) 46%);
+    }
+
+    .tab-open-button {
+      min-width: 0;
+      min-height: 34px;
+      padding: 0;
+      justify-content: flex-start;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 10px;
+      background: transparent;
+      border-radius: 6px;
+      text-align: left;
+    }
+
+    .tab-open-button:hover,
+    .tab-open-button:focus-visible {
+      background: color-mix(in oklab, var(--accent), transparent 88%);
+      outline: 1px solid var(--accent);
+      outline-offset: 3px;
+    }
+
+    .tab-copy {
+      min-width: 0;
+      display: grid;
+      gap: 2px;
+    }
+
+    .tab-title,
+    .session-title {
+      min-width: 0;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-weight: 510;
+    }
+
+    .tab-url,
+    .session-preview {
+      min-width: 0;
+      overflow: hidden;
+      color: var(--muted);
+      font-size: var(--text-xs);
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .row-actions {
+      display: flex;
+      gap: 6px;
+      justify-content: flex-end;
+    }
+
+    .session-list {
+      display: grid;
+      gap: 10px;
+    }
+
+    .session-card {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+    }
+
+    .session-card header {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .session-tab-list {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding: 0;
+      list-style: none;
+    }
+
+    .session-tab-row {
+      list-style: none;
+    }
+
+    .session-tab-row .tab-open-button {
+      width: 100%;
+    }
+
+    .empty-state {
+      min-height: 132px;
+      display: grid;
+      place-items: center;
+      color: var(--muted);
+      border: 1px dashed var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface);
+      text-align: center;
+      padding: 18px;
+    }
+
+    .drawer-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 20;
+      display: none;
+      justify-content: flex-end;
+      background: color-mix(in oklab, var(--bg), transparent 18%);
+      backdrop-filter: blur(3px);
+    }
+
+    .drawer-backdrop.is-open {
+      display: flex;
+    }
+
+    .drawer {
+      width: min(100%, 430px);
+      height: 100%;
+      overflow: auto;
+      padding: 18px;
+      display: grid;
+      align-content: start;
+      gap: 14px;
+      background: var(--surface);
+      border-left: 1px solid var(--border);
+      box-shadow: var(--elev-raised);
+    }
+
+    .drawer header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: start;
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-warm);
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+    }
+
+    .field span,
+    .caps-label {
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 510;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+    }
+
+    .field input,
+    .field select {
+      width: 100%;
+      min-height: 38px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 0 10px;
+      color: inherit;
+      background: var(--bg);
+      outline: none;
+    }
+
+    .drawer-link-list {
+      display: grid;
+      gap: 8px;
+    }
+
+    .drawer-link-row {
+      min-width: 0;
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 9px;
+      padding: 9px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      background: var(--surface-warm);
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: 18px;
+      z-index: 30;
+      max-width: min(520px, calc(100vw - 28px));
+      display: none;
+      transform: translateX(-50%);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-pill);
+      padding: 9px 14px;
+      color: var(--fg);
+      background: color-mix(in oklab, var(--success), var(--surface) 78%);
+      box-shadow: var(--elev-raised);
+      font-size: var(--text-sm);
+    }
+
+    .toast.is-visible {
+      display: block;
+    }
+
+    @media (max-width: 1080px) {
+      .topbar,
+      .workspace-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .topbar {
+        align-items: stretch;
+      }
+
+      .header-actions {
+        justify-content: flex-start;
+      }
+
+      .quick-link-grid {
+        grid-template-columns: repeat(4, minmax(90px, 1fr));
+      }
+    }
+
+    @media (max-width: 620px) {
+      .page-shell {
+        padding: 12px;
+      }
+
+      .quick-link-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+      }
+
+      .tab-row,
+      .session-card header,
+      .drawer-link-row {
+        grid-template-columns: auto minmax(0, 1fr);
+      }
+
+      .row-actions,
+      .session-card header > .row-actions,
+      .drawer-link-row > .row-actions {
+        grid-column: 1 / -1;
+        justify-content: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <main class="page-shell" data-od-id="newtab-shell">
+    <header class="topbar" data-od-id="topbar">
+      <div class="brand-lockup" data-od-id="brand-lockup">
+        <div class="mark" aria-hidden="true">T</div>
+        <div>
+          <h1 data-od-id="page-title">Tabstow</h1>
+          <p class="subtle">Stow, organize, and restore your browser tabs.</p>
+        </div>
+      </div>
+      <label class="search" data-od-id="dashboard-search">
+        <span aria-hidden="true">Search</span>
+        <input id="global-search" type="search" placeholder="Search open and stowed tabs" />
+        <span class="kbd">/</span>
+      </label>
+      <div class="header-actions" data-od-id="topbar-actions">
+        <button class="secondary-button" type="button" id="theme-toggle-button" data-od-id="theme-toggle-button" aria-pressed="false" aria-label="Switch to light mode">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4"></circle>
+            <path d="M12 2v2"></path>
+            <path d="M12 20v2"></path>
+            <path d="m4.93 4.93 1.41 1.41"></path>
+            <path d="m17.66 17.66 1.41 1.41"></path>
+            <path d="M2 12h2"></path>
+            <path d="M20 12h2"></path>
+            <path d="m6.34 17.66-1.41 1.41"></path>
+            <path d="m19.07 4.93-1.41 1.41"></path>
+          </svg>
+          <span>Light</span>
+        </button>
+        <button class="secondary-button" type="button" id="settings-button" data-od-id="settings-button">Settings</button>
+        <button class="secondary-button" type="button" id="sync-button" hidden aria-hidden="true" style="display: none;">Pull sync</button>
+        <button class="primary-button" type="button" id="stow-window-button">Stow current window</button>
+      </div>
+    </header>
+
+    <section class="panel quick-links-panel" aria-labelledby="quick-links-title" data-od-id="quick-links-section">
+      <div class="section-header">
+        <div>
+          <h2 id="quick-links-title" data-od-id="quick-links-title">Quick links</h2>
+          <p class="subtle">Custom web icons stay one click away at the top of the new tab page.</p>
+        </div>
+        <div class="header-actions" data-od-id="quick-link-header-actions">
+          <button class="icon-button" type="button" id="add-quick-link-button" data-od-id="add-quick-link-button" aria-label="Add quick link" onclick="openDrawer()">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14"></path>
+              <path d="M5 12h14"></path>
+            </svg>
+          </button>
+          <button class="secondary-button" type="button" id="customize-links-button" data-od-id="customize-links-button">Customize</button>
+        </div>
+      </div>
+      <div class="quick-link-grid" id="quick-link-grid" data-od-id="quick-link-grid"></div>
+    </section>
+
+    <section class="workspace-grid" aria-label="Tab workspace" data-od-id="workspace-grid">
+      <section class="panel column" aria-labelledby="active-tabs-title" data-od-id="active-tabs-column">
+        <div class="section-header">
+          <div>
+            <h2 id="active-tabs-title" data-od-id="active-tabs-title">Active tabs</h2>
+            <p class="subtle">Equivalent to open Chrome tabs, grouped by domain or manual workspace.</p>
+          </div>
+          <span class="meta-pill" id="active-count" data-od-id="active-tabs-count">0 open</span>
+        </div>
+        <div class="tabs-toolbar" id="group-filters" aria-label="Active tab group filters" data-od-id="group-filters"></div>
+        <div class="meta-row" data-od-id="active-actions">
+          <button class="secondary-button" type="button" id="close-duplicates-button">Close duplicates</button>
+          <button class="secondary-button" type="button" id="collapse-groups-button">Collapse Chrome groups</button>
+        </div>
+        <div class="tab-groups" id="active-groups" data-od-id="active-groups"></div>
+      </section>
+
+      <section class="panel column" aria-labelledby="saved-title" data-od-id="saved-tabs-column">
+        <div class="section-header">
+          <div>
+            <h2 id="saved-title" data-od-id="saved-tabs-title">Saved for later</h2>
+            <p class="subtle">Durable stowed sessions sorted newest first. Restoring keeps the saved copy.</p>
+          </div>
+          <span class="meta-row" id="saved-count" data-od-id="saved-tabs-count" aria-label="Saved sessions and tabs count" style="flex-wrap: nowrap; justify-content: flex-end;">
+            <span class="meta-pill" style="white-space: nowrap;">0 sessions</span>
+            <span class="meta-pill" style="white-space: nowrap;">0 tabs</span>
+          </span>
+        </div>
+        <div class="session-toolbar" data-od-id="saved-actions">
+          <button class="secondary-button" type="button" id="push-button">Push</button>
+          <button class="secondary-button" type="button" id="pull-button" aria-label="Pull saved sessions from Gist; synced" title="Synced from Gist">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 3v11"></path>
+              <path d="m7 10 5 5 5-5"></path>
+              <path d="M5 19h14"></path>
+            </svg>
+            <span>Pull</span>
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--success)" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6 9 17l-5-5"></path>
+            </svg>
+          </button>
+        </div>
+        <div class="session-list" id="saved-sessions" data-od-id="saved-sessions"></div>
+      </section>
+    </section>
+  </main>
+
+  <aside class="drawer-backdrop" id="quick-link-drawer" aria-hidden="true" data-od-id="quick-link-drawer">
+    <div class="drawer" role="dialog" aria-modal="true" aria-labelledby="drawer-title">
+      <header>
+        <div>
+          <h2 id="drawer-title" data-od-id="drawer-title">Customize quick links</h2>
+          <p class="subtle">Use http or https URLs. Blank labels fall back to the hostname.</p>
+        </div>
+        <button class="icon-button" type="button" id="close-drawer-button" aria-label="Close customization">x</button>
+      </header>
+
+      <form class="form-grid" id="quick-link-form" data-od-id="quick-link-form">
+        <input type="hidden" id="editing-link-id" />
+        <label class="field">
+          <span>Current link</span>
+          <select id="current-link-selector" data-od-id="current-link-selector">
+            <option value="">New quick link</option>
+          </select>
+        </label>
+        <label class="field">
+          <span>URL</span>
+          <input id="quick-link-url" type="url" placeholder="https://example.com" required />
+        </label>
+        <label class="field">
+          <span>Label</span>
+          <input id="quick-link-label" type="text" placeholder="Auto from hostname" />
+        </label>
+        <label class="field">
+          <span>Icon text</span>
+          <input id="quick-link-icon" type="text" placeholder="A" maxlength="3" />
+        </label>
+        <label class="field">
+          <span>Tone</span>
+          <select id="quick-link-tone">
+            <option value="blue">Blue</option>
+            <option value="green">Green</option>
+            <option value="red">Red</option>
+            <option value="gold">Gold</option>
+            <option value="slate">Slate</option>
+          </select>
+        </label>
+        <div class="row-actions">
+          <button class="primary-button" type="submit" id="save-quick-link-button">Save quick link</button>
+          <button class="secondary-button" type="button" id="reset-form-button">Clear</button>
+        </div>
+      </form>
+
+      <div>
+        <p class="caps-label">Current links</p>
+        <div class="drawer-link-list" id="drawer-link-list" data-od-id="drawer-link-list"></div>
+      </div>
+    </div>
+  </aside>
+
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const state = {
+      search: "",
+      groupFilter: "all",
+      quickLinks: [
+        { id: "mail", label: "Gmail", url: "https://mail.google.com", icon: "G", tone: "red" },
+        { id: "github", label: "GitHub", url: "https://github.com", icon: "GH", tone: "slate" },
+        { id: "docs", label: "Docs", url: "https://docs.google.com", icon: "D", tone: "blue" },
+        { id: "linear", label: "Linear", url: "https://linear.app", icon: "L", tone: "green" },
+        { id: "calendar", label: "Calendar", url: "https://calendar.google.com", icon: "C", tone: "gold" },
+        { id: "figma", label: "Figma", url: "https://figma.com", icon: "F", tone: "red" },
+        { id: "x", label: "X Home", url: "https://x.com/home", icon: "X", tone: "slate" },
+        { id: "news", label: "News", url: "https://news.ycombinator.com", icon: "HN", tone: "gold" }
+      ],
+      activeGroups: [
+        {
+          key: "manual:launch",
+          title: "Launch review",
+          kind: "manual",
+          tabs: [
+            { id: 101, title: "Tabstow MVP plan", url: "github.com/zrx/tabstow/docs", icon: "TS", tone: "blue", pinned: true },
+            { id: 102, title: "Chrome Web Store Dashboard", url: "chrome.google.com/webstore/devconsole", icon: "CW", tone: "green" },
+            { id: 103, title: "Manifest V3 tabs API", url: "developer.chrome.com/docs/extensions/reference/api/tabs", icon: "MV", tone: "slate" }
+          ]
+        },
+        {
+          key: "domain:github.com",
+          title: "GitHub",
+          kind: "domain",
+          tabs: [
+            { id: 201, title: "Pull request: active tabs grouping", url: "github.com/zrx/tabstow/pull/18", icon: "GH", tone: "slate" },
+            { id: 202, title: "Issue: quick link image token cache", url: "github.com/zrx/tabstow/issues/24", icon: "GH", tone: "slate" },
+            { id: 203, title: "Pull request: active tabs grouping", url: "github.com/zrx/tabstow/pull/18", icon: "GH", tone: "slate", duplicate: true }
+          ]
+        },
+        {
+          key: "landing:homepages",
+          title: "Homepages",
+          kind: "landing",
+          tabs: [
+            { id: 301, title: "Gmail", url: "mail.google.com", icon: "G", tone: "red" },
+            { id: 302, title: "X Home", url: "x.com/home", icon: "X", tone: "slate" }
+          ]
+        }
+      ],
+      savedSessions: [
+        {
+          id: "s1",
+          title: "8 tabs stowed",
+          createdAt: "Today, 9:42 AM",
+          source: "MacBook Pro",
+          tabs: ["Dexie docs", "WXT storage", "Chrome tabGroups", "i18n test matrix", "Release checklist", "Gist sync", "Manifest V3 tabs API", "Quick link image cache"]
+        },
+        {
+          id: "s2",
+          title: "Design references",
+          createdAt: "Yesterday, 4:16 PM",
+          source: "Office desktop",
+          tabs: ["Sentry issue page", "GitHub dashboard", "Arc spaces", "Notion home"]
+        },
+        {
+          id: "s3",
+          title: "1 tab",
+          createdAt: "Mon, 11:08 AM",
+          source: "MacBook Pro",
+          tabs: ["Chrome extension icon guidelines"]
+        }
+      ]
+    };
+
+    const els = {
+      search: document.getElementById("global-search"),
+      quickGrid: document.getElementById("quick-link-grid"),
+      drawer: document.getElementById("quick-link-drawer"),
+      drawerList: document.getElementById("drawer-link-list"),
+      form: document.getElementById("quick-link-form"),
+      linkSelector: document.getElementById("current-link-selector"),
+      editId: document.getElementById("editing-link-id"),
+      url: document.getElementById("quick-link-url"),
+      label: document.getElementById("quick-link-label"),
+      icon: document.getElementById("quick-link-icon"),
+      tone: document.getElementById("quick-link-tone"),
+      groupFilters: document.getElementById("group-filters"),
+      activeGroups: document.getElementById("active-groups"),
+      savedSessions: document.getElementById("saved-sessions"),
+      activeCount: document.getElementById("active-count"),
+      savedCount: document.getElementById("saved-count"),
+      themeToggle: document.getElementById("theme-toggle-button"),
+      toast: document.getElementById("toast")
+    };
+
+    const THEME_KEY = "tabstow:theme";
+
+    function escapeHtml(value) {
+      return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+    }
+
+    function hostname(value) {
+      try {
+        return new URL(value.startsWith("http") ? value : `https://${value}`).hostname.replace(/^www\./, "");
+      } catch {
+        return value;
+      }
+    }
+
+    function isValidHttpUrl(value) {
+      try {
+        const parsed = new URL(value);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch {
+        return false;
+      }
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("is-visible");
+      window.clearTimeout(showToast.timer);
+      showToast.timer = window.setTimeout(() => els.toast.classList.remove("is-visible"), 2400);
+    }
+
+    function closestFromEvent(event, selector) {
+      return event.target instanceof Element ? event.target.closest(selector) : null;
+    }
+
+    function getStoredTheme() {
+      try {
+        return localStorage.getItem(THEME_KEY) === "light" ? "light" : "dark";
+      } catch {
+        return "dark";
+      }
+    }
+
+    function themeButtonMarkup(theme) {
+      if (theme === "light") {
+        return `
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M12 3a7 7 0 1 0 9 9 9 9 0 0 1-9-9Z"></path>
+          </svg>
+          <span>Dark</span>
+        `;
+      }
+      return `
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="4"></circle>
+          <path d="M12 2v2"></path>
+          <path d="M12 20v2"></path>
+          <path d="m4.93 4.93 1.41 1.41"></path>
+          <path d="m17.66 17.66 1.41 1.41"></path>
+          <path d="M2 12h2"></path>
+          <path d="M20 12h2"></path>
+          <path d="m6.34 17.66-1.41 1.41"></path>
+          <path d="m19.07 4.93-1.41 1.41"></path>
+        </svg>
+        <span>Light</span>
+      `;
+    }
+
+    function applyTheme(theme) {
+      const nextTheme = theme === "light" ? "light" : "dark";
+      document.documentElement.dataset.theme = nextTheme;
+      els.themeToggle.innerHTML = themeButtonMarkup(nextTheme);
+      els.themeToggle.setAttribute("aria-pressed", String(nextTheme === "light"));
+      els.themeToggle.setAttribute("aria-label", `Switch to ${nextTheme === "light" ? "dark" : "light"} mode`);
+      try {
+        localStorage.setItem(THEME_KEY, nextTheme);
+      } catch {}
+    }
+
+    function allActiveTabs() {
+      return state.activeGroups.flatMap((group) => group.tabs.map((tab) => ({ ...tab, groupTitle: group.title })));
+    }
+
+    function savedTabDetails(tab, session, index) {
+      const title = typeof tab === "string" ? tab : tab.title;
+      const words = String(title).match(/[A-Za-z0-9]+/g) || ["T"];
+      const icon = typeof tab === "string" ? words.slice(0, 2).map((word) => word[0]).join("").toUpperCase() : tab.icon;
+      const tones = ["blue", "slate", "green", "gold", "red"];
+      return {
+        title,
+        icon: icon.slice(0, 3),
+        tone: typeof tab === "string" ? tones[index % tones.length] : tab.tone,
+        url: typeof tab === "string" ? `${session.source} · saved copy` : tab.url
+      };
+    }
+
+    function removeActiveTab(tabId) {
+      for (const group of state.activeGroups) {
+        group.tabs = group.tabs.filter((tab) => tab.id !== tabId);
+      }
+      state.activeGroups = state.activeGroups.filter((group) => group.tabs.length > 0);
+    }
+
+    function matchesSearch(values) {
+      const query = state.search.trim().toLowerCase();
+      if (!query) return true;
+      return values.some((value) => String(value).toLowerCase().includes(query));
+    }
+
+    function renderQuickLinks() {
+      els.quickGrid.innerHTML = state.quickLinks.map((link, index) => `
+        <a class="quick-link-card" href="${escapeHtml(link.url)}" target="_blank" rel="noreferrer" data-od-id="quick-link-${escapeHtml(link.id)}">
+          <span class="favicon tone-${escapeHtml(link.tone)}" aria-hidden="true">${escapeHtml(link.icon || link.label.slice(0, 1))}</span>
+          <span class="quick-link-label">${escapeHtml(link.label)}</span>
+        </a>
+      `).join("");
+      renderCurrentLinkSelector();
+      renderDrawerList();
+    }
+
+    function renderCurrentLinkSelector() {
+      const selected = els.linkSelector.value || els.editId.value;
+      els.linkSelector.innerHTML = `
+        <option value="">New quick link</option>
+        ${state.quickLinks.map((link) => `
+          <option value="${escapeHtml(link.id)}">${escapeHtml(link.label)} · ${escapeHtml(hostname(link.url))}</option>
+        `).join("")}
+      `;
+      els.linkSelector.value = state.quickLinks.some((link) => link.id === selected) ? selected : "";
+    }
+
+    function loadLinkIntoForm(link) {
+      els.editId.value = link.id;
+      els.linkSelector.value = link.id;
+      els.url.value = link.url;
+      els.label.value = link.label;
+      els.icon.value = link.icon;
+      els.tone.value = link.tone;
+      document.getElementById("save-quick-link-button").textContent = "Update quick link";
+    }
+
+    function renderDrawerList() {
+      els.drawerList.innerHTML = state.quickLinks.map((link, index) => `
+        <div class="drawer-link-row" data-od-id="drawer-link-${escapeHtml(link.id)}">
+          <span class="favicon tone-${escapeHtml(link.tone)}" aria-hidden="true">${escapeHtml(link.icon || link.label.slice(0, 1))}</span>
+          <div class="tab-copy">
+            <span class="tab-title">${escapeHtml(link.label)}</span>
+            <span class="tab-url">${escapeHtml(hostname(link.url))}</span>
+          </div>
+          <div class="row-actions">
+            <button class="icon-button" type="button" data-action="move-link-up" data-id="${escapeHtml(link.id)}" ${index === 0 ? "disabled" : ""} aria-label="Move ${escapeHtml(link.label)} up">Up</button>
+            <button class="icon-button" type="button" data-action="move-link-down" data-id="${escapeHtml(link.id)}" ${index === state.quickLinks.length - 1 ? "disabled" : ""} aria-label="Move ${escapeHtml(link.label)} down">Dn</button>
+            <button class="secondary-button" type="button" data-action="edit-link" data-id="${escapeHtml(link.id)}">Edit</button>
+            <button class="danger-button" type="button" data-action="remove-link" data-id="${escapeHtml(link.id)}">Remove</button>
+          </div>
+        </div>
+      `).join("");
+    }
+
+    function renderGroupFilters() {
+      const groups = [{ key: "all", title: "All", count: allActiveTabs().length }, ...state.activeGroups.map((group) => ({ key: group.key, title: group.title, count: group.tabs.length }))];
+      els.groupFilters.innerHTML = groups.map((group) => `
+        <button class="group-filter" type="button" data-filter="${escapeHtml(group.key)}" aria-pressed="${state.groupFilter === group.key}">
+          <span>${escapeHtml(group.title)}</span>
+          <strong>${group.count}</strong>
+        </button>
+      `).join("");
+    }
+
+    function renderActiveTabs() {
+      const visibleGroups = state.activeGroups
+        .filter((group) => state.groupFilter === "all" || state.groupFilter === group.key)
+        .map((group) => ({
+          ...group,
+          tabs: group.tabs.filter((tab) => matchesSearch([tab.title, tab.url, group.title]))
+        }))
+        .filter((group) => group.tabs.length > 0);
+
+      const total = allActiveTabs().length;
+      els.activeCount.textContent = `${total} open`;
+
+      if (visibleGroups.length === 0) {
+        els.activeGroups.innerHTML = `<div class="empty-state" data-od-id="active-empty">No matching active tabs.</div>`;
+        return;
+      }
+
+      els.activeGroups.innerHTML = visibleGroups.map((group) => `
+        <article class="tab-group" data-od-id="active-group-${escapeHtml(group.key.replace(/[^a-z0-9]/gi, "-").toLowerCase())}">
+          <header>
+            <div>
+              <h3>${escapeHtml(group.title)}</h3>
+              <p class="subtle">${group.kind === "manual" ? "Manual group" : group.kind === "landing" ? "Homepage bucket" : "Domain group"}</p>
+            </div>
+            <button class="icon-button" type="button" data-action="close-group" data-key="${escapeHtml(group.key)}" aria-label="Close ${escapeHtml(group.title)} tabs">x</button>
+          </header>
+          <div class="tab-list">
+            ${group.tabs.map((tab) => `
+              <div class="tab-row" data-od-id="active-tab-${tab.id}">
+                <button class="tab-open-button" type="button" data-action="focus-tab" data-id="${tab.id}" aria-label="Focus ${escapeHtml(tab.title)}">
+                  <span class="favicon tone-${escapeHtml(tab.tone)}" aria-hidden="true">${escapeHtml(tab.icon)}</span>
+                  <span class="tab-copy">
+                    <span class="tab-title">${escapeHtml(tab.title)}</span>
+                    <span class="tab-url">${escapeHtml(tab.url)}${tab.pinned ? " · pinned" : ""}${tab.duplicate ? " · duplicate" : ""}</span>
+                  </span>
+                </button>
+                <div class="row-actions">
+                  <button class="icon-button" type="button" data-action="save-tab" data-id="${tab.id}" aria-label="Save ${escapeHtml(tab.title)} for later">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                      <rect x="3" y="3" width="18" height="5" rx="1"></rect>
+                      <path d="M5 8v11a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8"></path>
+                      <path d="M10 12h4"></path>
+                    </svg>
+                  </button>
+                  <button class="icon-button" type="button" data-action="close-tab" data-id="${tab.id}" aria-label="Close ${escapeHtml(tab.title)}">x</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function renderSavedSessions() {
+      const visible = state.savedSessions.filter((session) => matchesSearch([session.title, session.source, session.tabs.join(" ")]));
+      const tabCount = state.savedSessions.reduce((count, session) => count + session.tabs.length, 0);
+      els.savedCount.innerHTML = `
+        <span class="meta-pill" style="white-space: nowrap;">${state.savedSessions.length} sessions</span>
+        <span class="meta-pill" style="white-space: nowrap;">${tabCount} tabs</span>
+      `;
+
+      if (visible.length === 0) {
+        els.savedSessions.innerHTML = `<div class="empty-state" data-od-id="saved-empty">No saved sessions match this search.</div>`;
+        return;
+      }
+
+      els.savedSessions.innerHTML = visible.map((session) => `
+        <article class="session-card" data-od-id="saved-session-${escapeHtml(session.id)}">
+          <header>
+            <div class="tab-copy">
+              <span class="session-title">${escapeHtml(session.title)}</span>
+              <span class="session-preview">${escapeHtml(session.createdAt)} · ${session.tabs.length} ${session.tabs.length === 1 ? "tab" : "tabs"} · ${escapeHtml(session.source)}</span>
+            </div>
+            <div class="row-actions">
+              <button class="secondary-button" type="button" data-action="restore-session" data-id="${escapeHtml(session.id)}">Restore</button>
+              <button class="danger-button" type="button" data-action="delete-session" data-id="${escapeHtml(session.id)}">Delete</button>
+            </div>
+          </header>
+          <ol class="session-tab-list" aria-label="Tabs in ${escapeHtml(session.title)}">
+            ${session.tabs.map((tab, index) => {
+              const item = savedTabDetails(tab, session, index);
+              return `
+              <li class="session-tab-row tab-row" data-od-id="saved-session-${escapeHtml(session.id)}-tab-${index + 1}">
+                <button class="tab-open-button" type="button" data-action="open-saved-tab" data-session-id="${escapeHtml(session.id)}" data-tab-index="${index}" data-title="${escapeHtml(item.title)}" aria-label="Open ${escapeHtml(item.title)}">
+                  <span class="favicon tone-${escapeHtml(item.tone)}" aria-hidden="true">${escapeHtml(item.icon)}</span>
+                  <span class="tab-copy">
+                    <span class="tab-title">${escapeHtml(item.title)}</span>
+                    <span class="tab-url">${escapeHtml(item.url)}</span>
+                  </span>
+                </button>
+              </li>
+            `;
+            }).join("")}
+          </ol>
+        </article>
+      `).join("");
+    }
+
+    function renderAll() {
+      renderQuickLinks();
+      renderGroupFilters();
+      renderActiveTabs();
+      renderSavedSessions();
+    }
+
+    function openDrawer() {
+      els.drawer.classList.add("is-open");
+      els.drawer.setAttribute("aria-hidden", "false");
+      els.url.focus();
+    }
+
+    function closeDrawer() {
+      els.drawer.classList.remove("is-open");
+      els.drawer.setAttribute("aria-hidden", "true");
+      resetForm();
+    }
+
+    function resetForm() {
+      els.editId.value = "";
+      els.url.value = "";
+      els.label.value = "";
+      els.icon.value = "";
+      els.tone.value = "blue";
+      els.linkSelector.value = "";
+      document.getElementById("save-quick-link-button").textContent = "Save quick link";
+    }
+
+    function saveTabForLater(tabId) {
+      const tab = allActiveTabs().find((item) => item.id === tabId);
+      if (!tab) return;
+      state.savedSessions.unshift({
+        id: `saved-${Date.now()}`,
+        title: tab.title,
+        createdAt: "Just now",
+        source: "Current window",
+        tabs: [tab.title]
+      });
+      removeActiveTab(tabId);
+      state.groupFilter = "all";
+      renderAll();
+      showToast(`Saved "${tab.title}" for later.`);
+    }
+
+    function restoreSession(sessionId) {
+      const session = state.savedSessions.find((item) => item.id === sessionId);
+      if (!session) return;
+      state.activeGroups.unshift({
+        key: `manual:restored-${Date.now()}`,
+        title: "Restored session",
+        kind: "manual",
+        tabs: session.tabs.map((title, index) => ({
+          id: Date.now() + index,
+          title,
+          url: hostname(title).includes(".") ? hostname(title) : "restored.tab",
+          icon: title.slice(0, 2).toUpperCase(),
+          tone: "blue"
+        }))
+      });
+      state.groupFilter = "all";
+      renderAll();
+      showToast(`Restored ${session.tabs.length} ${session.tabs.length === 1 ? "tab" : "tabs"} into the current window.`);
+    }
+
+    document.getElementById("customize-links-button").addEventListener("click", openDrawer);
+    document.getElementById("close-drawer-button").addEventListener("click", closeDrawer);
+    document.getElementById("reset-form-button").addEventListener("click", resetForm);
+    els.linkSelector.addEventListener("change", () => {
+      const link = state.quickLinks.find((item) => item.id === els.linkSelector.value);
+      if (link) loadLinkIntoForm(link);
+      else resetForm();
+    });
+
+    els.drawer.addEventListener("click", (event) => {
+      if (event.target === els.drawer) closeDrawer();
+    });
+
+    els.search.addEventListener("input", (event) => {
+      state.search = event.target.value;
+      renderActiveTabs();
+      renderSavedSessions();
+    });
+
+    document.addEventListener("keydown", (event) => {
+      const target = event.target;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable)) return;
+      if (event.key === "/") {
+        event.preventDefault();
+        els.search.focus();
+      }
+      if (event.key === "Escape" && els.drawer.classList.contains("is-open")) {
+        closeDrawer();
+      }
+    });
+
+    els.groupFilters.addEventListener("click", (event) => {
+      const button = closestFromEvent(event, "[data-filter]");
+      if (!button) return;
+      state.groupFilter = button.dataset.filter;
+      renderGroupFilters();
+      renderActiveTabs();
+    });
+
+    els.activeGroups.addEventListener("click", (event) => {
+      const button = closestFromEvent(event, "[data-action]");
+      if (!button) return;
+      const action = button.dataset.action;
+      const id = Number(button.dataset.id);
+      if (action === "save-tab") saveTabForLater(id);
+      if (action === "focus-tab") showToast("Focused the selected tab.");
+      if (action === "close-tab") {
+        removeActiveTab(id);
+        renderAll();
+        showToast("Closed tab.");
+      }
+      if (action === "close-group") {
+        state.activeGroups = state.activeGroups.filter((group) => group.key !== button.dataset.key);
+        state.groupFilter = "all";
+        renderAll();
+        showToast("Closed group.");
+      }
+    });
+
+    els.savedSessions.addEventListener("click", (event) => {
+      const button = closestFromEvent(event, "[data-action]");
+      if (!button) return;
+      if (button.dataset.action === "open-saved-tab") showToast(`Opened ${button.dataset.title}.`);
+      if (button.dataset.action === "restore-session") restoreSession(button.dataset.id);
+      if (button.dataset.action === "delete-session") {
+        state.savedSessions = state.savedSessions.filter((session) => session.id !== button.dataset.id);
+        renderAll();
+        showToast("Deleted saved session.");
+      }
+    });
+
+    els.drawerList.addEventListener("click", (event) => {
+      const button = closestFromEvent(event, "[data-action]");
+      if (!button) return;
+      const id = button.dataset.id;
+      const index = state.quickLinks.findIndex((link) => link.id === id);
+      const link = state.quickLinks[index];
+      if (!link) return;
+      if (button.dataset.action === "edit-link") {
+        loadLinkIntoForm(link);
+      }
+      if (button.dataset.action === "remove-link") {
+        if (els.editId.value === id) resetForm();
+        state.quickLinks = state.quickLinks.filter((item) => item.id !== id);
+        renderQuickLinks();
+        showToast("Removed quick link.");
+      }
+      if (button.dataset.action === "move-link-up" && index > 0) {
+        [state.quickLinks[index - 1], state.quickLinks[index]] = [state.quickLinks[index], state.quickLinks[index - 1]];
+        renderQuickLinks();
+      }
+      if (button.dataset.action === "move-link-down" && index < state.quickLinks.length - 1) {
+        [state.quickLinks[index + 1], state.quickLinks[index]] = [state.quickLinks[index], state.quickLinks[index + 1]];
+        renderQuickLinks();
+      }
+    });
+
+    els.form.addEventListener("submit", (event) => {
+      event.preventDefault();
+      const rawUrl = els.url.value.trim();
+      if (!isValidHttpUrl(rawUrl)) {
+        showToast("Quick link URL is invalid.");
+        return;
+      }
+      const next = {
+        id: els.editId.value || `link-${Date.now()}`,
+        url: new URL(rawUrl).toString(),
+        label: els.label.value.trim() || hostname(rawUrl),
+        icon: (els.icon.value.trim() || hostname(rawUrl).slice(0, 1)).toUpperCase(),
+        tone: els.tone.value
+      };
+      const existingIndex = state.quickLinks.findIndex((link) => link.id === next.id);
+      if (existingIndex >= 0) {
+        state.quickLinks[existingIndex] = next;
+        showToast("Updated quick link.");
+      } else {
+        state.quickLinks.push(next);
+        showToast("Added quick link.");
+      }
+      resetForm();
+      renderQuickLinks();
+    });
+
+    document.getElementById("stow-window-button").addEventListener("click", () => {
+      const tabs = allActiveTabs();
+      if (tabs.length === 0) {
+        showToast("No eligible tabs were found in the current window.");
+        return;
+      }
+      state.savedSessions.unshift({
+        id: `window-${Date.now()}`,
+        title: `${tabs.length} tabs stowed`,
+        createdAt: "Just now",
+        source: "Current window",
+        tabs: tabs.map((tab) => tab.title)
+      });
+      state.activeGroups = [];
+      state.groupFilter = "all";
+      renderAll();
+      showToast(`Stowed ${tabs.length} tabs and closed ${tabs.length}.`);
+    });
+
+    document.getElementById("close-duplicates-button").addEventListener("click", () => {
+      const duplicates = allActiveTabs().filter((tab) => tab.duplicate);
+      duplicates.forEach((tab) => removeActiveTab(tab.id));
+      renderAll();
+      showToast(duplicates.length ? `Closed ${duplicates.length} duplicate tab.` : "No duplicates found.");
+    });
+
+    document.getElementById("collapse-groups-button").addEventListener("click", () => showToast("Collapsed Chrome tab groups."));
+    document.getElementById("sync-button").addEventListener("click", () => showToast("Pulled latest sessions from Gist."));
+    document.getElementById("push-button").addEventListener("click", () => showToast("Pushed saved sessions to Gist."));
+    document.getElementById("pull-button").addEventListener("click", () => showToast("Pulled saved sessions from Gist."));
+    document.getElementById("settings-button").addEventListener("click", () => showToast("Opened Tabstow settings."));
+    els.themeToggle.addEventListener("click", () => {
+      applyTheme(document.documentElement.dataset.theme === "light" ? "dark" : "light");
+    });
+
+    applyTheme(getStoredTheme());
+    renderAll();
+  </script>
+</body>
+</html>
