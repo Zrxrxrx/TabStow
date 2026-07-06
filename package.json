@@ -1,0 +1,20 @@
+{
+  "name": "tabstow",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun --cwd apps/extension run dev",
+    "build": "bun --cwd packages/core run build && bun --cwd apps/extension run build",
+    "zip": "bun --cwd apps/extension run zip",
+    "typecheck": "bun --cwd packages/core run typecheck && bun --cwd apps/extension run typecheck",
+    "test": "bun --cwd packages/core run test && bun --cwd apps/extension run test"
+  },
+  "devDependencies": {
+    "typescript": "latest",
+    "vitest": "latest"
+  }
+}

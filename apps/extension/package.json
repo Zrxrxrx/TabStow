@@ -1,0 +1,29 @@
+{
+  "name": "@tabstow/extension",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build -b chrome",
+    "zip": "wxt zip -b chrome",
+    "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
+    "test": "vitest run",
+    "postinstall": "wxt prepare"
+  },
+  "dependencies": {
+    "@tabstow/core": "workspace:*",
+    "@wxt-dev/module-react": "latest",
+    "dexie": "latest",
+    "lucide-react": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "wxt": "latest"
+  },
+  "devDependencies": {
+    "@types/chrome": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "jsdom": "latest"
+  }
+}

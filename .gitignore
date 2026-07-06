@@ -1,0 +1,12 @@
+node_modules/
+bun.lockb
+.DS_Store
+.env
+.env.*
+!.env.example
+
+apps/extension/.output/
+apps/extension/.wxt/
+apps/extension/dist/
+packages/core/dist/
+coverage/
