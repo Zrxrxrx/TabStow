@@ -81,7 +81,7 @@ export function ThemeControls() {
     setTheme(next);
     applyTheme(next, backgroundUrl ?? null);
     if (previousToken && previousToken !== next.customBackground) {
-      await deleteCustomBackground(previousToken);
+      void deleteCustomBackground(previousToken).catch(() => undefined);
     }
     setErrorMessage(null);
   }

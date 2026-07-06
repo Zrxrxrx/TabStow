@@ -410,6 +410,44 @@ describe('App', () => {
     expect(screen().getByRole('alert').textContent).toBe('Custom background image is too large to save.');
   });
 
+  it('keeps a successful new background upload when old background cleanup fails', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getThemePreferences.mockResolvedValue({
+      mode: 'system',
+      paletteId: 'paper',
+      surfaceOpacity: 92,
+      customBackground: 'theme-bg:old-token',
+    });
+    resolveCustomBackgroundUrl
+      .mockResolvedValueOnce('blob:old-token')
+      .mockResolvedValueOnce('blob:new-token');
+    saveCustomBackgroundFile.mockResolvedValue('theme-bg:new-token');
+    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
+      mode: 'system',
+      paletteId: 'paper',
+      surfaceOpacity: 92,
+      customBackground: (preferences as { customBackground: string }).customBackground,
+    }));
+    deleteCustomBackground.mockImplementation(async (token: string | null | undefined) => {
+      if (token === 'theme-bg:old-token') throw new Error('cache delete failed');
+    });
+
+    await renderApp();
+    const backgroundInput = screen().getByLabelText('Custom background');
+    const upload = new File(['replacement-background'], 'replacement.png', { type: 'image/png' });
+
+    await uploadFile(backgroundInput, upload);
+
+    expect(saveThemePreferences).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customBackground: 'theme-bg:new-token',
+      }),
+    );
+    expect(deleteCustomBackground).toHaveBeenCalledWith('theme-bg:old-token');
+    expect(deleteCustomBackground).not.toHaveBeenCalledWith('theme-bg:new-token');
+    expect(() => screen().getByRole('alert')).toThrow();
+  });
+
   it('closes duplicate tabs from the active workspace action', async () => {
     mockMessages({ activeTabs: DUPLICATE_TABS });
 
