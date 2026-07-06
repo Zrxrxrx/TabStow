@@ -273,6 +273,29 @@ describe('App', () => {
     expect(saveQuickLinks).toHaveBeenLastCalledWith([]);
   });
 
+  it('keeps current quick links when manual quick-link input is invalid', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+    promptSpy
+      .mockReturnValueOnce('notaurl')
+      .mockReturnValueOnce('Broken');
+
+    await renderApp();
+    await click(screen().getByLabelText('Add quick link'));
+
+    expect(saveQuickLinks).not.toHaveBeenCalled();
+    expect(screen().getByText('Example')).not.toBeNull();
+    expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
+  });
+
   it('updates theme controls and todo actions from the utility panels', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getTodos.mockResolvedValue([
@@ -323,6 +346,18 @@ describe('App', () => {
       expect.objectContaining({ id: 'todo-1', dismissed: false }),
       expect.objectContaining({ id: 'todo-2', dismissed: true }),
     ]);
+  });
+
+  it('rejects oversized custom background uploads before saving theme preferences', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    await renderApp();
+    const backgroundInput = screen().getByLabelText('Custom background');
+    const oversizedFile = new File(['a'.repeat(129 * 1024)], 'wallpaper.png', { type: 'image/png' });
+
+    await uploadFile(backgroundInput, oversizedFile);
+
+    expect(saveThemePreferences).not.toHaveBeenCalled();
+    expect(screen().getByRole('alert').textContent).toBe('Custom background image is too large to save.');
   });
 
   it('closes duplicate tabs from the active workspace action', async () => {
@@ -759,6 +794,19 @@ async function change(element: HTMLElement, value: string) {
   });
 }
 
+async function uploadFile(element: HTMLElement, file: File) {
+  await act(async () => {
+    if (!(element instanceof HTMLInputElement)) {
+      throw new Error('Expected file input.');
+    }
+    Object.defineProperty(element, 'files', {
+      configurable: true,
+      value: [file],
+    });
+    element.dispatchEvent(new Event('change', { bubbles: true }));
+  });
+}
+
 function sentMessageTypes() {
   return sendExtensionMessage.mock.calls.map((call) => (call[0] as { type: string }).type);
 }
@@ -773,6 +821,7 @@ function screen() {
       const elements = Array.from(container.querySelectorAll<HTMLElement>('*')).filter((element) => {
         if (role === 'button') return element.tagName === 'BUTTON';
         if (role === 'heading') return /^H[1-6]$/.test(element.tagName);
+        if (role === 'alert') return element.getAttribute('role') === 'alert';
         return element.getAttribute('role') === role;
       });
       const match = elements.find((element) => matchesName(element, options?.name));

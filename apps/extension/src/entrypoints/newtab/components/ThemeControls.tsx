@@ -13,6 +13,9 @@ import {
   type ThemePreferences,
 } from '@/features/theme/theme-preferences';
 
+const MAX_CUSTOM_BACKGROUND_BYTES = 128 * 1024;
+const MAX_CUSTOM_BACKGROUND_DATA_URL_LENGTH = 180 * 1024;
+
 function applyTheme(theme: ThemePreferences) {
   document.documentElement.dataset.themeMode = theme.mode;
   document.documentElement.dataset.themePalette = theme.paletteId;
@@ -26,6 +29,7 @@ function applyTheme(theme: ThemePreferences) {
 export function ThemeControls() {
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const [theme, setTheme] = useState<ThemePreferences | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void Promise.all([getThemePreferences(), getLanguagePreference()]).then(
@@ -42,6 +46,7 @@ export function ThemeControls() {
     const next = await saveThemePreferences({ ...(theme ?? {}), ...partial });
     setTheme(next);
     applyTheme(next);
+    setErrorMessage(null);
   }
 
   async function updateLanguage(nextLanguage: LanguagePreference) {
@@ -52,6 +57,10 @@ export function ThemeControls() {
 
   async function updateBackground(file: File | undefined) {
     if (!file) return;
+    if (file.size > MAX_CUSTOM_BACKGROUND_BYTES) {
+      setErrorMessage('Custom background image is too large to save.');
+      return;
+    }
 
     const dataUrl = await new Promise<string>((resolve, reject) => {
       const reader = new FileReader();
@@ -59,6 +68,10 @@ export function ThemeControls() {
       reader.addEventListener('error', () => reject(new Error('Could not read background image.')));
       reader.readAsDataURL(file);
     });
+    if (dataUrl.length > MAX_CUSTOM_BACKGROUND_DATA_URL_LENGTH) {
+      setErrorMessage('Custom background image is too large to save.');
+      return;
+    }
 
     await updateTheme({ customBackground: dataUrl });
   }
@@ -134,6 +147,12 @@ export function ThemeControls() {
           />
         </label>
       </div>
+
+      {errorMessage ? (
+        <p className="status-message status-message--error utility-status" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
     </section>
   );
 }

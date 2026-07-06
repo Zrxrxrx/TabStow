@@ -364,6 +364,10 @@ button:disabled {
   padding: 8px 0;
 }
 
+.utility-status {
+  margin: 0;
+}
+
 .quick-link {
   border: 1px solid var(--border, #d7dde6);
   border-radius: 8px;

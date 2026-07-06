@@ -9,6 +9,7 @@ import { sendExtensionMessage } from '@/lib/messages';
 
 export function QuickLinks() {
   const [links, setLinks] = useState<QuickLink[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     void getQuickLinks().then(setLinks);
@@ -19,7 +20,12 @@ export function QuickLinks() {
     if (!url) return;
 
     const label = window.prompt('Quick link label') ?? '';
-    setLinks(await saveQuickLinks([...links, createQuickLink({ url, label })]));
+    try {
+      setLinks(await saveQuickLinks([...links, createQuickLink({ url, label })]));
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'Quick link URL is invalid.');
+    }
   }
 
   async function addFromOpenTabs() {
@@ -86,6 +92,12 @@ export function QuickLinks() {
           ))}
         </div>
       )}
+
+      {errorMessage ? (
+        <p className="status-message status-message--error utility-status" role="alert">
+          {errorMessage}
+        </p>
+      ) : null}
     </section>
   );
 }
