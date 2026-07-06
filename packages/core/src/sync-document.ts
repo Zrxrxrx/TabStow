@@ -14,7 +14,7 @@ export function toSafeSyncSettings(settings: ExtensionSettings): SafeSyncSetting
 
 export function toImportableSettings(
   settings: SafeSyncSettings,
-): Partial<Omit<ExtensionSettings, 'githubToken' | 'deviceId'>> {
+): Partial<ExtensionSettings> {
   const { deviceId: _deviceId, ...importableSettings } = settings;
   return importableSettings;
 }
