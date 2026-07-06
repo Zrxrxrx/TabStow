@@ -36,4 +36,20 @@ describe('active workspace storage', () => {
     expect(storageMocks.setItem).toHaveBeenCalledWith('local:tabstow-active-workspace', result);
     expect(result.order.groupOrder).toEqual(['domain:example.com']);
   });
+
+  it('normalizes malformed chrome group mappings without throwing', async () => {
+    storageMocks.getItem.mockResolvedValue({
+      chromeTabGroups: {
+        enabled: true,
+        mappings: [null],
+      },
+    });
+
+    const { getActiveWorkspaceState } = await import('./active-workspace-storage');
+    await expect(getActiveWorkspaceState()).resolves.toEqual({
+      manualGroups: { groups: [], assignments: {} },
+      order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
+      chromeTabGroups: { enabled: true, mappings: [] },
+    });
+  });
 });

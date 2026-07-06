@@ -45,8 +45,17 @@ function normalizeChromeGroups(input: Partial<ChromeTabGroupsState> | undefined)
     mappings: Array.isArray(input?.mappings)
       ? input.mappings
           .filter(
+            (
+              mapping,
+            ): mapping is {
+              virtualGroupKey: unknown;
+              windowId: unknown;
+              chromeGroupId: unknown;
+            } => Boolean(mapping && typeof mapping === 'object'),
+          )
+          .filter(
             (mapping) =>
-              mapping.virtualGroupKey &&
+              Boolean(mapping.virtualGroupKey) &&
               Number.isInteger(mapping.windowId) &&
               Number.isInteger(mapping.chromeGroupId),
           )
