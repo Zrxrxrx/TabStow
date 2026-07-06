@@ -19,3 +19,8 @@ Implemented the extension infrastructure requested for the Tabstow MVP, limited 
 
 - The implementation follows the task brief closely and uses the core schemas/helpers exported from `@tabstow/core`.
 - No additional compatibility changes were needed beyond the requested surface.
+
+## Fix
+
+- Updated [`apps/extension/src/db/db.ts`](</Users/zrx/Dev/tabstow/apps/extension/src/db/db.ts:1>) so `importSessions()` returns `listSessions()` after persisting imported rows, which includes existing local-only sessions in the returned state.
+- Verification: `bun run typecheck` passed after the fix.

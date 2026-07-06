@@ -52,5 +52,5 @@ export async function importSessions(sessions: TabSession[]): Promise<TabSession
   await db.transaction('rw', db.sessions, async () => {
     await db.sessions.bulkPut(parsed);
   });
-  return sortSessionsNewestFirst(parsed);
+  return listSessions();
 }
