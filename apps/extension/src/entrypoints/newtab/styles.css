@@ -354,6 +354,31 @@ button:disabled {
   font-size: 17px;
 }
 
+.quick-links-panel {
+  background: rgba(var(--surface-rgb), var(--surface-opacity));
+  border: 1px solid var(--border, #d7dde6);
+  border-radius: 8px;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.quick-links-panel .section-header {
+  align-items: flex-start;
+}
+
+.quick-links-panel .section-header > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.quick-links-panel .subtle {
+  color: var(--muted-text);
+  font-size: 14px;
+  margin: 0;
+}
+
 .utility-panel header,
 .quick-link,
 .todo-row {
@@ -377,12 +402,72 @@ button:disabled {
   gap: 8px;
 }
 
+.quick-links-panel .quick-link-grid {
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+}
+
 .utility-empty-state {
   padding: 8px 0;
 }
 
 .utility-status {
   margin: 0;
+}
+
+.quick-link-card-shell {
+  background: rgba(var(--surface-rgb), 0.56);
+  border: 1px solid var(--border, #d7dde6);
+  border-radius: 8px;
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.quick-link-card {
+  align-items: center;
+  color: inherit;
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  text-decoration: none;
+}
+
+.quick-link-card:hover {
+  text-decoration: none;
+}
+
+.favicon {
+  align-items: center;
+  border-radius: 8px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 28px;
+  justify-content: center;
+  width: 28px;
+}
+
+.favicon.tone-blue {
+  background: #dce7f7;
+  color: #234a7c;
+  font-weight: 600;
+}
+
+.quick-link-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.quick-link-card-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.quick-link-card-actions .icon-button {
+  flex: 0 0 auto;
 }
 
 .quick-link {
