@@ -11,6 +11,12 @@ const tabs: ActiveBrowserTab[] = [
   { id: 5, windowId: 7, index: 4, active: false, pinned: false, title: 'Duplicate 2', url: 'https://example.com/a' },
 ];
 
+const multiWindowTabs: ActiveBrowserTab[] = [
+  { id: 10, windowId: 2, index: 3, active: false, pinned: false, title: 'Example A', url: 'https://example.com/a' },
+  { id: 11, windowId: 1, index: 8, active: false, pinned: false, title: 'Example A copy', url: 'https://example.com/a' },
+  { id: 12, windowId: 1, index: 9, active: false, pinned: false, title: 'Example B', url: 'https://example.com/b' },
+];
+
 describe('active tab labels', () => {
   it('identifies landing pages', () => {
     expect(isLandingPage('https://github.com/')).toBe(true);
@@ -47,6 +53,19 @@ describe('active tab groups', () => {
         url: 'https://example.com/a',
         keepTabId: 4,
         duplicateTabIds: [5],
+      },
+    ]);
+  });
+
+  it('orders tabs and duplicate retention deterministically across windows', () => {
+    const groups = buildActiveTabGroups(multiWindowTabs, { groups: [], assignments: {} }, { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} });
+
+    expect(groups.find((group) => group.key === 'domain:example.com')?.tabs.map((tab) => tab.id)).toEqual([11, 12, 10]);
+    expect(findDuplicateTabGroups(multiWindowTabs)).toEqual([
+      {
+        url: 'https://example.com/a',
+        keepTabId: 11,
+        duplicateTabIds: [10],
       },
     ]);
   });

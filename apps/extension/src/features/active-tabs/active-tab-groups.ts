@@ -13,12 +13,16 @@ function tabId(tab: Pick<ActiveBrowserTab, 'id'>): string {
   return String(tab.id);
 }
 
+function compareTabs(a: ActiveBrowserTab, b: ActiveBrowserTab): number {
+  return (a.windowId ?? 0) - (b.windowId ?? 0) || (a.index ?? 0) - (b.index ?? 0) || (a.id ?? 0) - (b.id ?? 0);
+}
+
 function sortTabsByOrder(tabs: ActiveBrowserTab[], orderIds: string[] | undefined): ActiveBrowserTab[] {
-  if (!orderIds?.length) return [...tabs].sort((a, b) => a.index - b.index);
+  if (!orderIds?.length) return [...tabs].sort(compareTabs);
   const byId = new Map(tabs.map((tab) => [tabId(tab), tab]));
   const ordered = orderIds.map((id) => byId.get(id)).filter((tab): tab is ActiveBrowserTab => Boolean(tab));
   const orderedIds = new Set(ordered.map(tabId));
-  const rest = tabs.filter((tab) => !orderedIds.has(tabId(tab))).sort((a, b) => a.index - b.index);
+  const rest = tabs.filter((tab) => !orderedIds.has(tabId(tab))).sort(compareTabs);
   return [...ordered, ...rest];
 }
 
@@ -80,7 +84,7 @@ export function findDuplicateTabGroups(tabs: ActiveBrowserTab[]): DuplicateTabGr
   return Array.from(byUrl.entries())
     .filter(([, matches]) => matches.length > 1)
     .map(([url, matches]) => {
-      const ordered = [...matches].sort((a, b) => a.index - b.index);
+      const ordered = [...matches].sort(compareTabs);
       return {
         url,
         keepTabId: ordered[0].id as number,
