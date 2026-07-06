@@ -22,17 +22,31 @@ export type ActiveWorkspaceState = {
 };
 
 function normalizeOrder(input: Partial<ActiveWorkspaceOrderState> | undefined): ActiveWorkspaceOrderState {
+  const dedupe = (values: unknown[]): string[] => {
+    const seen = new Set<string>();
+    const result: string[] = [];
+
+    for (const value of values) {
+      const stringValue = String(value);
+      if (!stringValue || seen.has(stringValue)) continue;
+      seen.add(stringValue);
+      result.push(stringValue);
+    }
+
+    return result;
+  };
+
   return {
-    groupOrder: Array.isArray(input?.groupOrder) ? input.groupOrder.map(String).filter(Boolean) : [],
+    groupOrder: Array.isArray(input?.groupOrder) ? dedupe(input.groupOrder) : [],
     pinnedGroupKeys: Array.isArray(input?.pinnedGroupKeys)
-      ? input.pinnedGroupKeys.map(String).filter(Boolean)
+      ? dedupe(input.pinnedGroupKeys)
       : [],
     groupTabOrder:
       input?.groupTabOrder && typeof input.groupTabOrder === 'object'
         ? Object.fromEntries(
             Object.entries(input.groupTabOrder).map(([key, ids]) => [
               key,
-              Array.isArray(ids) ? ids.map(String).filter(Boolean) : [],
+              Array.isArray(ids) ? dedupe(ids) : [],
             ]),
           )
         : {},

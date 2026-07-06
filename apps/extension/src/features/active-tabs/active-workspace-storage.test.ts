@@ -52,4 +52,31 @@ describe('active workspace storage', () => {
       chromeTabGroups: { enabled: true, mappings: [] },
     });
   });
+
+  it('dedupes persisted order arrays while preserving first-seen order', async () => {
+    storageMocks.getItem.mockResolvedValue({
+      order: {
+        groupOrder: ['domain:example.com', 'domain:example.com', 'manual:1', 'manual:1'],
+        pinnedGroupKeys: ['pinned:1', 'pinned:1', 'pinned:2', 'pinned:1'],
+        groupTabOrder: {
+          'domain:example.com': ['tab-1', 'tab-1', 'tab-2', 'tab-2', 'tab-1'],
+          'manual:1': ['tab-3', 'tab-3'],
+        },
+      },
+    });
+
+    const { getActiveWorkspaceState } = await import('./active-workspace-storage');
+    await expect(getActiveWorkspaceState()).resolves.toEqual({
+      manualGroups: { groups: [], assignments: {} },
+      order: {
+        groupOrder: ['domain:example.com', 'manual:1'],
+        pinnedGroupKeys: ['pinned:1', 'pinned:2'],
+        groupTabOrder: {
+          'domain:example.com': ['tab-1', 'tab-2'],
+          'manual:1': ['tab-3'],
+        },
+      },
+      chromeTabGroups: { enabled: false, mappings: [] },
+    });
+  });
 });
