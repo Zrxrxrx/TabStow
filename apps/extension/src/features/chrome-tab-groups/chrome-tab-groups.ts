@@ -39,20 +39,29 @@ function isMissingChromeGroupError(error: unknown): boolean {
 async function groupTabsIntoChromeGroup(
   tabIds: number[],
   existingChromeGroupId?: number,
-): Promise<number> {
+): Promise<{ chromeGroupId: number; reusedExistingGroup: boolean }> {
   if (typeof existingChromeGroupId !== 'number') {
-    return browser.tabs.group({ tabIds });
+    return {
+      chromeGroupId: await browser.tabs.group({ tabIds }),
+      reusedExistingGroup: false,
+    };
   }
 
   try {
     await browser.tabs.group({ groupId: existingChromeGroupId, tabIds });
-    return existingChromeGroupId;
+    return {
+      chromeGroupId: existingChromeGroupId,
+      reusedExistingGroup: true,
+    };
   } catch (error) {
     if (!isMissingChromeGroupError(error)) {
       throw error;
     }
 
-    return browser.tabs.group({ tabIds });
+    return {
+      chromeGroupId: await browser.tabs.group({ tabIds }),
+      reusedExistingGroup: false,
+    };
   }
 }
 
@@ -72,7 +81,22 @@ export async function syncChromeTabGroups(
         const existing = state.mappings.find(
           (mapping) => mapping.virtualGroupKey === group.key && mapping.windowId === windowId,
         );
-        const chromeGroupId = await groupTabsIntoChromeGroup(tabIds, existing?.chromeGroupId);
+        const { chromeGroupId, reusedExistingGroup } = await groupTabsIntoChromeGroup(
+          tabIds,
+          existing?.chromeGroupId,
+        );
+
+        if (reusedExistingGroup) {
+          const currentTabs = await browser.tabs.query({ groupId: chromeGroupId });
+          const desiredTabIds = new Set(tabIds);
+          const extraTabIds = currentTabs
+            .map((tab) => tab.id)
+            .filter((tabId): tabId is number => typeof tabId === 'number' && !desiredTabIds.has(tabId));
+
+          if (extraTabIds.length > 0) {
+            await browser.tabs.ungroup(extraTabIds);
+          }
+        }
 
         await browser.tabGroups.update(chromeGroupId, { title: group.title, collapsed: true });
         nextMappings.push({

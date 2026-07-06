@@ -9,6 +9,7 @@ const browserMocks = vi.hoisted(() => ({
   tabs: {
     group: vi.fn(),
     query: vi.fn(),
+    ungroup: vi.fn(),
   },
 }));
 
@@ -112,6 +113,31 @@ describe('chrome tab groups', () => {
     expect(result).toEqual({
       ok: true,
       data: { enabled: true, mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 123 }] },
+    });
+  });
+
+  it('ungroups stale native members when reusing an existing group', async () => {
+    browserMocks.tabs.group.mockResolvedValueOnce(88);
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 10, groupId: 88 },
+      { id: 11, groupId: 88 },
+      { id: 12, groupId: 88 },
+      { id: undefined, groupId: 88 },
+    ]);
+
+    const { syncChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await syncChromeTabGroups(groups, {
+      enabled: true,
+      mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 88 }],
+    });
+
+    expect(browserMocks.tabs.group).toHaveBeenCalledWith({ groupId: 88, tabIds: [10, 11] });
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ groupId: 88 });
+    expect(browserMocks.tabs.ungroup).toHaveBeenCalledWith([12]);
+    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(88, { title: 'Launch', collapsed: true });
+    expect(result).toEqual({
+      ok: true,
+      data: { enabled: true, mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 88 }] },
     });
   });
 
