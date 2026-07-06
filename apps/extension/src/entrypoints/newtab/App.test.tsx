@@ -281,6 +281,9 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
     expect(screen().getByText('Example')).not.toBeNull();
+    expect(container.querySelector('.quick-links-panel')).not.toBeNull();
+    expect(container.querySelector('.quick-link-card')).not.toBeNull();
+    expect(container.querySelector('.quick-link-card-actions')).not.toBeNull();
     await click(screen().getByRole('button', { name: 'Extra' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(screen().getByText('Review launch checklist')).not.toBeNull();

@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronUp, ExternalLink, ImageUp, Pencil, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ImageUp, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
@@ -29,6 +29,19 @@ function iconFromPrompt(value: string): QuickLinkIcon {
 
 function getImageIconToken(icon: QuickLinkIcon | null | undefined): string | null {
   return icon?.kind === 'image' ? icon.value : null;
+}
+
+function hostnameInitial(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, '').slice(0, 1).toUpperCase() || 'T';
+  } catch {
+    return 'T';
+  }
+}
+
+function renderTextIcon(link: QuickLink) {
+  if (link.icon?.kind === 'emoji') return link.icon.value;
+  return hostnameInitial(link.url);
 }
 
 function QuickLinkImageIcon({ token, label }: { token: string; label: string }) {
@@ -176,10 +189,15 @@ export function QuickLinks({ locale }: Props) {
   }
 
   return (
-    <section className="utility-panel" aria-labelledby="quick-links-title">
-      <header>
-        <h2 id="quick-links-title">{t(locale, 'quickLinks')}</h2>
-        <div className="utility-panel-actions">
+    <section className="panel quick-links-panel" aria-labelledby="quick-links-title" data-od-id="quick-links-section">
+      <div className="section-header">
+        <div>
+          <h2 id="quick-links-title" data-od-id="quick-links-title">
+            {t(locale, 'quickLinks')}
+          </h2>
+          <p className="subtle">Custom web icons stay one click away at the top of the new tab page.</p>
+        </div>
+        <div className="header-actions" data-od-id="quick-link-header-actions">
           <button
             type="button"
             className="icon-button"
@@ -192,84 +210,87 @@ export function QuickLinks({ locale }: Props) {
             {t(locale, 'addOpenTab')}
           </button>
         </div>
-      </header>
+      </div>
 
       {links.length === 0 ? (
         <div className="empty-state utility-empty-state">{t(locale, 'noQuickLinks')}</div>
       ) : (
-        <div className="quick-link-grid">
+        <div className="quick-link-grid" data-od-id="quick-link-grid">
           {links.map((link, index) => (
-            <div className="quick-link" key={link.id}>
-              <a href={link.url} target="_blank" rel="noreferrer" className="quick-link-anchor">
-                {link.icon?.kind === 'emoji' ? (
-                  <span aria-hidden="true">{link.icon.value}</span>
-                ) : link.icon?.kind === 'image' ? (
+            <div className="quick-link-card-shell" key={link.id}>
+              <a href={link.url} target="_blank" rel="noreferrer" className="quick-link-card">
+                {link.icon?.kind === 'image' ? (
                   <QuickLinkImageIcon token={link.icon.value} label={link.label} />
-                ) : null}
-                <span>{link.label}</span>
-                <ExternalLink size={14} aria-hidden="true" />
+                ) : (
+                  <span className="favicon tone-blue" aria-hidden="true">
+                    {renderTextIcon(link)}
+                  </span>
+                )}
+                <span className="quick-link-label">{link.label}</span>
               </a>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={t(locale, 'moveUp', { label: link.label })}
-                onClick={() => void move(link.id, -1)}
-                disabled={index === 0}
-              >
-                <ChevronUp size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={t(locale, 'moveDown', { label: link.label })}
-                onClick={() => void move(link.id, 1)}
-                disabled={index === links.length - 1}
-              >
-                <ChevronDown size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
-                onClick={() => uploadInputRefs.current.get(link.id)?.click()}
-              >
-                <ImageUp size={14} aria-hidden="true" />
-              </button>
-              <input
-                accept="image/*"
-                aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
-                data-quick-link-upload-id={link.id}
-                hidden
-                ref={(node) => {
-                  if (node) {
-                    uploadInputRefs.current.set(link.id, node);
-                    return;
-                  }
+              <div className="quick-link-card-actions">
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t(locale, 'moveUp', { label: link.label })}
+                  onClick={() => void move(link.id, -1)}
+                  disabled={index === 0}
+                >
+                  <ChevronUp size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t(locale, 'moveDown', { label: link.label })}
+                  onClick={() => void move(link.id, 1)}
+                  disabled={index === links.length - 1}
+                >
+                  <ChevronDown size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
+                  onClick={() => uploadInputRefs.current.get(link.id)?.click()}
+                >
+                  <ImageUp size={14} aria-hidden="true" />
+                </button>
+                <input
+                  accept="image/*"
+                  aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
+                  data-quick-link-upload-id={link.id}
+                  hidden
+                  ref={(node) => {
+                    if (node) {
+                      uploadInputRefs.current.set(link.id, node);
+                      return;
+                    }
 
-                  uploadInputRefs.current.delete(link.id);
-                }}
-                onChange={(event) => {
-                  void uploadIcon(link, event.target.files?.[0]);
-                  event.target.value = '';
-                }}
-                type="file"
-              />
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={t(locale, 'editQuickLink', { label: link.label })}
-                onClick={() => void edit(link)}
-              >
-                <Pencil size={14} aria-hidden="true" />
-              </button>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={t(locale, 'removeQuickLink', { label: link.label })}
-                onClick={() => void remove(link.id)}
-              >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
+                    uploadInputRefs.current.delete(link.id);
+                  }}
+                  onChange={(event) => {
+                    void uploadIcon(link, event.target.files?.[0]);
+                    event.target.value = '';
+                  }}
+                  type="file"
+                />
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t(locale, 'editQuickLink', { label: link.label })}
+                  onClick={() => void edit(link)}
+                >
+                  <Pencil size={14} aria-hidden="true" />
+                </button>
+                <button
+                  type="button"
+                  className="icon-button"
+                  aria-label={t(locale, 'removeQuickLink', { label: link.label })}
+                  onClick={() => void remove(link.id)}
+                >
+                  <Trash2 size={14} aria-hidden="true" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
