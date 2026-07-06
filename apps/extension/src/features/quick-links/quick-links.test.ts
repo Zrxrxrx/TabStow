@@ -66,6 +66,12 @@ describe('quick links', () => {
     });
   });
 
+  it('rejects quick links outside http and https', () => {
+    expect(() => createQuickLink({ url: 'javascript:alert(1)' })).toThrow('Quick link URL is invalid.');
+    expect(() => createQuickLink({ url: 'data:text/html,hello' })).toThrow('Quick link URL is invalid.');
+    expect(() => createQuickLink({ url: 'ftp://example.com/file.txt' })).toThrow('Quick link URL is invalid.');
+  });
+
   it('updates label and icon metadata while preserving link identity', () => {
     const link = {
       id: 'a',
@@ -80,6 +86,56 @@ describe('quick links', () => {
       label: 'Alpha',
       icon: { kind: 'emoji', value: '*' },
     });
+  });
+
+  it('keeps only lightweight image icon tokens during normalization', () => {
+    expect(
+      normalizeQuickLinks([
+        {
+          id: 'a',
+          url: 'https://example.com',
+          label: 'Example',
+          createdAt: '2026-07-06T00:00:00.000Z',
+          icon: { kind: 'image', value: 'quick-link-icon:token-1' },
+        },
+        {
+          id: 'b',
+          url: 'https://example.com/docs',
+          label: 'Docs',
+          createdAt: '2026-07-06T00:00:00.000Z',
+          icon: { kind: 'image', value: 'data:image/png;base64,abc' },
+        },
+        {
+          id: 'c',
+          url: 'https://example.com/blog',
+          label: 'Blog',
+          createdAt: '2026-07-06T00:00:00.000Z',
+          icon: { kind: 'image', value: 'https://cdn.example.com/icon.png' },
+        },
+      ]),
+    ).toEqual([
+      {
+        id: 'a',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: { kind: 'image', value: 'quick-link-icon:token-1' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'b',
+        url: 'https://example.com/docs',
+        label: 'Docs',
+        icon: null,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'c',
+        url: 'https://example.com/blog',
+        label: 'Blog',
+        icon: null,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
   });
 
   it('reorders by id and appends missing links', () => {

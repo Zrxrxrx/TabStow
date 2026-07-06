@@ -1,3 +1,5 @@
+import { isQuickLinkIconToken } from './quick-link-icons-cache';
+
 export type QuickLinkIcon =
   | { kind: 'emoji'; value: string }
   | { kind: 'image'; value: string }
@@ -13,7 +15,8 @@ export type QuickLink = {
 
 function normalizeUrl(value: string): string | null {
   try {
-    return new URL(value).toString();
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
   } catch {
     return null;
   }
@@ -31,7 +34,7 @@ function normalizeIcon(value: unknown): QuickLinkIcon | null {
   if (candidate.kind === 'emoji' && typeof candidate.value === 'string') {
     return { kind: 'emoji', value: candidate.value };
   }
-  if (candidate.kind === 'image' && typeof candidate.value === 'string') {
+  if (candidate.kind === 'image' && isQuickLinkIconToken(candidate.value)) {
     return { kind: 'image', value: candidate.value };
   }
   return null;

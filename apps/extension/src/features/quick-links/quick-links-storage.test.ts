@@ -62,4 +62,41 @@ describe('quick link storage', () => {
       },
     ]);
   });
+
+  it('drops non-token image icon values before saving', async () => {
+    const links: QuickLink[] = [
+      {
+        id: 'a',
+        url: 'https://example.com',
+        label: 'Example',
+        icon: { kind: 'image', value: 'data:image/png;base64,abc123' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'b',
+        url: 'https://example.com/docs',
+        label: 'Docs',
+        icon: { kind: 'image', value: 'quick-link-icon:token-1' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ];
+
+    const { saveQuickLinks } = await import('./quick-links-storage');
+    await expect(saveQuickLinks(links)).resolves.toEqual([
+      {
+        id: 'a',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'b',
+        url: 'https://example.com/docs',
+        label: 'Docs',
+        icon: { kind: 'image', value: 'quick-link-icon:token-1' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+  });
 });

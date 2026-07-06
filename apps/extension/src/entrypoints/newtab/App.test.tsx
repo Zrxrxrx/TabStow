@@ -22,6 +22,12 @@ const { getQuickLinks, saveQuickLinks } = vi.hoisted(() => ({
   getQuickLinks: vi.fn(),
   saveQuickLinks: vi.fn(),
 }));
+const { saveQuickLinkIcon, resolveQuickLinkIconUrl, deleteQuickLinkIcon, isQuickLinkIconToken } = vi.hoisted(() => ({
+  saveQuickLinkIcon: vi.fn(),
+  resolveQuickLinkIconUrl: vi.fn(),
+  deleteQuickLinkIcon: vi.fn(),
+  isQuickLinkIconToken: vi.fn((value: unknown) => typeof value === 'string' && value.startsWith('quick-link-icon:')),
+}));
 const { getTodos, saveTodos } = vi.hoisted(() => ({
   getTodos: vi.fn(),
   saveTodos: vi.fn(),
@@ -52,6 +58,13 @@ vi.mock('@/features/active-tabs/active-workspace-storage', () => ({
 vi.mock('@/features/quick-links/quick-links-storage', () => ({
   getQuickLinks,
   saveQuickLinks,
+}));
+
+vi.mock('@/features/quick-links/quick-link-icons-cache', () => ({
+  saveQuickLinkIcon,
+  resolveQuickLinkIconUrl,
+  deleteQuickLinkIcon,
+  isQuickLinkIconToken,
 }));
 
 vi.mock('@/features/todos/todos-storage', () => ({
@@ -153,6 +166,10 @@ describe('App', () => {
     updateActiveWorkspaceState.mockReset();
     getQuickLinks.mockReset();
     saveQuickLinks.mockReset();
+    saveQuickLinkIcon.mockReset();
+    resolveQuickLinkIconUrl.mockReset();
+    deleteQuickLinkIcon.mockReset();
+    isQuickLinkIconToken.mockClear();
     getTodos.mockReset();
     saveTodos.mockReset();
     getThemePreferences.mockReset();
@@ -176,6 +193,9 @@ describe('App', () => {
     );
     getQuickLinks.mockResolvedValue([]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    saveQuickLinkIcon.mockResolvedValue('quick-link-icon:token-1');
+    resolveQuickLinkIconUrl.mockResolvedValue('blob:quick-link-icon-token-1');
+    deleteQuickLinkIcon.mockResolvedValue(undefined);
     getTodos.mockResolvedValue([]);
     saveTodos.mockImplementation(async (todos: unknown) => todos);
     getThemePreferences.mockResolvedValue({
@@ -390,6 +410,68 @@ describe('App', () => {
     expect(saveQuickLinks).not.toHaveBeenCalled();
     expect(screen().getByText('Example')).not.toBeNull();
     expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
+  });
+
+  it('rejects javascript quick-link URLs from manual input', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+    promptSpy
+      .mockReturnValueOnce('javascript:alert(1)')
+      .mockReturnValueOnce('Bad Link');
+
+    await renderApp();
+    await click(screen().getByLabelText('Add quick link'));
+
+    expect(saveQuickLinks).not.toHaveBeenCalled();
+    expect(screen().getByText('Example')).not.toBeNull();
+    expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
+  });
+
+  it('uploads a quick-link image icon as a lightweight token and renders the resolved image', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    saveQuickLinkIcon.mockResolvedValue('quick-link-icon:upload-1');
+    resolveQuickLinkIconUrl.mockResolvedValue('blob:quick-link-icon-upload-1');
+
+    await renderApp();
+
+    const uploadInput = container.querySelector<HTMLInputElement>('input[data-quick-link-upload-id="link-1"]');
+    expect(uploadInput).not.toBeNull();
+    const upload = new File(['icon-bytes'], 'icon.png', { type: 'image/png' });
+
+    await uploadFile(uploadInput as HTMLInputElement, upload);
+
+    expect(saveQuickLinkIcon).toHaveBeenCalledWith(upload);
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'link-1',
+        icon: { kind: 'image', value: 'quick-link-icon:upload-1' },
+      }),
+    ]);
+    expect(
+      saveQuickLinks.mock.calls.some((call) =>
+        JSON.stringify(call[0]).includes('data:image/png'),
+      ),
+    ).toBe(false);
+    const image = container.querySelector<HTMLImageElement>('img.quick-link-image-icon');
+    expect(image?.getAttribute('src')).toBe('blob:quick-link-icon-upload-1');
   });
 
   it('updates theme controls and todo actions from the utility panels', async () => {
