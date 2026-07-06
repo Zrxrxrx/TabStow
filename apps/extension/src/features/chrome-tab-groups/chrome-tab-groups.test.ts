@@ -266,4 +266,45 @@ describe('chrome tab groups', () => {
       },
     });
   });
+
+  it('reuses one replacement manual group for stale mappings across windows', async () => {
+    browserMocks.tabGroups.query.mockResolvedValue([
+      { id: 31, windowId: 7, title: 'Reading' },
+      { id: 32, windowId: 8, title: 'Reading' },
+    ]);
+
+    const { importChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await importChromeTabGroups(
+      [
+        { id: 1, windowId: 7, groupId: 31, index: 0, active: false, pinned: false, url: 'https://example.com/a' },
+        { id: 2, windowId: 8, groupId: 32, index: 0, active: false, pinned: false, url: 'https://example.com/b' },
+      ],
+      { groups: [], assignments: {} },
+      {
+        enabled: true,
+        mappings: [
+          { virtualGroupKey: 'manual:missing-group', windowId: 1, chromeGroupId: 31 },
+          { virtualGroupKey: 'manual:missing-group', windowId: 2, chromeGroupId: 32 },
+        ],
+      },
+      () => 'replacement-group',
+    );
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        manualGroups: {
+          groups: [{ id: 'replacement-group', name: 'Reading', createdAt: expect.any(String) }],
+          assignments: { '1': 'replacement-group', '2': 'replacement-group' },
+        },
+        chromeTabGroups: {
+          enabled: true,
+          mappings: [
+            { virtualGroupKey: 'manual:replacement-group', windowId: 7, chromeGroupId: 31 },
+            { virtualGroupKey: 'manual:replacement-group', windowId: 8, chromeGroupId: 32 },
+          ],
+        },
+      },
+    });
+  });
 });

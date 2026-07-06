@@ -140,6 +140,7 @@ export async function importChromeTabGroups(
     const chromeGroups = await browser.tabGroups.query({});
     let nextManualGroups = manualGroups;
     const mappings = state.mappings.map((mapping) => ({ ...mapping }));
+    const replacementGroupIdsByStaleKey = new Map<string, string>();
 
     for (const chromeGroup of chromeGroups) {
       const groupTabs = tabs.filter((tab) => tab.groupId === chromeGroup.id && typeof tab.id === 'number');
@@ -149,16 +150,28 @@ export async function importChromeTabGroups(
       }
 
       const existingMapping = mappings.find((mapping) => mapping.chromeGroupId === chromeGroup.id);
-      let manualGroupId = existingMapping?.virtualGroupKey.replace(/^manual:/, '') ?? '';
+      const mappedVirtualGroupKey = existingMapping?.virtualGroupKey ?? '';
+      let manualGroupId = mappedVirtualGroupKey.replace(/^manual:/, '');
+      const hasExistingManualGroup = nextManualGroups.groups.some((group) => group.id === manualGroupId);
 
-      if (!manualGroupId || !nextManualGroups.groups.some((group) => group.id === manualGroupId)) {
-        const baseName = chromeGroup.title?.trim() || `Chrome group ${chromeGroup.id}`;
-        const name = nextManualGroups.groups.some((group) => group.name.toLowerCase() === baseName.toLowerCase())
-          ? `${baseName} ${chromeGroup.id}`
-          : baseName;
-        const created = addManualGroup(nextManualGroups, name, createId);
-        nextManualGroups = created.state;
-        manualGroupId = created.group.id;
+      if (!manualGroupId || !hasExistingManualGroup) {
+        const replacementGroupId = replacementGroupIdsByStaleKey.get(mappedVirtualGroupKey);
+        if (replacementGroupId) {
+          manualGroupId = replacementGroupId;
+        } else {
+          const baseName = chromeGroup.title?.trim() || `Chrome group ${chromeGroup.id}`;
+          const name = nextManualGroups.groups.some(
+            (group) => group.name.toLowerCase() === baseName.toLowerCase(),
+          )
+            ? `${baseName} ${chromeGroup.id}`
+            : baseName;
+          const created = addManualGroup(nextManualGroups, name, createId);
+          nextManualGroups = created.state;
+          manualGroupId = created.group.id;
+          if (mappedVirtualGroupKey) {
+            replacementGroupIdsByStaleKey.set(mappedVirtualGroupKey, manualGroupId);
+          }
+        }
       }
 
       for (const tab of groupTabs) {
