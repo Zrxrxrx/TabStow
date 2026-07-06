@@ -85,7 +85,7 @@
   - Search form with `.dashboard-search` and visible keyboard hint `.kbd`
   - Drawer `<aside className="extra-drawer-backdrop is-open">` when `extraOpen === true`
   - Drawer dialog labelled by `extra-drawer-title`
-  - Topbar `Stow current window` button that calls the existing `runAction('stow', ...)`
+  - Topbar stow button using `t(locale, 'stowCurrentWindow')` that calls the existing `runAction('stow', ...)`
 
 - [ ] **Step 1: Add a failing layout/drawer test**
 
@@ -109,7 +109,6 @@ Append this test inside `describe('App', () => { ... })` in `apps/extension/src/
     expect(container.querySelector('.page-shell')).not.toBeNull();
     expect(container.querySelector('.topbar')).not.toBeNull();
     expect(container.querySelector('.workspace-grid')).not.toBeNull();
-    expect(container.querySelector('.quick-links-panel')).not.toBeNull();
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
     expect(screen().getByRole('button', { name: 'Extra' })).not.toBeNull();
     expect(screen().getByRole('button', { name: 'Open settings' })).not.toBeNull();
@@ -117,7 +116,7 @@ Append this test inside `describe('App', () => { ... })` in `apps/extension/src/
     expect(screen().getByText('Example')).not.toBeNull();
 
     expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: 'Saved for later' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Stowed sessions' })).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Todos' })).toThrow();
     expect(() => screen().getByRole('heading', { name: 'Appearance' })).toThrow();
 
@@ -150,6 +149,17 @@ Replace the `App` component body in `apps/extension/src/entrypoints/newtab/App.t
 
 ```tsx
 import { Archive, Settings, SlidersHorizontal, X } from 'lucide-react';
+```
+
+Add `t` to the existing i18n import:
+
+```tsx
+import {
+  getLanguagePreference,
+  resolveLocale,
+  t,
+  type LanguagePreference,
+} from '@/features/i18n/i18n';
 ```
 
 Inside `export function App()`, add drawer state after the language state:
@@ -234,7 +244,7 @@ Replace the current `return (` block with:
               disabled={busyAction !== null}
             >
               <Archive size={16} aria-hidden="true" />
-              Stow current window
+              {t(locale, 'stowCurrentWindow')}
             </button>
           </div>
         </header>
@@ -338,6 +348,38 @@ The final form body should be:
 ```
 
 - [ ] **Step 5: Remove duplicate old shell classes**
+
+Update the existing test `renders utility panels from stored quick links, todos, and theme preferences` so the todo and appearance assertions happen after opening the `Extra` drawer. Replace this block:
+
+```tsx
+    expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
+    expect(screen().getByText('Review launch checklist')).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+```
+
+with:
+
+```tsx
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
+    expect(screen().getByText('Review launch checklist')).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+```
+
+Update the existing test `renders migrated dashboard labels in Simplified Chinese when selected` so secondary utilities are asserted after opening the `Extra` drawer. Replace:
+
+```tsx
+    expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+```
+
+with:
+
+```tsx
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+```
 
 In `apps/extension/src/entrypoints/newtab/App.tsx`, make sure the old classes below no longer appear:
 
