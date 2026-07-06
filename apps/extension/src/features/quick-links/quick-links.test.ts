@@ -8,11 +8,51 @@ describe('quick links', () => {
         null,
         undefined,
         'bad',
-        { id: 'a', url: 'https://example.com', label: 'Example' },
+        {
+          id: 'a',
+          url: 'https://example.com',
+          label: 'Example',
+          createdAt: 123,
+          icon: { kind: 'emoji', value: 'sparkles' },
+        },
+        {
+          id: 'b',
+          url: 'https://site.example',
+          label: 'Site',
+          createdAt: '2026-07-06T00:00:00.000Z',
+          icon: { kind: 'site', value: null },
+        },
+        {
+          id: 'c',
+          url: 'https://image.example',
+          label: 'Image',
+          createdAt: undefined,
+          icon: { kind: 'emoji', value: 42 },
+        },
         { id: '', url: 'bad' },
       ]),
     ).toEqual([
-      { id: 'a', url: 'https://example.com/', label: 'Example', icon: null, createdAt: expect.any(String) },
+      {
+        id: 'a',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: { kind: 'emoji', value: 'sparkles' },
+        createdAt: expect.any(String),
+      },
+      {
+        id: 'b',
+        url: 'https://site.example/',
+        label: 'Site',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'c',
+        url: 'https://image.example/',
+        label: 'Image',
+        icon: null,
+        createdAt: expect.any(String),
+      },
     ]);
   });
 

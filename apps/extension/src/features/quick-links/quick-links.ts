@@ -19,6 +19,24 @@ function normalizeUrl(value: string): string | null {
   }
 }
 
+function normalizeCreatedAt(value: unknown): string {
+  return typeof value === 'string' ? value : new Date().toISOString();
+}
+
+function normalizeIcon(value: unknown): QuickLinkIcon | null {
+  if (!value || typeof value !== 'object') return null;
+
+  const candidate = value as Partial<QuickLinkIcon> & { kind?: unknown; value?: unknown };
+  if (candidate.kind === 'site' && candidate.value === null) return { kind: 'site', value: null };
+  if (candidate.kind === 'emoji' && typeof candidate.value === 'string') {
+    return { kind: 'emoji', value: candidate.value };
+  }
+  if (candidate.kind === 'image' && typeof candidate.value === 'string') {
+    return { kind: 'image', value: candidate.value };
+  }
+  return null;
+}
+
 export function normalizeQuickLinks(input: unknown): QuickLink[] {
   if (!Array.isArray(input)) return [];
 
@@ -34,8 +52,8 @@ export function normalizeQuickLinks(input: unknown): QuickLink[] {
         id,
         url,
         label: String(candidate.label ?? '').trim() || new URL(url).hostname.replace(/^www\./, ''),
-        icon: candidate.icon ?? null,
-        createdAt: candidate.createdAt ?? new Date().toISOString(),
+        icon: normalizeIcon(candidate.icon),
+        createdAt: normalizeCreatedAt(candidate.createdAt),
       };
     })
     .filter((item): item is QuickLink => Boolean(item));
