@@ -9,6 +9,11 @@ import {
   listActiveTabs,
   runDefaultSearch,
 } from '@/features/active-tabs/active-tabs-service';
+import {
+  collapseChromeTabGroups,
+  importChromeTabGroups,
+  syncChromeTabGroups,
+} from '@/features/chrome-tab-groups/chrome-tab-groups';
 import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
@@ -40,6 +45,12 @@ async function handleMessage(
         return closeActiveTabs(message.tabIds);
       case 'active-tabs:search':
         return runDefaultSearch(message.query);
+      case 'chrome-tab-groups:sync':
+        return syncChromeTabGroups(message.groups, message.state);
+      case 'chrome-tab-groups:import':
+        return importChromeTabGroups(message.tabs, message.manualGroups, message.state);
+      case 'chrome-tab-groups:collapse-window':
+        return collapseChromeTabGroups(message.windowId);
       case 'settings:get':
         return ok(await getSettings());
       case 'settings:update':

@@ -58,6 +58,12 @@ const activeTabsMocks = vi.hoisted(() => ({
   runDefaultSearch: vi.fn(),
 }));
 
+const chromeTabGroupMocks = vi.hoisted(() => ({
+  collapseChromeTabGroups: vi.fn(),
+  importChromeTabGroups: vi.fn(),
+  syncChromeTabGroups: vi.fn(),
+}));
+
 vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
@@ -69,6 +75,7 @@ vi.mock('@/features/settings/settings-storage', () => settingsMocks);
 vi.mock('@/features/sync/sync-service', () => syncMocks);
 vi.mock('@/features/tabs/session-service', () => sessionServiceMocks);
 vi.mock('@/features/active-tabs/active-tabs-service', () => activeTabsMocks);
+vi.mock('@/features/chrome-tab-groups/chrome-tab-groups', () => chromeTabGroupMocks);
 
 describe('background message routing', () => {
   beforeEach(() => {
@@ -151,5 +158,49 @@ describe('background message routing', () => {
     await listener?.({ type: 'active-tabs:close', tabIds: [11, 12] }, {});
 
     expect(activeTabsMocks.closeActiveTabs).toHaveBeenCalledWith([11, 12]);
+  });
+
+  it('routes chrome tab group sync messages', async () => {
+    chromeTabGroupMocks.syncChromeTabGroups.mockResolvedValue({
+      ok: true,
+      data: { enabled: true, mappings: [] },
+    });
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+    await listener?.({
+      type: 'chrome-tab-groups:sync',
+      groups: [],
+      state: { enabled: true, mappings: [] },
+    }, {});
+
+    expect(chromeTabGroupMocks.syncChromeTabGroups).toHaveBeenCalledWith([], { enabled: true, mappings: [] });
+  });
+
+  it('routes chrome tab group import messages', async () => {
+    chromeTabGroupMocks.importChromeTabGroups.mockResolvedValue({
+      ok: true,
+      data: {
+        manualGroups: { groups: [], assignments: {} },
+        chromeTabGroups: { enabled: true, mappings: [] },
+      },
+    });
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+    const payload = {
+      tabs: [],
+      manualGroups: { groups: [], assignments: {} },
+      state: { enabled: true, mappings: [] },
+    };
+    await listener?.({ type: 'chrome-tab-groups:import', ...payload }, {});
+
+    expect(chromeTabGroupMocks.importChromeTabGroups).toHaveBeenCalledWith(
+      payload.tabs,
+      payload.manualGroups,
+      payload.state,
+    );
   });
 });

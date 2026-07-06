@@ -1,5 +1,11 @@
 import type { ExtensionSettings, TabSession } from '@tabstow/core';
-import type { ActiveBrowserTab } from '@/features/active-tabs/types';
+import type { ChromeTabGroupsState } from '@/features/active-tabs/active-workspace-storage';
+import type {
+  ActiveBrowserTab,
+  ActiveTabGroup,
+  ManualGroupsState,
+} from '@/features/active-tabs/types';
+import type { ImportedChromeGroupsResult } from '@/features/chrome-tab-groups/chrome-tab-groups';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
 
@@ -26,6 +32,14 @@ export type ExtensionMessage =
   | { type: 'active-tabs:focus'; tabId: number; windowId: number }
   | { type: 'active-tabs:close'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
+  | { type: 'chrome-tab-groups:sync'; groups: ActiveTabGroup[]; state: ChromeTabGroupsState }
+  | {
+      type: 'chrome-tab-groups:import';
+      tabs: ActiveBrowserTab[];
+      manualGroups: ManualGroupsState;
+      state: ChromeTabGroupsState;
+    }
+  | { type: 'chrome-tab-groups:collapse-window'; windowId: number }
   | { type: 'settings:get' }
   | { type: 'settings:update'; settings: Partial<ExtensionSettings> }
   | { type: 'sync:push' }
@@ -38,9 +52,12 @@ export type ExtensionMessageResponse =
   | AppResult<ActiveBrowserTab[]>
   | AppResult<ExtensionSettings>
   | AppResult<SyncResult>
+  | AppResult<ChromeTabGroupsState>
+  | AppResult<ImportedChromeGroupsResult>
   | AppResult<{ deleted: true }>
   | AppResult<{ focused: true }>
   | AppResult<{ closed: true; tabCount: number }>
+  | AppResult<{ collapsed: true; groupCount: number }>
   | AppResult<{ searched: true }>
   | AppResult<{ restored: true; tabCount: number }>;
 
