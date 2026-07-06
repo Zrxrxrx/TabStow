@@ -281,6 +281,7 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
     expect(screen().getByText('Example')).not.toBeNull();
+    await click(screen().getByRole('button', { name: 'Extra' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
     expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
@@ -298,13 +299,55 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '打开的标签页' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '已收起的标签页' })).not.toBeNull();
     expect(screen().getByLabelText('搜索网页')).not.toBeNull();
     expect(screen().getByLabelText('添加快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+  });
+
+  it('renders the v1 shell and moves secondary utilities into the Extra drawer', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+
+    await renderApp();
+
+    expect(container.querySelector('.page-shell')).not.toBeNull();
+    expect(container.querySelector('.topbar')).not.toBeNull();
+    expect(container.querySelector('.workspace-grid')).not.toBeNull();
+    expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
+    expect(screen().getByRole('button', { name: 'Extra' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Open settings' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Stow current window' })).not.toBeNull();
+    expect(screen().getByText('Example')).not.toBeNull();
+
+    expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Stowed sessions' })).not.toBeNull();
+    expect(() => screen().getByRole('heading', { name: 'Todos' })).toThrow();
+    expect(() => screen().getByRole('heading', { name: 'Appearance' })).toThrow();
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+
+    expect(container.querySelector('.extra-drawer-backdrop.is-open')).not.toBeNull();
+    expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Todos' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Appearance' })).not.toBeNull();
+
+    await click(screen().getByRole('button', { name: 'Close extra drawer' }));
+
+    expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
   });
 
   it('adds and removes quick links through the utility panel', async () => {
@@ -1211,7 +1254,24 @@ function screen() {
 
 function matchesName(element: HTMLElement, name: string | undefined) {
   if (!name) return true;
-  return element.textContent?.replace(/\s+/g, ' ').trim() === name;
+  return getAccessibleName(element) === name;
+}
+
+function getAccessibleName(element: HTMLElement) {
+  const ariaLabel = element.getAttribute('aria-label');
+  if (ariaLabel) return ariaLabel;
+
+  const labelledBy = element.getAttribute('aria-labelledby');
+  if (labelledBy) {
+    const label = labelledBy
+      .split(/\s+/)
+      .map((id) => container.querySelector<HTMLElement>(`#${id}`)?.textContent?.trim() ?? '')
+      .join(' ')
+      .trim();
+    if (label) return label;
+  }
+
+  return element.textContent?.replace(/\s+/g, ' ').trim() ?? '';
 }
 
 function deferred<T>() {

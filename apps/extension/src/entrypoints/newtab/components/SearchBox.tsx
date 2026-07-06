@@ -38,6 +38,9 @@ export function SearchBox({ disabled = false, locale, onStatus }: Props) {
         type="search"
         value={query}
       />
+      <span className="kbd" aria-hidden="true">
+        /
+      </span>
     </form>
   );
 }
