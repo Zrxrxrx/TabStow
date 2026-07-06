@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const browserMocks = vi.hoisted(() => ({
+  action: {
+    onClicked: {
+      addListener: vi.fn(),
+    },
+    setBadgeBackgroundColor: vi.fn(),
+    setBadgeText: vi.fn(),
+    setTitle: vi.fn(),
+  },
   runtime: {
     onInstalled: {
       addListener: vi.fn(),
@@ -34,6 +42,10 @@ const syncMocks = vi.hoisted(() => ({
   pushToGist: vi.fn(),
 }));
 
+const actionFeedbackMocks = vi.hoisted(() => ({
+  showActionFeedback: vi.fn(),
+}));
+
 const sessionServiceMocks = vi.hoisted(() => ({
   restoreSession: vi.fn(),
   saveCurrentWindowAsSession: vi.fn(),
@@ -43,6 +55,7 @@ vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
 
+vi.mock('@/features/action-feedback/action-feedback', () => actionFeedbackMocks);
 vi.mock('@/features/context-menu/context-menu', () => contextMenuMocks);
 vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
@@ -77,5 +90,44 @@ describe('background message routing', () => {
     );
 
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(91);
+  });
+
+  it('registers toolbar action click handling', async () => {
+    await import('../entrypoints/background');
+
+    expect(browserMocks.action.onClicked.addListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('stows the clicked tab window from the toolbar action', async () => {
+    const result = {
+      ok: true,
+      data: { session: null, savedTabCount: 3, closedTabCount: 3 },
+    };
+    sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.action.onClicked.addListener.mock.calls[0]?.[0];
+    await listener?.({ windowId: 41 } as chrome.tabs.Tab);
+
+    expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(41);
+    expect(actionFeedbackMocks.showActionFeedback).toHaveBeenCalledWith(result);
+  });
+
+  it('falls back to the last focused window when toolbar tab has no window id', async () => {
+    sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValue({
+      ok: false,
+      error: {
+        code: 'no-eligible-tabs',
+        message: 'No eligible tabs were found in the current window.',
+      },
+    });
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.action.onClicked.addListener.mock.calls[0]?.[0];
+    await listener?.({} as chrome.tabs.Tab);
+
+    expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(undefined);
   });
 });

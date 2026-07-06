@@ -3,6 +3,7 @@ import {
   registerContextMenu,
   registerContextMenuClickHandler,
 } from '@/features/context-menu/context-menu';
+import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
 import { restoreSession, saveCurrentWindowAsSession } from '@/features/tabs/session-service';
@@ -49,6 +50,10 @@ export default defineBackground(() => {
   });
 
   registerContextMenuClickHandler();
+
+  browser.action.onClicked.addListener((tab) => {
+    void saveCurrentWindowAsSession(tab.windowId).then(showActionFeedback);
+  });
 
   browser.runtime.onMessage.addListener((message: ExtensionMessage, sender) => {
     return handleMessage(message, sender);
