@@ -53,14 +53,18 @@ async function ensureWindowSurvivesRemoval(
   });
 }
 
-async function getCurrentWindowTabs(): Promise<StowableBrowserTab[]> {
-  return browser.tabs.query({ currentWindow: true });
+async function getCurrentWindowTabs(windowId?: number): Promise<StowableBrowserTab[]> {
+  if (windowId != null) {
+    return browser.tabs.query({ windowId });
+  }
+
+  return browser.tabs.query({ lastFocusedWindow: true });
 }
 
-export async function saveCurrentWindowAsSession(): Promise<AppResult<StowResult>> {
+export async function saveCurrentWindowAsSession(windowId?: number): Promise<AppResult<StowResult>> {
   try {
     const settings = await getSettings();
-    const tabs = await getCurrentWindowTabs();
+    const tabs = await getCurrentWindowTabs(windowId);
     const eligibleTabs = tabs.filter((tab) => isStowableTab(tab, settings));
 
     if (eligibleTabs.length === 0) {
@@ -73,7 +77,7 @@ export async function saveCurrentWindowAsSession(): Promise<AppResult<StowResult
       id: crypto.randomUUID(),
       title: titleFromTabs(savedTabs),
       tabs: savedTabs,
-      sourceWindowId: eligibleTabs[0]?.windowId,
+      sourceWindowId: windowId ?? eligibleTabs[0]?.windowId,
       createdAt,
       updatedAt: createdAt,
       deviceId: settings.deviceId,
@@ -121,6 +125,9 @@ export async function restoreSession(
     const session = await getSession(sessionId);
     if (!session) {
       return err('session-not-found', 'Saved session was not found.');
+    }
+    if (session.tabs.length === 0) {
+      return err('empty-session', 'Saved session has no tabs to restore.');
     }
 
     if (mode === 'new-window') {

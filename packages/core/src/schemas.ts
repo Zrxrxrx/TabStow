@@ -44,6 +44,21 @@ export const syncDocumentSchema = z.object({
   exportedAt: z.string().datetime(),
   sessions: z.array(tabSessionSchema),
   settings: safeSyncSettingsSchema,
+}).superRefine((document, context) => {
+  const seenSessionIds = new Set<string>();
+
+  for (const [index, session] of document.sessions.entries()) {
+    if (seenSessionIds.has(session.id)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['sessions', index, 'id'],
+        message: 'Session IDs must be unique.',
+      });
+      continue;
+    }
+
+    seenSessionIds.add(session.id);
+  }
 });
 
 export const DEFAULT_SETTINGS = {
@@ -52,6 +67,10 @@ export const DEFAULT_SETTINGS = {
   closePinnedTabs: false,
   theme: 'system',
 } as const satisfies z.infer<typeof defaultSettingsSchema>;
+
+export function isZodValidationError(error: unknown): error is z.ZodError {
+  return error instanceof z.ZodError;
+}
 
 export type SavedTab = z.infer<typeof savedTabSchema>;
 export type TabSession = z.infer<typeof tabSessionSchema>;

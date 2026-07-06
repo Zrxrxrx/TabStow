@@ -12,6 +12,17 @@ type GistResponse = {
 
 const GITHUB_API_VERSION = '2022-11-28';
 
+export class GistFileNotFoundError extends Error {}
+
+function isTrustedRawGistUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return url.protocol === 'https:' && url.hostname === 'gist.githubusercontent.com';
+  } catch {
+    return false;
+  }
+}
+
 export class GistClient {
   constructor(
     private readonly token: string,
@@ -40,7 +51,7 @@ export class GistClient {
     const file = gist.files?.[fileName];
 
     if (!file) {
-      throw new Error('Gist file was not found.');
+      throw new GistFileNotFoundError('Gist file was not found.');
     }
 
     if (!file.truncated && typeof file.content === 'string') {
@@ -50,10 +61,12 @@ export class GistClient {
     if (!file.raw_url) {
       throw new Error('Gist file content was unavailable.');
     }
+    if (!isTrustedRawGistUrl(file.raw_url)) {
+      throw new Error('Gist file raw URL was invalid.');
+    }
 
     const rawResponse = await this.fetcher(file.raw_url, {
       method: 'GET',
-      headers: this.headers(),
     });
 
     if (!rawResponse.ok) {

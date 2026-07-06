@@ -6,6 +6,7 @@ export type AppErrorCode =
   | 'chrome-tabs-error'
   | 'no-eligible-tabs'
   | 'session-not-found'
+  | 'empty-session'
   | 'unknown-error';
 
 export type AppError = {

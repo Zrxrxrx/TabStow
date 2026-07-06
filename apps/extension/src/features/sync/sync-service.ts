@@ -1,5 +1,6 @@
 import {
   buildSyncDocument,
+  isZodValidationError,
   mergeSessionsById,
   parseSyncDocument,
   toImportableSettings,
@@ -8,7 +9,7 @@ import { exportSessions, importSessions, listSessions } from '@/db/db';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import type { SyncResult } from '@/lib/messages';
-import { GistClient } from './gist-client';
+import { GistClient, GistFileNotFoundError } from './gist-client';
 
 function requireSyncSettings(settings: {
   githubToken?: string;
@@ -35,23 +36,50 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
     const required = requireSyncSettings(settings);
     if (!required.ok) return required;
 
-    const sessions = await exportSessions();
+    const localSessions = await exportSessions();
     const exportedAt = new Date().toISOString();
+    const client = new GistClient(required.data.githubToken);
+    let sessionsToPush = localSessions;
+
+    try {
+      const remoteContent = await client.getFileContent(
+        required.data.gistId,
+        required.data.gistFileName,
+      );
+      const remoteDocument = parseSyncDocument(JSON.parse(remoteContent));
+      sessionsToPush = mergeSessionsById(remoteDocument.sessions, localSessions);
+    } catch (error) {
+      if (!(error instanceof GistFileNotFoundError)) {
+        if (error instanceof SyntaxError) {
+          return err(
+            'invalid-sync-document',
+            'The configured Gist file did not contain valid JSON.',
+          );
+        }
+        if (isZodValidationError(error)) {
+          return err(
+            'invalid-sync-document',
+            'The configured Gist file was not a valid Tabstow sync document.',
+          );
+        }
+        throw error;
+      }
+    }
+
     const document = buildSyncDocument({
       deviceId: settings.deviceId,
       exportedAt,
-      sessions,
+      sessions: sessionsToPush,
       settings,
     });
 
-    const client = new GistClient(required.data.githubToken);
     await client.updateFile(
       required.data.gistId,
       required.data.gistFileName,
       JSON.stringify(document, null, 2),
     );
 
-    return ok({ sessionCount: sessions.length, exportedAt });
+    return ok({ sessionCount: sessionsToPush.length, exportedAt });
   } catch (error) {
     return err('github-api-error', toErrorMessage(error));
   }
@@ -76,19 +104,18 @@ export async function pullFromGist(): Promise<AppResult<SyncResult>> {
       importedAt: new Date().toISOString(),
     });
   } catch (error) {
-    const message = toErrorMessage(error);
-    if (message === 'Gist file was not found.') {
-      return err('gist-file-not-found', message);
+    if (error instanceof GistFileNotFoundError) {
+      return err('gist-file-not-found', error.message);
     }
     if (error instanceof SyntaxError) {
       return err('invalid-sync-document', 'The configured Gist file did not contain valid JSON.');
     }
-    if (message.includes('Invalid') || message.includes('Expected')) {
+    if (isZodValidationError(error)) {
       return err(
         'invalid-sync-document',
         'The configured Gist file was not a valid Tabstow sync document.',
       );
     }
-    return err('github-api-error', message);
+    return err('github-api-error', toErrorMessage(error));
   }
 }

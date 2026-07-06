@@ -1,5 +1,5 @@
 import type { ExtensionSettings, TabSession } from '@tabstow/core';
-import type { AppResult } from './errors';
+import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
 
 export type RestoreMode = 'current-window' | 'new-window';
@@ -38,5 +38,9 @@ export type ExtensionMessageResponse =
 export async function sendExtensionMessage<T extends ExtensionMessageResponse = ExtensionMessageResponse>(
   message: ExtensionMessage,
 ): Promise<T> {
-  return browser.runtime.sendMessage(message) as Promise<T>;
+  try {
+    return (await browser.runtime.sendMessage(message)) as T;
+  } catch (error) {
+    return err('unknown-error', toErrorMessage(error)) as T;
+  }
 }

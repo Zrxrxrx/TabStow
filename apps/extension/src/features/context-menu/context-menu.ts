@@ -13,8 +13,8 @@ export async function registerContextMenu(): Promise<void> {
 }
 
 export function registerContextMenuClickHandler(): void {
-  browser.contextMenus.onClicked.addListener((info) => {
+  browser.contextMenus.onClicked.addListener((info, tab) => {
     if (info.menuItemId !== STOW_CURRENT_WINDOW_MENU_ID) return;
-    void saveCurrentWindowAsSession();
+    void saveCurrentWindowAsSession(tab?.windowId);
   });
 }

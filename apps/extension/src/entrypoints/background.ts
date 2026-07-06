@@ -10,13 +10,16 @@ import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { browser } from '@/lib/browser';
 import type { ExtensionMessage } from '@/lib/messages';
 
-async function handleMessage(message: ExtensionMessage): Promise<AppResult<unknown>> {
+async function handleMessage(
+  message: ExtensionMessage,
+  sender?: chrome.runtime.MessageSender,
+): Promise<AppResult<unknown>> {
   try {
     switch (message.type) {
       case 'sessions:list':
         return ok(await listSessions());
       case 'sessions:stow-current-window':
-        return saveCurrentWindowAsSession();
+        return saveCurrentWindowAsSession(sender?.tab?.windowId);
       case 'sessions:restore':
         return restoreSession(message.sessionId, message.mode);
       case 'sessions:delete':
@@ -47,7 +50,7 @@ export default defineBackground(() => {
 
   registerContextMenuClickHandler();
 
-  browser.runtime.onMessage.addListener((message: ExtensionMessage) => {
-    return handleMessage(message);
+  browser.runtime.onMessage.addListener((message: ExtensionMessage, sender) => {
+    return handleMessage(message, sender);
   });
 });

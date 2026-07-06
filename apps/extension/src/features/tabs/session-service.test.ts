@@ -146,4 +146,64 @@ describe('session service', () => {
       }),
     });
   });
+
+  it('uses the initiating window id for stow queries and survivor tabs', async () => {
+    settingsMocks.getSettings.mockResolvedValue({
+      ...DEFAULT_SETTINGS,
+      deviceId: 'device-1',
+      closePinnedTabs: true,
+    });
+    browserMocks.tabs.query.mockResolvedValue([
+      {
+        id: 21,
+        windowId: 55,
+        url: 'https://example.com/',
+        title: 'Example',
+        pinned: false,
+        active: true,
+      },
+    ]);
+    dbMocks.createSession.mockResolvedValue(undefined);
+    browserMocks.tabs.create.mockResolvedValue({ id: 88 });
+    browserMocks.tabs.remove.mockResolvedValue(undefined);
+
+    const result = await saveCurrentWindowAsSession(55);
+
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        savedTabCount: 1,
+        closedTabCount: 1,
+      }),
+    });
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowId: 55 });
+    expect(browserMocks.tabs.create).toHaveBeenCalledWith({
+      windowId: 55,
+      url: 'chrome-extension://tabstow/newtab.html',
+      active: true,
+    });
+  });
+
+  it('rejects restoring an empty saved session with a typed error', async () => {
+    dbMocks.getSession.mockResolvedValue({
+      id: 'session-1',
+      title: 'Empty session',
+      tabs: [],
+      createdAt: '2026-07-06T00:00:00.000Z',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+      deviceId: 'device-1',
+    } satisfies TabSession);
+
+    const result = await restoreSession('session-1', 'current-window');
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'empty-session',
+        message: 'Saved session has no tabs to restore.',
+      },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(browserMocks.windows.create).not.toHaveBeenCalled();
+  });
 });
