@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import type { AppResult } from '@/lib/errors';
-import { sendExtensionMessage } from '@/lib/messages';
+import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { SearchBox } from './components/SearchBox';
 import { StowedSessions } from './components/StowedSessions';
@@ -15,6 +15,7 @@ export function App() {
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
+  const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
 
   async function loadSessions() {
     const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
@@ -44,6 +45,7 @@ export function App() {
     if (response.ok) {
       setStatus({ tone: 'success', message: success(response.data) });
       await loadSessions();
+      setActiveWorkspaceRefreshKey((value) => value + 1);
       return;
     }
 
@@ -67,7 +69,20 @@ export function App() {
         />
       </section>
 
-      <ActiveWorkspace onStatus={(tone, message) => setStatus({ tone, message })} />
+      <ActiveWorkspace
+        onStatus={(tone, message) => setStatus({ tone, message })}
+        refreshKey={activeWorkspaceRefreshKey}
+        onStowCurrentWindow={() =>
+          runAction(
+            'stow',
+            () =>
+              sendExtensionMessage<AppResult<StowResult>>({
+                type: 'sessions:stow-current-window',
+              }),
+            (result) => `Stowed ${result.savedTabCount} tabs and closed ${result.closedTabCount}.`,
+          )
+        }
+      />
 
       <section className="stowed-sessions">
         <StowedSessions

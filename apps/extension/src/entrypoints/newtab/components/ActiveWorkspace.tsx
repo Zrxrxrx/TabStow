@@ -18,14 +18,16 @@ import {
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
 import type { AppResult } from '@/lib/errors';
-import { sendExtensionMessage, type StowResult } from '@/lib/messages';
+import { sendExtensionMessage } from '@/lib/messages';
 import { GroupNav } from './GroupNav';
 
 type Props = {
   onStatus: (tone: 'success' | 'error', message: string) => void;
+  onStowCurrentWindow: () => Promise<void>;
+  refreshKey: number;
 };
 
-export function ActiveWorkspace({ onStatus }: Props) {
+export function ActiveWorkspace({ onStatus, onStowCurrentWindow, refreshKey }: Props) {
   const [tabs, setTabs] = useState<ActiveBrowserTab[]>([]);
   const [workspace, setWorkspace] = useState<ActiveWorkspaceState | null>(null);
   const groupRefs = useRef(new Map<string, HTMLElement>());
@@ -56,7 +58,7 @@ export function ActiveWorkspace({ onStatus }: Props) {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [refreshKey]);
 
   const groups = useMemo(
     () => (workspace ? buildActiveTabGroups(tabs, workspace.manualGroups, workspace.order) : []),
@@ -85,21 +87,6 @@ export function ActiveWorkspace({ onStatus }: Props) {
       windowId: tab.windowId,
     });
     if (!response.ok) onStatus('error', response.error.message);
-  }
-
-  async function stowCurrentWindow() {
-    const response = await sendExtensionMessage<AppResult<StowResult>>({
-      type: 'sessions:stow-current-window',
-    });
-    if (response.ok) {
-      onStatus(
-        'success',
-        `Stowed ${response.data.savedTabCount} tabs and closed ${response.data.closedTabCount}.`,
-      );
-      await refresh();
-      return;
-    }
-    onStatus('error', response.error.message);
   }
 
   async function createManualGroupForTab(tab: ActiveBrowserTab) {
@@ -134,7 +121,7 @@ export function ActiveWorkspace({ onStatus }: Props) {
 
       <div className="active-workspace-hint">
         <p>Ready to clear this workspace? Stow the current window here or from the toolbar.</p>
-        <button type="button" className="secondary-button" onClick={() => void stowCurrentWindow()}>
+        <button type="button" className="secondary-button" onClick={() => void onStowCurrentWindow()}>
           <Archive size={16} aria-hidden="true" />
           Stow this window
         </button>

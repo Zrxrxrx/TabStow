@@ -180,6 +180,34 @@ describe('App', () => {
       tabIds: [12],
     });
   });
+
+  it('refreshes active tabs after stowing from saved sessions', async () => {
+    let activeTabs = [UNIQUE_TAB];
+    sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:list') {
+        return { ok: true, data: activeTabs };
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'sessions:stow-current-window') {
+        activeTabs = [];
+        return { ok: true, data: { sessionId: 'session-1', savedTabCount: 1, closedTabCount: 1 } };
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    expect(screen().getByText('1 open')).not.toBeNull();
+
+    await click(screen().getByText('Stow current window'));
+
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:list')).toHaveLength(2);
+    expect(screen().getByText('0 open')).not.toBeNull();
+  });
 });
 
 function defaultWorkspace() {
