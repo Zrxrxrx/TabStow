@@ -4,6 +4,7 @@ import {
   registerContextMenuClickHandler,
 } from '@/features/context-menu/context-menu';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
+import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
 import { restoreSession, saveCurrentWindowAsSession } from '@/features/tabs/session-service';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { browser } from '@/lib/browser';
@@ -26,8 +27,9 @@ async function handleMessage(message: ExtensionMessage): Promise<AppResult<unkno
       case 'settings:update':
         return ok(await updateSettings(message.settings));
       case 'sync:push':
+        return pushToGist();
       case 'sync:pull':
-        return err('unknown-error', 'Sync is not available until the sync service is installed.');
+        return pullFromGist();
     }
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
