@@ -36,6 +36,22 @@ function getTabsByWindow(group: ActiveTabGroup): Array<{ windowId: number; tabId
   return Array.from(tabIdsByWindow.entries()).map(([windowId, tabIds]) => ({ windowId, tabIds }));
 }
 
+async function groupTabsIntoChromeGroup(
+  tabIds: number[],
+  existingChromeGroupId?: number,
+): Promise<number> {
+  if (typeof existingChromeGroupId !== 'number') {
+    return browser.tabs.group({ tabIds });
+  }
+
+  try {
+    await browser.tabs.group({ groupId: existingChromeGroupId, tabIds });
+    return existingChromeGroupId;
+  } catch {
+    return browser.tabs.group({ tabIds });
+  }
+}
+
 export async function syncChromeTabGroups(
   groups: ActiveTabGroup[],
   state: ChromeTabGroupsState,
@@ -52,11 +68,7 @@ export async function syncChromeTabGroups(
         const existing = state.mappings.find(
           (mapping) => mapping.virtualGroupKey === group.key && mapping.windowId === windowId,
         );
-        const chromeGroupId = existing?.chromeGroupId ?? await browser.tabs.group({ tabIds });
-
-        if (existing) {
-          await browser.tabs.group({ groupId: chromeGroupId, tabIds });
-        }
+        const chromeGroupId = await groupTabsIntoChromeGroup(tabIds, existing?.chromeGroupId);
 
         await browser.tabGroups.update(chromeGroupId, { title: group.title, collapsed: true });
         nextMappings.push({
@@ -99,7 +111,7 @@ export async function importChromeTabGroups(
   try {
     const chromeGroups = await browser.tabGroups.query({});
     let nextManualGroups = manualGroups;
-    const mappings = [...state.mappings];
+    const mappings = state.mappings.map((mapping) => ({ ...mapping }));
 
     for (const chromeGroup of chromeGroups) {
       const groupTabs = tabs.filter((tab) => tab.groupId === chromeGroup.id && typeof tab.id === 'number');

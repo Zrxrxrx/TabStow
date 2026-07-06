@@ -95,6 +95,26 @@ describe('chrome tab groups', () => {
     });
   });
 
+  it('recovers stale native mappings during sync', async () => {
+    browserMocks.tabs.group
+      .mockRejectedValueOnce(new Error('No group with id: 88'))
+      .mockResolvedValueOnce(123);
+
+    const { syncChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await syncChromeTabGroups(groups, {
+      enabled: true,
+      mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 88 }],
+    });
+
+    expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(1, { groupId: 88, tabIds: [10, 11] });
+    expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(2, { tabIds: [10, 11] });
+    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(123, { title: 'Launch', collapsed: true });
+    expect(result).toEqual({
+      ok: true,
+      data: { enabled: true, mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 123 }] },
+    });
+  });
+
   it('collapses all groups in a window', async () => {
     browserMocks.tabGroups.query.mockResolvedValue([{ id: 3, windowId: 7 }, { id: 4, windowId: 8 }]);
 
@@ -150,6 +170,41 @@ describe('chrome tab groups', () => {
       () => 'replacement-group',
     );
 
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        manualGroups: {
+          groups: [{ id: 'replacement-group', name: 'Reading', createdAt: expect.any(String) }],
+          assignments: { '1': 'replacement-group' },
+        },
+        chromeTabGroups: {
+          enabled: true,
+          mappings: [{ virtualGroupKey: 'manual:replacement-group', windowId: 7, chromeGroupId: 31 }],
+        },
+      },
+    });
+  });
+
+  it('does not mutate input mappings when retargeting stale imports', async () => {
+    browserMocks.tabGroups.query.mockResolvedValue([{ id: 31, windowId: 7, title: 'Reading' }]);
+    const state = {
+      enabled: true,
+      mappings: [{ virtualGroupKey: 'manual:missing-group', windowId: 1, chromeGroupId: 31 }],
+    };
+
+    const { importChromeTabGroups } = await import('./chrome-tab-groups');
+    const result = await importChromeTabGroups(
+      [
+        { id: 1, windowId: 7, groupId: 31, index: 0, active: false, pinned: false, url: 'https://example.com' },
+      ],
+      { groups: [], assignments: {} },
+      state,
+      () => 'replacement-group',
+    );
+
+    expect(state.mappings).toEqual([
+      { virtualGroupKey: 'manual:missing-group', windowId: 1, chromeGroupId: 31 },
+    ]);
     expect(result).toEqual({
       ok: true,
       data: {
