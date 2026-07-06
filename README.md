@@ -48,10 +48,19 @@ Create a GitHub Gist manually, add a file named `tabstow.sync.json`, and paste t
 
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
 - Open a new tab and confirm the Tabstow dashboard appears.
+- Click the extension toolbar icon and confirm the current window's eligible tabs are stowed and no popup opens.
 - Open several ordinary web tabs and use **Stow current window**.
+- Confirm active tabs group by domain and homepage-style tabs appear in the Homepages group.
+- Create a manual group from an active tab and move the tab back to its domain group.
+- Enable Chrome tab-group sync and confirm manual groups become native Chrome tab groups.
+- Collapse Chrome tab groups from the dashboard.
+- Close one tab, close a group, and close duplicates.
+- Add and open a quick link.
+- Create, complete, search, and clear todos.
+- Change theme mode, palette, transparency, and language preference.
+- Run dashboard search with the default search provider.
 - Confirm the saved session appears and eligible tabs close.
 - Restore the saved session.
 - Delete the saved session.
 - Open the options page and save Gist settings.
-- Push to the configured Gist.
-- Pull from the configured Gist and confirm sessions merge by ID.
+- Push and pull Gist sync and confirm only stowed sessions sync.
