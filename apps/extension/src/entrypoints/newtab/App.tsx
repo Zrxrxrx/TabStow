@@ -3,8 +3,11 @@ import type { TabSession } from '@tabstow/core';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
+import { QuickLinks } from './components/QuickLinks';
 import { SearchBox } from './components/SearchBox';
 import { StowedSessions } from './components/StowedSessions';
+import { ThemeControls } from './components/ThemeControls';
+import { TodosPanel } from './components/TodosPanel';
 
 type StatusState = {
   tone: 'info' | 'success' | 'error';
@@ -92,6 +95,12 @@ export function App() {
           )
         }
       />
+
+      <section className="utility-grid" aria-label="Utilities">
+        <QuickLinks />
+        <TodosPanel />
+        <ThemeControls />
+      </section>
 
       <section className="stowed-sessions">
         <StowedSessions

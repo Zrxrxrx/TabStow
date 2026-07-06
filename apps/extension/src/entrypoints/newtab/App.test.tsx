@@ -17,6 +17,22 @@ const { getActiveWorkspaceState, updateActiveWorkspaceState } = vi.hoisted(() =>
   getActiveWorkspaceState: vi.fn(),
   updateActiveWorkspaceState: vi.fn(),
 }));
+const { getQuickLinks, saveQuickLinks } = vi.hoisted(() => ({
+  getQuickLinks: vi.fn(),
+  saveQuickLinks: vi.fn(),
+}));
+const { getTodos, saveTodos } = vi.hoisted(() => ({
+  getTodos: vi.fn(),
+  saveTodos: vi.fn(),
+}));
+const { getThemePreferences, saveThemePreferences } = vi.hoisted(() => ({
+  getThemePreferences: vi.fn(),
+  saveThemePreferences: vi.fn(),
+}));
+const { getLanguagePreference, saveLanguagePreference } = vi.hoisted(() => ({
+  getLanguagePreference: vi.fn(),
+  saveLanguagePreference: vi.fn(),
+}));
 
 vi.mock('@/lib/messages', () => ({
   sendExtensionMessage,
@@ -26,6 +42,36 @@ vi.mock('@/features/active-tabs/active-workspace-storage', () => ({
   getActiveWorkspaceState,
   updateActiveWorkspaceState,
 }));
+
+vi.mock('@/features/quick-links/quick-links-storage', () => ({
+  getQuickLinks,
+  saveQuickLinks,
+}));
+
+vi.mock('@/features/todos/todos-storage', () => ({
+  getTodos,
+  saveTodos,
+}));
+
+vi.mock('@/features/theme/theme-preferences', async () => {
+  const actual = await vi.importActual<typeof import('@/features/theme/theme-preferences')>(
+    '@/features/theme/theme-preferences',
+  );
+  return {
+    ...actual,
+    getThemePreferences,
+    saveThemePreferences,
+  };
+});
+
+vi.mock('@/features/i18n/i18n', async () => {
+  const actual = await vi.importActual<typeof import('@/features/i18n/i18n')>('@/features/i18n/i18n');
+  return {
+    ...actual,
+    getLanguagePreference,
+    saveLanguagePreference,
+  };
+});
 
 const SESSIONS: TabSession[] = [];
 const DUPLICATE_TABS: ActiveBrowserTab[] = [
@@ -93,6 +139,14 @@ describe('App', () => {
     sendExtensionMessage.mockReset();
     getActiveWorkspaceState.mockReset();
     updateActiveWorkspaceState.mockReset();
+    getQuickLinks.mockReset();
+    saveQuickLinks.mockReset();
+    getTodos.mockReset();
+    saveTodos.mockReset();
+    getThemePreferences.mockReset();
+    saveThemePreferences.mockReset();
+    getLanguagePreference.mockReset();
+    saveLanguagePreference.mockReset();
     getActiveWorkspaceState.mockResolvedValue(defaultWorkspace());
     updateActiveWorkspaceState.mockImplementation(
       async (state: {
@@ -105,7 +159,25 @@ describe('App', () => {
         chromeTabGroups: state.chromeTabGroups ?? defaultWorkspace().chromeTabGroups,
       }),
     );
+    getQuickLinks.mockResolvedValue([]);
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    getTodos.mockResolvedValue([]);
+    saveTodos.mockImplementation(async (todos: unknown) => todos);
+    getThemePreferences.mockResolvedValue({
+      mode: 'system',
+      paletteId: 'paper',
+      surfaceOpacity: 92,
+      customBackground: null,
+    });
+    saveThemePreferences.mockImplementation(async (preferences: unknown) => preferences);
+    getLanguagePreference.mockResolvedValue('auto');
+    saveLanguagePreference.mockImplementation(async (language: unknown) => language);
     promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
+    document.documentElement.removeAttribute('data-theme-mode');
+    document.documentElement.removeAttribute('data-theme-palette');
+    document.documentElement.removeAttribute('lang');
+    document.documentElement.style.removeProperty('--surface-opacity');
+    document.documentElement.style.removeProperty('--dashboard-background-image');
   });
 
   afterEach(async () => {
@@ -134,6 +206,123 @@ describe('App', () => {
 
     expect(sectionHeader?.nextElementSibling).toBe(controls);
     expect(controls?.nextElementSibling).toBe(hint);
+  });
+
+  it('renders utility panels from stored quick links, todos, and theme preferences', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+    getTodos.mockResolvedValue([
+      {
+        id: 'todo-1',
+        title: 'Review launch checklist',
+        description: '',
+        createdAt: '2026-07-07T00:00:00.000Z',
+        completed: false,
+        completedAt: null,
+        dismissed: false,
+      },
+    ]);
+    getThemePreferences.mockResolvedValue({
+      mode: 'dark',
+      paletteId: 'sage',
+      surfaceOpacity: 84,
+      customBackground: null,
+    });
+    getLanguagePreference.mockResolvedValue('zh-CN');
+
+    await renderApp();
+
+    expect(screen().getByRole('heading', { name: 'Quick links' })).not.toBeNull();
+    expect(screen().getByText('Example')).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Todos' })).not.toBeNull();
+    expect(screen().getByText('Review launch checklist')).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Appearance' })).not.toBeNull();
+    expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(document.documentElement.dataset.themePalette).toBe('sage');
+    expect(document.documentElement.lang).toBe('zh-CN');
+  });
+
+  it('adds and removes quick links through the utility panel', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    promptSpy
+      .mockReturnValueOnce('https://example.com')
+      .mockReturnValueOnce('Example');
+
+    await renderApp();
+    await click(screen().getByLabelText('Add quick link'));
+
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://example.com/',
+        label: 'Example',
+      }),
+    ]);
+    expect(screen().getByText('Example')).not.toBeNull();
+
+    await click(screen().getByLabelText('Remove Example'));
+
+    expect(saveQuickLinks).toHaveBeenLastCalledWith([]);
+  });
+
+  it('updates theme controls and todo actions from the utility panels', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getTodos.mockResolvedValue([
+      {
+        id: 'todo-1',
+        title: 'Review launch checklist',
+        description: 'Remember the migration notes',
+        createdAt: '2026-07-07T00:00:00.000Z',
+        completed: false,
+        completedAt: null,
+        dismissed: false,
+      },
+      {
+        id: 'todo-2',
+        title: 'Ship notes',
+        description: '',
+        createdAt: '2026-07-07T00:00:00.000Z',
+        completed: true,
+        completedAt: '2026-07-07T00:00:00.000Z',
+        dismissed: false,
+      },
+    ]);
+    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
+      mode: 'dark',
+      paletteId: 'blush',
+      surfaceOpacity: 70,
+      customBackground: null,
+      ...(preferences as object),
+    }));
+    saveTodos.mockImplementation(async (todos: unknown) => todos);
+
+    await renderApp();
+
+    await change(screen().getByLabelText('Palette'), 'blush');
+    expect(saveThemePreferences).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paletteId: 'blush',
+      }),
+    );
+    expect(document.documentElement.dataset.themePalette).toBe('blush');
+
+    await change(screen().getByLabelText('Search todos'), 'launch');
+    expect((screen().getByLabelText('Search todos') as HTMLInputElement).value).toBe('launch');
+
+    await change(screen().getByLabelText('Search todos'), '');
+    await click(screen().getByText('Clear completed'));
+    expect(saveTodos).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'todo-1', dismissed: false }),
+      expect.objectContaining({ id: 'todo-2', dismissed: true }),
+    ]);
   });
 
   it('closes duplicate tabs from the active workspace action', async () => {
@@ -553,6 +742,20 @@ async function renderApp() {
 async function click(element: HTMLElement) {
   await act(async () => {
     element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+
+async function change(element: HTMLElement, value: string) {
+  await act(async () => {
+    if (
+      element instanceof HTMLInputElement
+      || element instanceof HTMLSelectElement
+      || element instanceof HTMLTextAreaElement
+    ) {
+      element.value = value;
+    }
+    element.dispatchEvent(new Event('input', { bubbles: true }));
+    element.dispatchEvent(new Event('change', { bubbles: true }));
   });
 }
 
