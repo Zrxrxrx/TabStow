@@ -3,6 +3,8 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveBrowserTab, ManualGroupsState } from '@/features/active-tabs/types';
+import type { AppResult } from '@/lib/errors';
+import type { StowResult } from '@/lib/messages';
 import { App } from './App';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -169,6 +171,27 @@ describe('App', () => {
     });
   });
 
+  it('clears a manual group assignment when moving a tab back to its domain group', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getActiveWorkspaceState.mockResolvedValue({
+      ...defaultWorkspace(),
+      manualGroups: {
+        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
+        assignments: { '12': 'manual-1' },
+      },
+    });
+
+    await renderApp();
+    await click(screen().getByLabelText('Move to domain group'));
+
+    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
+      manualGroups: {
+        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
+        assignments: {},
+      },
+    });
+  });
+
   it('closes a single tab from its row action', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
 
@@ -207,6 +230,49 @@ describe('App', () => {
 
     expect(sentMessageTypes().filter((type) => type === 'active-tabs:list')).toHaveLength(2);
     expect(screen().getByText('0 open')).not.toBeNull();
+  });
+
+  it('disables active workspace stow while another app action is busy', async () => {
+    const pendingStow = deferred<AppResult<StowResult>>();
+    sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:list') {
+        return { ok: true, data: [UNIQUE_TAB] };
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'sessions:stow-current-window') {
+        return pendingStow.promise;
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    await click(screen().getByText('Stow current window'));
+
+    expect(screen().getByText('Stow this window')).toHaveProperty('disabled', true);
+
+    pendingStow.resolve({
+      ok: true,
+      data: {
+        session: {
+          id: 'session-1',
+          title: 'Session 1',
+          tabs: [],
+          createdAt: '2026-07-07T00:00:00.000Z',
+          updatedAt: '2026-07-07T00:00:00.000Z',
+          deviceId: 'device-1',
+        },
+        savedTabCount: 1,
+        closedTabCount: 1,
+      },
+    });
+    await act(async () => {
+      await pendingStow.promise;
+    });
   });
 });
 
@@ -292,4 +358,12 @@ function screen() {
 function matchesName(element: HTMLElement, name: string | undefined) {
   if (!name) return true;
   return element.textContent?.replace(/\s+/g, ' ').trim() === name;
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((nextResolve) => {
+    resolve = nextResolve;
+  });
+  return { promise, resolve };
 }

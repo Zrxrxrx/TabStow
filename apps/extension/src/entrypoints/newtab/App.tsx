@@ -37,6 +37,7 @@ export function App() {
     action: () => Promise<AppResult<T>>,
     success: (data: T) => string,
   ) {
+    if (busyAction !== null) return;
     setBusyAction(actionId);
     setStatus({ tone: 'info', message: null });
     const response = await action();
@@ -70,6 +71,7 @@ export function App() {
       </section>
 
       <ActiveWorkspace
+        busy={busyAction !== null}
         onStatus={(tone, message) => setStatus({ tone, message })}
         refreshKey={activeWorkspaceRefreshKey}
         onStowCurrentWindow={() =>

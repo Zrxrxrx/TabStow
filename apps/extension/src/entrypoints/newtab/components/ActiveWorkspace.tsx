@@ -22,12 +22,13 @@ import { sendExtensionMessage } from '@/lib/messages';
 import { GroupNav } from './GroupNav';
 
 type Props = {
+  busy: boolean;
   onStatus: (tone: 'success' | 'error', message: string) => void;
   onStowCurrentWindow: () => Promise<void>;
   refreshKey: number;
 };
 
-export function ActiveWorkspace({ onStatus, onStowCurrentWindow, refreshKey }: Props) {
+export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKey }: Props) {
   const [tabs, setTabs] = useState<ActiveBrowserTab[]>([]);
   const [workspace, setWorkspace] = useState<ActiveWorkspaceState | null>(null);
   const groupRefs = useRef(new Map<string, HTMLElement>());
@@ -121,7 +122,12 @@ export function ActiveWorkspace({ onStatus, onStowCurrentWindow, refreshKey }: P
 
       <div className="active-workspace-hint">
         <p>Ready to clear this workspace? Stow the current window here or from the toolbar.</p>
-        <button type="button" className="secondary-button" onClick={() => void onStowCurrentWindow()}>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void onStowCurrentWindow()}
+          disabled={busy}
+        >
           <Archive size={16} aria-hidden="true" />
           Stow this window
         </button>
