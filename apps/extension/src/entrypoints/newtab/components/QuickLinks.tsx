@@ -71,6 +71,7 @@ function QuickLinkImageIcon({ token, label }: { token: string; label: string }) 
 export function QuickLinks({ locale }: Props) {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const uploadInputRefs = useRef(new Map<string, HTMLInputElement>());
 
   useEffect(() => {
     void getQuickLinks().then(setLinks);
@@ -230,12 +231,7 @@ export function QuickLinks({ locale }: Props) {
                 type="button"
                 className="icon-button"
                 aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
-                onClick={() => {
-                  const input = document.querySelector<HTMLInputElement>(
-                    `input[data-quick-link-upload-id="${link.id}"]`,
-                  );
-                  input?.click();
-                }}
+                onClick={() => uploadInputRefs.current.get(link.id)?.click()}
               >
                 <ImageUp size={14} aria-hidden="true" />
               </button>
@@ -244,6 +240,14 @@ export function QuickLinks({ locale }: Props) {
                 aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
                 data-quick-link-upload-id={link.id}
                 hidden
+                ref={(node) => {
+                  if (node) {
+                    uploadInputRefs.current.set(link.id, node);
+                    return;
+                  }
+
+                  uploadInputRefs.current.delete(link.id);
+                }}
                 onChange={(event) => {
                   void uploadIcon(link, event.target.files?.[0]);
                   event.target.value = '';
