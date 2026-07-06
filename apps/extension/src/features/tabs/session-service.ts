@@ -1,9 +1,9 @@
 import type { SavedTab, TabSession } from '@tabstow/core';
-import { createSession, getSession } from '@/db/db';
-import { getSettings } from '@/features/settings/settings-storage';
-import { browser } from '@/lib/browser';
-import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
-import type { RestoreMode, StowResult } from '@/lib/messages';
+import { createSession, getSession } from '../../db/db';
+import { getSettings } from '../settings/settings-storage';
+import { browser } from '../../lib/browser';
+import { err, ok, toErrorMessage, type AppResult } from '../../lib/errors';
+import type { RestoreMode, StowResult } from '../../lib/messages';
 import { isStowableTab, shouldCloseSavedTab, type StowableBrowserTab } from './tab-filter';
 
 function nowIso(): string {
@@ -86,16 +86,27 @@ export async function saveCurrentWindowAsSession(): Promise<AppResult<StowResult
       .map((tab) => tab.id)
       .filter((id): id is number => typeof id === 'number');
 
-    await ensureWindowSurvivesRemoval(session.sourceWindowId, tabs.length, tabIdsToClose);
+    let closedTabCount = 0;
+
+    try {
+      await ensureWindowSurvivesRemoval(session.sourceWindowId, tabs.length, tabIdsToClose);
+    } catch {
+      // Best effort only; the session is already persisted.
+    }
 
     if (tabIdsToClose.length > 0) {
-      await browser.tabs.remove(tabIdsToClose);
+      try {
+        await browser.tabs.remove(tabIdsToClose);
+        closedTabCount = tabIdsToClose.length;
+      } catch {
+        closedTabCount = 0;
+      }
     }
 
     return ok({
       session,
       savedTabCount: savedTabs.length,
-      closedTabCount: tabIdsToClose.length,
+      closedTabCount,
     });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
@@ -113,10 +124,22 @@ export async function restoreSession(
     }
 
     if (mode === 'new-window') {
-      await browser.windows.create({
+      const createdWindow = await browser.windows.create({
         url: session.tabs.map((tab) => tab.url),
         focused: true,
       });
+
+      const createdWindowId = createdWindow?.id;
+      if (createdWindowId != null) {
+        const restoredTabs = await browser.tabs.query({ windowId: createdWindowId });
+
+        for (const [index, tab] of session.tabs.entries()) {
+          const restoredTab = restoredTabs[index];
+          if (tab.pinned && restoredTab?.id != null) {
+            await browser.tabs.update(restoredTab.id, { pinned: true });
+          }
+        }
+      }
 
       return ok({ restored: true, tabCount: session.tabs.length });
     }
