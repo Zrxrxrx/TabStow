@@ -21,16 +21,33 @@ select {
   font: inherit;
 }
 
+button {
+  border: 0;
+  border-radius: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
 .newtab-shell {
-  width: min(1120px, calc(100vw - 32px));
+  width: min(1180px, calc(100vw - 32px));
   margin: 0 auto;
-  padding: 28px 0;
+  padding: 26px 0;
 }
 
 .newtab-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
   gap: 16px;
   padding-bottom: 18px;
   border-bottom: 1px solid #d8dde5;
@@ -47,18 +64,119 @@ select {
   color: #596474;
 }
 
-.newtab-header button {
-  min-height: 40px;
-  border: 0;
-  border-radius: 8px;
-  padding: 0 14px;
+.header-actions,
+.session-actions,
+.stats-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.primary-button {
   background: #234a7c;
   color: #fff;
-  cursor: pointer;
+}
+
+.secondary-button {
+  background: #e8edf4;
+  color: #243246;
+}
+
+.danger-button {
+  background: #f5e5e5;
+  color: #8f2424;
+}
+
+.icon-button {
+  width: 38px;
+  padding: 0;
+  background: #e8edf4;
+  color: #243246;
+}
+
+.stats-row {
+  margin-top: 16px;
+  color: #596474;
+  font-size: 14px;
+}
+
+.stats-row span {
+  padding-right: 10px;
+  border-right: 1px solid #cbd3dd;
+}
+
+.stats-row span:last-child {
+  border-right: 0;
+}
+
+.status-message {
+  margin: 16px 0 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+}
+
+.status-message--info {
+  background: #e8edf4;
+  color: #243246;
+}
+
+.status-message--success {
+  background: #e2f2e8;
+  color: #235b35;
+}
+
+.status-message--error {
+  background: #f5e5e5;
+  color: #8f2424;
+}
+
+.session-list {
+  margin-top: 18px;
+  display: grid;
+  gap: 10px;
 }
 
 .empty-state {
-  margin-top: 24px;
-  padding: 20px 0;
+  padding: 22px 0;
   color: #596474;
+}
+
+.session-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 0;
+  border-bottom: 1px solid #d8dde5;
+}
+
+.session-main h2 {
+  margin: 0;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.session-main p {
+  margin: 5px 0 0;
+  color: #596474;
+  font-size: 14px;
+}
+
+.session-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .newtab-header,
+  .session-row {
+    grid-template-columns: 1fr;
+  }
+
+  .header-actions,
+  .session-actions {
+    justify-content: flex-start;
+  }
 }
