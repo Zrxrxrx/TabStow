@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { SearchBox } from './components/SearchBox';
 import { StowedSessions } from './components/StowedSessions';
 
@@ -66,13 +67,17 @@ export function App() {
         />
       </section>
 
-      <StowedSessions
-        busyAction={busyAction}
-        onOpenOptions={openOptions}
-        onRunAction={runAction}
-        sessions={sessions}
-        status={status}
-      />
+      <ActiveWorkspace onStatus={(tone, message) => setStatus({ tone, message })} />
+
+      <section className="stowed-sessions">
+        <StowedSessions
+          busyAction={busyAction}
+          onOpenOptions={openOptions}
+          onRunAction={runAction}
+          sessions={sessions}
+          status={status}
+        />
+      </section>
     </main>
   );
 }

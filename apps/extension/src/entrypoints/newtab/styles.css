@@ -143,6 +143,23 @@ button:disabled {
   border-right: 0;
 }
 
+.section-header {
+  align-items: baseline;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.section-header h2,
+.active-group h3 {
+  margin: 0;
+}
+
+.section-header span {
+  color: #596474;
+  font-size: 14px;
+}
+
 .status-message {
   margin: 16px 0 0;
   padding: 10px 12px;
@@ -197,6 +214,85 @@ button:disabled {
 }
 
 .session-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-workspace,
+.stowed-sessions {
+  display: grid;
+  gap: 16px;
+}
+
+.group-nav {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.group-nav button,
+.active-tab-row,
+.active-group {
+  border: 1px solid var(--border, #d7dde6);
+  border-radius: 8px;
+}
+
+.group-nav button {
+  align-items: center;
+  background: var(--surface, #ffffff);
+  color: inherit;
+  display: flex;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+}
+
+.active-group-list {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.active-group {
+  background: var(--surface, #ffffff);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.active-group header,
+.active-tab-row {
+  align-items: center;
+  display: flex;
+  justify-content: space-between;
+}
+
+.active-tab-list {
+  display: grid;
+  gap: 8px;
+}
+
+.active-tab-row {
+  gap: 8px;
+  min-height: 40px;
+  padding: 6px;
+}
+
+.active-tab-row button:first-child {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  display: flex;
+  flex: 1;
+  gap: 8px;
+  min-width: 0;
+  text-align: left;
+}
+
+.active-tab-row span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
