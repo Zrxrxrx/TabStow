@@ -2,7 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
-import type { ActiveBrowserTab } from '@/features/active-tabs/types';
+import type { ActiveBrowserTab, ManualGroupsState } from '@/features/active-tabs/types';
 import { App } from './App';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -26,7 +26,7 @@ vi.mock('@/features/active-tabs/active-workspace-storage', () => ({
 }));
 
 const SESSIONS: TabSession[] = [];
-const ACTIVE_TABS: ActiveBrowserTab[] = [
+const DUPLICATE_TABS: ActiveBrowserTab[] = [
   {
     active: true,
     groupId: -1,
@@ -37,13 +37,53 @@ const ACTIVE_TABS: ActiveBrowserTab[] = [
     url: 'https://mail.google.com/mail/u/0/#inbox',
     windowId: 3,
   },
+  {
+    active: false,
+    groupId: -1,
+    id: 8,
+    index: 1,
+    pinned: false,
+    title: 'Issue tracker',
+    url: 'https://github.com/openai/tabstow/issues/10',
+    windowId: 3,
+  },
+  {
+    active: false,
+    groupId: -1,
+    id: 9,
+    index: 2,
+    pinned: false,
+    title: 'Issue tracker copy',
+    url: 'https://github.com/openai/tabstow/issues/10',
+    windowId: 3,
+  },
+  {
+    active: false,
+    groupId: -1,
+    id: 10,
+    index: 3,
+    pinned: false,
+    title: 'Issue tracker copy 2',
+    url: 'https://github.com/openai/tabstow/issues/10',
+    windowId: 3,
+  },
 ];
+const UNIQUE_TAB: ActiveBrowserTab = {
+  active: false,
+  groupId: -1,
+  id: 12,
+  index: 0,
+  pinned: false,
+  title: 'Spec draft',
+  url: 'https://docs.example.com/spec',
+  windowId: 4,
+};
 
 let container: HTMLDivElement;
+let root: Root;
+let promptSpy: ReturnType<typeof vi.spyOn>;
 
 describe('App', () => {
-  let root: Root;
-
   beforeEach(() => {
     container = document.createElement('div');
     document.body.appendChild(container);
@@ -51,48 +91,146 @@ describe('App', () => {
     sendExtensionMessage.mockReset();
     getActiveWorkspaceState.mockReset();
     updateActiveWorkspaceState.mockReset();
-    getActiveWorkspaceState.mockResolvedValue({
-      manualGroups: { groups: [], assignments: {} },
-      order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
-      chromeTabGroups: { enabled: false, mappings: [] },
-    });
-    updateActiveWorkspaceState.mockImplementation(async (state: unknown) => state);
+    getActiveWorkspaceState.mockResolvedValue(defaultWorkspace());
+    updateActiveWorkspaceState.mockImplementation(async (state: { manualGroups?: ManualGroupsState }) => ({
+      ...defaultWorkspace(),
+      ...state,
+      manualGroups: state.manualGroups ?? defaultWorkspace().manualGroups,
+    }));
+    promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await act(async () => {
       root.unmount();
     });
     container.remove();
   });
 
-  it('renders the active workspace above saved sessions', async () => {
-    sendExtensionMessage.mockImplementation(async (message: { type: string }) => {
-      if (message.type === 'active-tabs:list') {
-        return { ok: true, data: ACTIVE_TABS };
-      }
+  it('renders the active workspace above saved sessions and shows the stow hint', async () => {
+    mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
-      if (message.type === 'sessions:list') {
-        return { ok: true, data: SESSIONS };
-      }
-
-      throw new Error(`Unexpected message: ${message.type}`);
-    });
-
-    await act(async () => {
-      root.render(<App />);
-    });
+    await renderApp();
 
     expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
+    expect(screen().getByText('Stow this window')).not.toBeNull();
     expect(screen().getByText('1 open')).not.toBeNull();
-    expect(sendExtensionMessage.mock.calls.map((call) => (call[0] as { type: string }).type)).toEqual(
-      expect.arrayContaining(['active-tabs:list', 'sessions:list']),
-    );
+    expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:list', 'sessions:list']));
 
     const mainText = container.textContent ?? '';
     expect(mainText.indexOf('Active tabs')).toBeLessThan(mainText.indexOf('No saved sessions yet.'));
   });
+
+  it('closes duplicate tabs from the active workspace action', async () => {
+    mockMessages({ activeTabs: DUPLICATE_TABS });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Close 2 duplicates' }));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:close',
+      tabIds: [9, 10],
+    });
+  });
+
+  it('focuses a tab in its original window', async () => {
+    mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Inbox - Gmail' }));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:focus',
+      tabId: 7,
+      windowId: 3,
+    });
+  });
+
+  it('creates a manual group assignment from the prompt name', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    promptSpy.mockReturnValue('Launch');
+
+    await renderApp();
+    await click(screen().getByLabelText('Move to manual group'));
+
+    expect(updateActiveWorkspaceState).toHaveBeenCalledTimes(1);
+    expect(updateActiveWorkspaceState.mock.calls[0]?.[0]).toEqual({
+      manualGroups: {
+        groups: [
+          expect.objectContaining({
+            name: 'Launch',
+          }),
+        ],
+        assignments: {
+          '12': expect.any(String),
+        },
+      },
+    });
+  });
+
+  it('closes a single tab from its row action', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+    await click(screen().getByLabelText('Close Spec draft'));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:close',
+      tabIds: [12],
+    });
+  });
 });
+
+function defaultWorkspace() {
+  return {
+    manualGroups: { groups: [], assignments: {} },
+    order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
+    chromeTabGroups: { enabled: false, mappings: [] },
+  };
+}
+
+function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveBrowserTab[]; sessions?: TabSession[] }) {
+  sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+    if (message.type === 'active-tabs:list') {
+      return { ok: true, data: activeTabs };
+    }
+
+    if (message.type === 'sessions:list') {
+      return { ok: true, data: sessions };
+    }
+
+    if (message.type === 'active-tabs:close') {
+      return { ok: true, data: { closed: true, tabCount: message.tabIds?.length ?? 0 } };
+    }
+
+    if (message.type === 'active-tabs:focus') {
+      return { ok: true, data: { focused: true } };
+    }
+
+    if (message.type === 'sessions:stow-current-window') {
+      return { ok: true, data: { sessionId: 'session-1', savedTabCount: 2, closedTabCount: 2 } };
+    }
+
+    throw new Error(`Unexpected message: ${message.type}`);
+  });
+}
+
+async function renderApp() {
+  await act(async () => {
+    root.render(<App />);
+  });
+}
+
+async function click(element: HTMLElement) {
+  await act(async () => {
+    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  });
+}
+
+function sentMessageTypes() {
+  return sendExtensionMessage.mock.calls.map((call) => (call[0] as { type: string }).type);
+}
 
 function screen() {
   return {
@@ -102,11 +240,15 @@ function screen() {
         if (role === 'heading') return /^H[1-6]$/.test(element.tagName);
         return element.getAttribute('role') === role;
       });
-      const match = elements.find((element) => {
-        if (!options?.name) return true;
-        return element.textContent?.trim() === options.name;
-      });
+      const match = elements.find((element) => matchesName(element, options?.name));
       if (!match) throw new Error(`Missing role: ${role} ${options?.name ?? ''}`.trim());
+      return match;
+    },
+    getByLabelText(label: string) {
+      const match = Array.from(container.querySelectorAll<HTMLElement>('*')).find(
+        (element) => element.getAttribute('aria-label') === label,
+      );
+      if (!match) throw new Error(`Missing label: ${label}`);
       return match;
     },
     getByText(text: string) {
@@ -117,4 +259,9 @@ function screen() {
       return match;
     },
   };
+}
+
+function matchesName(element: HTMLElement, name: string | undefined) {
+  if (!name) return true;
+  return element.textContent?.replace(/\s+/g, ' ').trim() === name;
 }

@@ -18,7 +18,7 @@ import {
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
 import type { AppResult } from '@/lib/errors';
-import { sendExtensionMessage } from '@/lib/messages';
+import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import { GroupNav } from './GroupNav';
 
 type Props = {
@@ -87,6 +87,21 @@ export function ActiveWorkspace({ onStatus }: Props) {
     if (!response.ok) onStatus('error', response.error.message);
   }
 
+  async function stowCurrentWindow() {
+    const response = await sendExtensionMessage<AppResult<StowResult>>({
+      type: 'sessions:stow-current-window',
+    });
+    if (response.ok) {
+      onStatus(
+        'success',
+        `Stowed ${response.data.savedTabCount} tabs and closed ${response.data.closedTabCount}.`,
+      );
+      await refresh();
+      return;
+    }
+    onStatus('error', response.error.message);
+  }
+
   async function createManualGroupForTab(tab: ActiveBrowserTab) {
     if (!workspace || typeof tab.id !== 'number') return;
     const name = window.prompt('Group name');
@@ -115,6 +130,14 @@ export function ActiveWorkspace({ onStatus }: Props) {
       <div className="section-header">
         <h2 id="active-tabs-title">Active tabs</h2>
         <span>{tabs.length} open</span>
+      </div>
+
+      <div className="active-workspace-hint">
+        <p>Ready to clear this workspace? Stow the current window here or from the toolbar.</p>
+        <button type="button" className="secondary-button" onClick={() => void stowCurrentWindow()}>
+          <Archive size={16} aria-hidden="true" />
+          Stow this window
+        </button>
       </div>
 
       <GroupNav
