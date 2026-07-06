@@ -31,7 +31,15 @@ describe('todos', () => {
         undefined,
         'bad',
         { id: '', title: 'Missing id' },
-        { id: 'a', title: '  Review  ', description: 123, createdAt: 123, completed: 'yes', completedAt: 456, dismissed: 'no' },
+        {
+          id: 'a',
+          title: '  Review  ',
+          description: 123,
+          createdAt: 123,
+          completed: 'yes',
+          completedAt: 456,
+          dismissed: 'no',
+        },
       ]),
     ).toEqual([
       {
@@ -39,9 +47,27 @@ describe('todos', () => {
         title: 'Review',
         description: '123',
         createdAt: expect.any(String),
-        completed: true,
+        completed: false,
         completedAt: null,
-        dismissed: true,
+        dismissed: false,
+      },
+    ]);
+  });
+
+  it('normalizes non-boolean completed and dismissed values to false', () => {
+    expect(
+      normalizeTodos([
+        { id: 'a', title: 'Review', completed: 'yes', dismissed: 'no' },
+      ]),
+    ).toEqual([
+      {
+        id: 'a',
+        title: 'Review',
+        description: '',
+        createdAt: expect.any(String),
+        completed: false,
+        completedAt: null,
+        dismissed: false,
       },
     ]);
   });
@@ -52,6 +78,17 @@ describe('todos', () => {
     expect(completed[0].completed).toBe(true);
     expect(dismissTodo(completed, 'a')[0].dismissed).toBe(true);
     expect(clearCompletedTodos(completed)[0].dismissed).toBe(true);
+  });
+
+  it('keeps an existing completedAt timestamp when completing an already completed todo', () => {
+    const todos = normalizeTodos([
+      { id: 'a', title: 'Done', completed: true, completedAt: '2024-01-01T00:00:00.000Z' },
+    ]);
+
+    expect(completeTodo(todos, 'a')[0]).toMatchObject({
+      completed: true,
+      completedAt: '2024-01-01T00:00:00.000Z',
+    });
   });
 
   it('searches title and description', () => {

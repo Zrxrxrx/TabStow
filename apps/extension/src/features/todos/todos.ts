@@ -42,9 +42,9 @@ export function normalizeTodos(input: unknown): TodoItem[] {
         title,
         description: String(candidate.description ?? ''),
         createdAt: normalizeCreatedAt(candidate.createdAt),
-        completed: Boolean(candidate.completed),
+        completed: candidate.completed === true,
         completedAt: normalizeCompletedAt(candidate.completedAt),
-        dismissed: Boolean(candidate.dismissed),
+        dismissed: candidate.dismissed === true,
       };
     })
     .filter((todo): todo is TodoItem => Boolean(todo));
@@ -74,14 +74,13 @@ export function createTodo(
 
 export function completeTodo(todos: TodoItem[], id: string): TodoItem[] {
   const normalized = normalizeTodos(todos);
-  const completedAt = new Date().toISOString();
 
   return normalized.map((todo) =>
     todo.id === id
       ? {
           ...todo,
           completed: true,
-          completedAt,
+          completedAt: todo.completed ? todo.completedAt : new Date().toISOString(),
         }
       : todo,
   );
