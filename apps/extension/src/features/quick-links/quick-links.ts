@@ -24,6 +24,8 @@ export function normalizeQuickLinks(input: unknown): QuickLink[] {
 
   return input
     .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+
       const candidate = item as Partial<QuickLink>;
       const url = normalizeUrl(String(candidate.url ?? ''));
       const id = String(candidate.id ?? '');
@@ -57,7 +59,14 @@ export function createQuickLink(
 export function reorderQuickLinks(links: QuickLink[], orderedIds: string[]): QuickLink[] {
   const normalized = normalizeQuickLinks(links);
   const byId = new Map(normalized.map((link) => [link.id, link]));
-  const ordered = orderedIds.map((id) => byId.get(id)).filter((link): link is QuickLink => Boolean(link));
-  const orderedSet = new Set(ordered.map((link) => link.id));
-  return [...ordered, ...normalized.filter((link) => !orderedSet.has(link.id))];
+  const seen = new Set<string>();
+  const ordered = orderedIds.reduce<QuickLink[]>((acc, id) => {
+    if (seen.has(id)) return acc;
+    const link = byId.get(id);
+    if (!link) return acc;
+    seen.add(id);
+    acc.push(link);
+    return acc;
+  }, []);
+  return [...ordered, ...normalized.filter((link) => !seen.has(link.id))];
 }

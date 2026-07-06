@@ -5,6 +5,9 @@ describe('quick links', () => {
   it('normalizes valid links and drops invalid links', () => {
     expect(
       normalizeQuickLinks([
+        null,
+        undefined,
+        'bad',
         { id: 'a', url: 'https://example.com', label: 'Example' },
         { id: '', url: 'bad' },
       ]),
@@ -30,5 +33,15 @@ describe('quick links', () => {
     ];
 
     expect(reorderQuickLinks(links, ['b'])).toEqual([links[1], links[0]]);
+  });
+
+  it('keeps each link once when ordered ids repeat', () => {
+    const links = [
+      { id: 'a', url: 'https://a.example/', label: 'A', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+      { id: 'b', url: 'https://b.example/', label: 'B', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+      { id: 'c', url: 'https://c.example/', label: 'C', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+    ];
+
+    expect(reorderQuickLinks(links, ['b', 'b', 'a'])).toEqual([links[1], links[0], links[2]]);
   });
 });
