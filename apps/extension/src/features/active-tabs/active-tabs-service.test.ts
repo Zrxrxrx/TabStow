@@ -38,6 +38,24 @@ describe('active tabs service', () => {
     });
   });
 
+  it('filters extension and browser-internal tabs from active tab listings', async () => {
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, url: 'https://example.com' },
+      { id: 2, windowId: 2, index: 1, url: 'chrome://extensions' },
+      { id: 3, windowId: 2, index: 2, url: 'about:blank' },
+      { id: 4, windowId: 2, index: 3, url: 'chrome-extension://abc/newtab.html' },
+      { id: 5, windowId: 2, index: 4 },
+    ]);
+
+    const { listActiveTabs } = await import('./active-tabs-service');
+    const result = await listActiveTabs();
+
+    expect(result).toEqual({
+      ok: true,
+      data: [{ id: 1, windowId: 2, index: 0, url: 'https://example.com' }],
+    });
+  });
+
   it('focuses a tab and its window', async () => {
     const { focusActiveTab } = await import('./active-tabs-service');
     const result = await focusActiveTab(5, 8);

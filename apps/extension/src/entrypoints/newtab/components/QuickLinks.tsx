@@ -1,13 +1,28 @@
-import { ExternalLink, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, ExternalLink, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
-import { createQuickLink, type QuickLink } from '@/features/quick-links/quick-links';
+import { t, type Locale } from '@/features/i18n/i18n';
+import {
+  createQuickLink,
+  reorderQuickLinks,
+  updateQuickLink,
+  type QuickLink,
+  type QuickLinkIcon,
+} from '@/features/quick-links/quick-links';
 import { getQuickLinks, saveQuickLinks } from '@/features/quick-links/quick-links-storage';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 
-export function QuickLinks() {
+type Props = {
+  locale: Locale;
+};
+
+function iconFromPrompt(value: string): QuickLinkIcon {
+  return value.trim() ? { kind: 'emoji', value: value.trim() } : { kind: 'site', value: null };
+}
+
+export function QuickLinks({ locale }: Props) {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -53,39 +68,93 @@ export function QuickLinks() {
     setErrorMessage(null);
   }
 
+  async function edit(link: QuickLink) {
+    const label = window.prompt('Quick link label', link.label);
+    if (label === null) return;
+    const currentIcon = link.icon?.kind === 'emoji' ? link.icon.value : '';
+    const iconValue = window.prompt('Quick link icon. Leave blank to use the site icon.', currentIcon);
+    if (iconValue === null) return;
+
+    const next = links.map((item) =>
+      item.id === link.id ? updateQuickLink(item, { label, icon: iconFromPrompt(iconValue) }) : item,
+    );
+    setLinks(await saveQuickLinks(next));
+    setErrorMessage(null);
+  }
+
+  async function move(id: string, direction: -1 | 1) {
+    const index = links.findIndex((link) => link.id === id);
+    const nextIndex = index + direction;
+    if (index === -1 || nextIndex < 0 || nextIndex >= links.length) return;
+
+    const orderedIds = links.map((link) => link.id);
+    [orderedIds[index], orderedIds[nextIndex]] = [orderedIds[nextIndex], orderedIds[index]];
+    setLinks(await saveQuickLinks(reorderQuickLinks(links, orderedIds)));
+    setErrorMessage(null);
+  }
+
   return (
     <section className="utility-panel" aria-labelledby="quick-links-title">
       <header>
-        <h2 id="quick-links-title">Quick links</h2>
+        <h2 id="quick-links-title">{t(locale, 'quickLinks')}</h2>
         <div className="utility-panel-actions">
           <button
             type="button"
             className="icon-button"
-            aria-label="Add quick link"
+            aria-label={t(locale, 'addQuickLink')}
             onClick={() => void addByUrl()}
           >
             <Plus size={16} aria-hidden="true" />
           </button>
           <button type="button" className="secondary-button" onClick={() => void addFromOpenTabs()}>
-            Add open tab
+            {t(locale, 'addOpenTab')}
           </button>
         </div>
       </header>
 
       {links.length === 0 ? (
-        <div className="empty-state utility-empty-state">No quick links yet.</div>
+        <div className="empty-state utility-empty-state">{t(locale, 'noQuickLinks')}</div>
       ) : (
         <div className="quick-link-grid">
-          {links.map((link) => (
+          {links.map((link, index) => (
             <div className="quick-link" key={link.id}>
               <a href={link.url} target="_blank" rel="noreferrer" className="quick-link-anchor">
+                {link.icon?.kind === 'emoji' ? (
+                  <span aria-hidden="true">{link.icon.value}</span>
+                ) : null}
                 <span>{link.label}</span>
                 <ExternalLink size={14} aria-hidden="true" />
               </a>
               <button
                 type="button"
                 className="icon-button"
-                aria-label={`Remove ${link.label}`}
+                aria-label={t(locale, 'moveUp', { label: link.label })}
+                onClick={() => void move(link.id, -1)}
+                disabled={index === 0}
+              >
+                <ChevronUp size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t(locale, 'moveDown', { label: link.label })}
+                onClick={() => void move(link.id, 1)}
+                disabled={index === links.length - 1}
+              >
+                <ChevronDown size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t(locale, 'editQuickLink', { label: link.label })}
+                onClick={() => void edit(link)}
+              >
+                <Pencil size={14} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="icon-button"
+                aria-label={t(locale, 'removeQuickLink', { label: link.label })}
                 onClick={() => void remove(link.id)}
               >
                 <Trash2 size={14} aria-hidden="true" />

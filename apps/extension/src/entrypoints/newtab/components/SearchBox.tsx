@@ -1,14 +1,16 @@
 import { Search } from 'lucide-react';
 import { useState, type FormEvent } from 'react';
+import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 
 type Props = {
   disabled?: boolean;
+  locale: Locale;
   onStatus: (tone: 'success' | 'error', message: string) => void;
 };
 
-export function SearchBox({ disabled = false, onStatus }: Props) {
+export function SearchBox({ disabled = false, locale, onStatus }: Props) {
   const [query, setQuery] = useState('');
 
   async function submit(event: FormEvent<HTMLFormElement>) {
@@ -29,10 +31,10 @@ export function SearchBox({ disabled = false, onStatus }: Props) {
     <form className="dashboard-search" onSubmit={(event) => void submit(event)}>
       <Search size={16} aria-hidden="true" />
       <input
-        aria-label="Search the web"
+        aria-label={t(locale, 'searchTheWeb')}
         disabled={disabled}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search with your default engine"
+        placeholder={t(locale, 'searchWithDefaultEngine')}
         type="search"
         value={query}
       />

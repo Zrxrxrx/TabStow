@@ -35,15 +35,20 @@ export const extensionSettingsSchema = defaultSettingsSchema.extend({
 });
 
 export const safeSyncSettingsSchema = extensionSettingsSchema
-  .omit({ githubToken: true })
+  .omit({ githubToken: true, theme: true })
   .strict();
+
+const syncDocumentSettingsSchema = safeSyncSettingsSchema
+  .extend({ theme: themeSchema.optional() })
+  .strict()
+  .transform(({ theme: _theme, ...settings }) => settings);
 
 export const syncDocumentSchema = z.object({
   schemaVersion: z.literal(1),
   deviceId: z.string().min(1),
   exportedAt: z.string().datetime(),
   sessions: z.array(tabSessionSchema),
-  settings: safeSyncSettingsSchema,
+  settings: syncDocumentSettingsSchema,
 }).superRefine((document, context) => {
   const seenSessionIds = new Set<string>();
 

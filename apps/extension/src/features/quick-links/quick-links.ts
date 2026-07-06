@@ -74,6 +74,21 @@ export function createQuickLink(
   };
 }
 
+export function updateQuickLink(
+  link: QuickLink,
+  patch: { label?: string; icon?: QuickLinkIcon | null },
+): QuickLink {
+  const [normalized] = normalizeQuickLinks([
+    {
+      ...link,
+      label: patch.label ?? link.label,
+      icon: patch.icon === undefined ? link.icon : patch.icon,
+    },
+  ]);
+  if (!normalized) throw new Error('Quick link URL is invalid.');
+  return normalized;
+}
+
 export function reorderQuickLinks(links: QuickLink[], orderedIds: string[]): QuickLink[] {
   const normalized = normalizeQuickLinks(links);
   const byId = new Map(normalized.map((link) => [link.id, link]));

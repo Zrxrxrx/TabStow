@@ -1,10 +1,12 @@
 import { browser } from '@/lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
+import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
 import type { ActiveBrowserTab } from './types';
 
 export async function listActiveTabs(): Promise<AppResult<ActiveBrowserTab[]>> {
   try {
-    return ok(await browser.tabs.query({}));
+    const tabs = await browser.tabs.query({});
+    return ok(tabs.filter((tab) => !isBlockedTabUrl(tab.url)));
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }

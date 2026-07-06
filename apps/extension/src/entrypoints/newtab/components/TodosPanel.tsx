@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { t, type Locale } from '@/features/i18n/i18n';
 import {
   clearCompletedTodos,
   completeTodo,
@@ -11,7 +12,11 @@ import {
 } from '@/features/todos/todos';
 import { getTodos, saveTodos } from '@/features/todos/todos-storage';
 
-export function TodosPanel() {
+type Props = {
+  locale: Locale;
+};
+
+export function TodosPanel({ locale }: Props) {
   const [query, setQuery] = useState('');
   const [todos, setTodos] = useState<TodoItem[]>([]);
 
@@ -58,23 +63,23 @@ export function TodosPanel() {
   return (
     <section className="utility-panel" aria-labelledby="todos-title">
       <header>
-        <h2 id="todos-title">Todos</h2>
-        <button type="button" className="icon-button" aria-label="Add todo" onClick={() => void addTodo()}>
+        <h2 id="todos-title">{t(locale, 'todos')}</h2>
+        <button type="button" className="icon-button" aria-label={t(locale, 'addTodo')} onClick={() => void addTodo()}>
           <Plus size={16} aria-hidden="true" />
         </button>
       </header>
 
       <input
         className="utility-input"
-        aria-label="Search todos"
+        aria-label={t(locale, 'searchTodos')}
         type="search"
         value={query}
         onChange={(event) => setQuery(event.target.value)}
-        placeholder="Search todos"
+        placeholder={t(locale, 'searchTodos')}
       />
 
       {visibleTodos.length === 0 ? (
-        <div className="empty-state utility-empty-state">No todos yet.</div>
+        <div className="empty-state utility-empty-state">{t(locale, 'noTodos')}</div>
       ) : (
         <div className="todo-list">
           {visibleTodos.map((todo, index) => (
@@ -91,7 +96,7 @@ export function TodosPanel() {
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={`Move ${todo.title} up`}
+                  aria-label={t(locale, 'moveUp', { label: todo.title })}
                   onClick={() => void moveTodo(todo.id, -1)}
                   disabled={index === 0}
                 >
@@ -100,7 +105,7 @@ export function TodosPanel() {
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={`Move ${todo.title} down`}
+                  aria-label={t(locale, 'moveDown', { label: todo.title })}
                   onClick={() => void moveTodo(todo.id, 1)}
                   disabled={index === visibleTodos.length - 1}
                 >
@@ -109,7 +114,7 @@ export function TodosPanel() {
                 <button
                   type="button"
                   className="icon-button"
-                  aria-label={`Delete ${todo.title}`}
+                  aria-label={`${t(locale, 'delete')} ${todo.title}`}
                   onClick={() => void remove(todo.id)}
                 >
                   <Trash2 size={14} aria-hidden="true" />
@@ -121,7 +126,7 @@ export function TodosPanel() {
       )}
 
       <button type="button" className="secondary-button" onClick={() => void clearCompleted()}>
-        Clear completed
+        {t(locale, 'clearCompleted')}
       </button>
     </section>
   );

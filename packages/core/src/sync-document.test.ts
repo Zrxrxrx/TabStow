@@ -34,7 +34,6 @@ describe('sync documents', () => {
       gistFileName: 'tabstow.sync.json',
       includePinnedTabs: true,
       closePinnedTabs: false,
-      theme: 'dark',
     });
   });
 
@@ -44,7 +43,6 @@ describe('sync documents', () => {
       gistFileName: 'tabstow.sync.json',
       includePinnedTabs: true,
       closePinnedTabs: false,
-      theme: 'dark',
     });
   });
 
@@ -57,6 +55,27 @@ describe('sync documents', () => {
     });
 
     expect(document.settings).not.toHaveProperty('githubToken');
+    expect(document.settings).not.toHaveProperty('theme');
     expect(parseSyncDocument(document).sessions).toHaveLength(1);
+  });
+
+  it('parses legacy sync documents that still contain theme without importing it', () => {
+    const document = parseSyncDocument({
+      schemaVersion: 1,
+      deviceId: 'device-1',
+      exportedAt: '2026-07-06T00:00:00.000Z',
+      sessions: [session],
+      settings: {
+        deviceId: 'device-1',
+        gistId: 'gist-1',
+        gistFileName: 'tabstow.sync.json',
+        includePinnedTabs: true,
+        closePinnedTabs: false,
+        theme: 'dark',
+      },
+    });
+
+    expect(document.settings).not.toHaveProperty('theme');
+    expect(toImportableSettings(document.settings)).not.toHaveProperty('theme');
   });
 });

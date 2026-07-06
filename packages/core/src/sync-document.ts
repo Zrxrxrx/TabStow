@@ -8,14 +8,15 @@ import {
 } from './schemas';
 
 export function toSafeSyncSettings(settings: ExtensionSettings): SafeSyncSettings {
-  const { githubToken: _githubToken, ...safeSettings } = settings;
+  const { githubToken: _githubToken, theme: _theme, ...safeSettings } = settings;
   return safeSyncSettingsSchema.parse(safeSettings);
 }
 
 export function toImportableSettings(
   settings: SafeSyncSettings,
 ): Partial<ExtensionSettings> {
-  const { deviceId: _deviceId, ...importableSettings } = settings;
+  const { deviceId: _deviceId, theme: _theme, ...importableSettings } =
+    settings as SafeSyncSettings & { theme?: unknown };
   return importableSettings;
 }
 

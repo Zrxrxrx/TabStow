@@ -105,6 +105,7 @@ describe('sync service', () => {
 
     const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
     expect(pushedDocument.sessions).toHaveLength(3);
+    expect(pushedDocument.settings).not.toHaveProperty('theme');
     expect(
       pushedDocument.sessions.find((session: TabSession) => session.id === 'shared')?.title,
     ).toBe('Local shared');
@@ -134,6 +135,7 @@ describe('sync service', () => {
 
     const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
     expect(pushedDocument.sessions).toEqual([localOnly]);
+    expect(pushedDocument.settings).not.toHaveProperty('theme');
   });
 
   it('returns invalid-sync-document instead of overwriting invalid remote sync data on push', async () => {
@@ -168,6 +170,7 @@ describe('sync service', () => {
           gistFileName: 'tabstow.sync.json',
           includePinnedTabs: false,
           closePinnedTabs: false,
+          githubToken: 'secret',
         },
       }),
     );

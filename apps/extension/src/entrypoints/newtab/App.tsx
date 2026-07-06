@@ -1,5 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
+import {
+  getLanguagePreference,
+  resolveLocale,
+  type LanguagePreference,
+} from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
@@ -19,7 +24,9 @@ export function App() {
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
+  const [language, setLanguage] = useState<LanguagePreference>('auto');
   const busyActionRef = useRef<string | null>(null);
+  const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
 
   async function loadSessions() {
     const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
@@ -35,6 +42,14 @@ export function App() {
   useEffect(() => {
     void loadSessions();
   }, []);
+
+  useEffect(() => {
+    void getLanguagePreference().then(setLanguage);
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = locale;
+  }, [locale]);
 
   async function runAction<T>(
     actionId: string,
@@ -76,12 +91,14 @@ export function App() {
         </div>
         <SearchBox
           disabled={busyAction !== null}
+          locale={locale}
           onStatus={(tone, message) => setStatus({ tone, message })}
         />
       </section>
 
       <ActiveWorkspace
         busy={busyAction !== null}
+        locale={locale}
         onStatus={(tone, message) => setStatus({ tone, message })}
         refreshKey={activeWorkspaceRefreshKey}
         onStowCurrentWindow={() =>
@@ -97,14 +114,15 @@ export function App() {
       />
 
       <section className="utility-grid" aria-label="Utilities">
-        <QuickLinks />
-        <TodosPanel />
-        <ThemeControls />
+        <QuickLinks locale={locale} />
+        <TodosPanel locale={locale} />
+        <ThemeControls language={language} locale={locale} onLanguageChange={setLanguage} />
       </section>
 
       <section className="stowed-sessions">
         <StowedSessions
           busyAction={busyAction}
+          locale={locale}
           onOpenOptions={openOptions}
           onRunAction={runAction}
           sessions={sessions}

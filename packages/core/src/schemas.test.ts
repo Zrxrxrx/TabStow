@@ -58,12 +58,29 @@ describe('core schemas', () => {
         gistFileName: 'tabstow.sync.json',
         includePinnedTabs: false,
         closePinnedTabs: false,
-        theme: 'system',
         githubToken: 'secret',
       },
     });
 
     expect(result.success).toBe(false);
+  });
+
+  it('parses legacy sync documents with theme but strips it from settings', () => {
+    const result = syncDocumentSchema.parse({
+      schemaVersion: 1,
+      deviceId: 'device-1',
+      exportedAt: '2026-07-06T00:00:00.000Z',
+      sessions: [],
+      settings: {
+        deviceId: 'device-1',
+        gistFileName: 'tabstow.sync.json',
+        includePinnedTabs: false,
+        closePinnedTabs: false,
+        theme: 'system',
+      },
+    });
+
+    expect(result.settings).not.toHaveProperty('theme');
   });
 
   it('rejects sync documents with duplicate session ids', () => {
@@ -94,7 +111,6 @@ describe('core schemas', () => {
         gistFileName: 'tabstow.sync.json',
         includePinnedTabs: false,
         closePinnedTabs: false,
-        theme: 'system',
       },
     });
 

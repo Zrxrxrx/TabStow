@@ -2,6 +2,7 @@ import { Archive, RefreshCcw, RotateCcw, Settings, Trash2, UploadCloud } from 'l
 import { useMemo } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { StatusMessage } from '@/components/StatusMessage';
+import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult, type SyncResult } from '@/lib/messages';
 
@@ -12,6 +13,7 @@ type StatusState = {
 
 type Props = {
   busyAction: string | null;
+  locale: Locale;
   sessions: TabSession[];
   status: StatusState;
   onOpenOptions: () => void;
@@ -46,6 +48,7 @@ function sessionPreview(session: TabSession): string {
 
 export function StowedSessions({
   busyAction,
+  locale,
   onOpenOptions,
   onRunAction,
   sessions,
@@ -58,6 +61,10 @@ export function StowedSessions({
 
   return (
     <>
+      <header className="section-header">
+        <h2>{t(locale, 'stowedSessions')}</h2>
+      </header>
+
       <section className="header-actions" aria-label="Session controls">
         <button
           type="button"
@@ -72,7 +79,7 @@ export function StowedSessions({
           disabled={busyAction !== null}
         >
           <RefreshCcw size={16} aria-hidden="true" />
-          Pull
+          {t(locale, 'pull')}
         </button>
         <button
           type="button"
@@ -87,13 +94,13 @@ export function StowedSessions({
           disabled={busyAction !== null}
         >
           <UploadCloud size={16} aria-hidden="true" />
-          Push
+          {t(locale, 'push')}
         </button>
         <button
           type="button"
           className="icon-button"
           onClick={onOpenOptions}
-          aria-label="Open settings"
+          aria-label={t(locale, 'openSettings')}
         >
           <Settings size={18} aria-hidden="true" />
         </button>
@@ -113,7 +120,7 @@ export function StowedSessions({
           disabled={busyAction !== null}
         >
           <Archive size={16} aria-hidden="true" />
-          Stow current window
+          {t(locale, 'stowCurrentWindow')}
         </button>
       </section>
 
@@ -126,7 +133,7 @@ export function StowedSessions({
 
       <section className="session-list" aria-label="Saved sessions">
         {sessions.length === 0 ? (
-          <div className="empty-state">No saved sessions yet.</div>
+          <div className="empty-state">{t(locale, 'noSavedSessions')}</div>
         ) : (
           sessions.map((session) => (
             <article className="session-row" key={session.id}>
@@ -157,7 +164,7 @@ export function StowedSessions({
                   disabled={busyAction !== null}
                 >
                   <RotateCcw size={16} aria-hidden="true" />
-                  Restore
+                  {t(locale, 'restore')}
                 </button>
                 <button
                   type="button"
@@ -176,7 +183,7 @@ export function StowedSessions({
                   disabled={busyAction !== null}
                 >
                   <Trash2 size={16} aria-hidden="true" />
-                  Delete
+                  {t(locale, 'delete')}
                 </button>
               </div>
             </article>

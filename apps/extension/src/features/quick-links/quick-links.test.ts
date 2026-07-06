@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createQuickLink, normalizeQuickLinks, reorderQuickLinks } from './quick-links';
+import { createQuickLink, normalizeQuickLinks, reorderQuickLinks, updateQuickLink } from './quick-links';
 
 describe('quick links', () => {
   it('normalizes valid links and drops invalid links', () => {
@@ -66,6 +66,22 @@ describe('quick links', () => {
     });
   });
 
+  it('updates label and icon metadata while preserving link identity', () => {
+    const link = {
+      id: 'a',
+      url: 'https://a.example/',
+      label: 'A',
+      icon: null,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    };
+
+    expect(updateQuickLink(link, { label: 'Alpha', icon: { kind: 'emoji', value: '*' } })).toEqual({
+      ...link,
+      label: 'Alpha',
+      icon: { kind: 'emoji', value: '*' },
+    });
+  });
+
   it('reorders by id and appends missing links', () => {
     const links = [
       { id: 'a', url: 'https://a.example/', label: 'A', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
@@ -83,5 +99,16 @@ describe('quick links', () => {
     ];
 
     expect(reorderQuickLinks(links, ['b', 'b', 'a'])).toEqual([links[1], links[0], links[2]]);
+  });
+
+  it('appends unspecified links in their existing relative order', () => {
+    const links = [
+      { id: 'a', url: 'https://a.example/', label: 'A', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+      { id: 'b', url: 'https://b.example/', label: 'B', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+      { id: 'c', url: 'https://c.example/', label: 'C', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+      { id: 'd', url: 'https://d.example/', label: 'D', icon: null, createdAt: '2026-07-06T00:00:00.000Z' },
+    ];
+
+    expect(reorderQuickLinks(links, ['c', 'a'])).toEqual([links[2], links[0], links[1], links[3]]);
   });
 });

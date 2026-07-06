@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import {
-  getLanguagePreference,
-  resolveLocale,
   saveLanguagePreference,
+  t,
   type LanguagePreference,
+  type Locale,
 } from '@/features/i18n/i18n';
 import {
   getThemePreferences,
@@ -30,8 +30,13 @@ function applyTheme(theme: ThemePreferences, backgroundUrl: string | null) {
   );
 }
 
-export function ThemeControls() {
-  const [language, setLanguage] = useState<LanguagePreference>('auto');
+type Props = {
+  language: LanguagePreference;
+  locale: Locale;
+  onLanguageChange: (language: LanguagePreference) => void;
+};
+
+export function ThemeControls({ language, locale, onLanguageChange }: Props) {
   const [theme, setTheme] = useState<ThemePreferences | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const backgroundUrlRef = useRef<string | null>(null);
@@ -52,14 +57,12 @@ export function ThemeControls() {
   }
 
   useEffect(() => {
-    void Promise.all([getThemePreferences(), getLanguagePreference()]).then(
-      async ([themePreferences, languagePreference]) => {
+    void getThemePreferences().then(
+      async (themePreferences) => {
         const backgroundUrl = await getResolvedBackgroundUrl(themePreferences.customBackground);
         replaceBackgroundUrl(backgroundUrl);
         setTheme(themePreferences);
-        setLanguage(languagePreference);
         applyTheme(themePreferences, backgroundUrl);
-        document.documentElement.lang = resolveLocale(languagePreference, navigator.language);
       },
     );
     return () => {
@@ -88,8 +91,7 @@ export function ThemeControls() {
 
   async function updateLanguage(nextLanguage: LanguagePreference) {
     const saved = await saveLanguagePreference(nextLanguage);
-    setLanguage(saved);
-    document.documentElement.lang = resolveLocale(saved, navigator.language);
+    onLanguageChange(saved);
   }
 
   async function updateBackground(file: File | undefined) {
@@ -118,27 +120,27 @@ export function ThemeControls() {
   return (
     <section className="utility-panel" aria-labelledby="appearance-title">
       <header>
-        <h2 id="appearance-title">Appearance</h2>
+        <h2 id="appearance-title">{t(locale, 'appearance')}</h2>
       </header>
 
       <div className="compact-controls">
         <label className="utility-field">
-          <span>Theme mode</span>
+          <span>{t(locale, 'themeMode')}</span>
           <select
-            aria-label="Theme mode"
+            aria-label={t(locale, 'themeMode')}
             value={theme.mode}
             onChange={(event) => void updateTheme({ mode: event.target.value as ThemeMode })}
           >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
+            <option value="system">{t(locale, 'system')}</option>
+            <option value="light">{t(locale, 'light')}</option>
+            <option value="dark">{t(locale, 'dark')}</option>
           </select>
         </label>
 
         <label className="utility-field">
-          <span>Palette</span>
+          <span>{t(locale, 'palette')}</span>
           <select
-            aria-label="Palette"
+            aria-label={t(locale, 'palette')}
             value={theme.paletteId}
             onChange={(event) => void updateTheme({ paletteId: event.target.value as ThemePaletteId })}
           >
@@ -150,9 +152,9 @@ export function ThemeControls() {
         </label>
 
         <label className="utility-field">
-          <span>Surface transparency</span>
+          <span>{t(locale, 'surfaceTransparency')}</span>
           <input
-            aria-label="Surface transparency"
+            aria-label={t(locale, 'surfaceTransparency')}
             max={100}
             min={35}
             onChange={(event) => void updateTheme({ surfaceOpacity: Number(event.target.value) })}
@@ -162,23 +164,23 @@ export function ThemeControls() {
         </label>
 
         <label className="utility-field">
-          <span>Language</span>
+          <span>{t(locale, 'language')}</span>
           <select
-            aria-label="Language"
+            aria-label={t(locale, 'language')}
             value={language}
             onChange={(event) => void updateLanguage(event.target.value as LanguagePreference)}
           >
-            <option value="auto">Auto</option>
+            <option value="auto">{t(locale, 'auto')}</option>
             <option value="en">English</option>
             <option value="zh-CN">Simplified Chinese</option>
           </select>
         </label>
 
         <label className="utility-field">
-          <span>Custom background</span>
+          <span>{t(locale, 'customBackground')}</span>
           <input
             accept="image/*"
-            aria-label="Custom background"
+            aria-label={t(locale, 'customBackground')}
             onChange={(event) => void updateBackground(event.target.files?.[0])}
             type="file"
           />
