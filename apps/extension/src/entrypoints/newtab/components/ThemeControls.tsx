@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   getLanguagePreference,
   resolveLocale,
@@ -12,17 +12,21 @@ import {
   type ThemePaletteId,
   type ThemePreferences,
 } from '@/features/theme/theme-preferences';
+import {
+  deleteCustomBackground,
+  resolveCustomBackgroundUrl,
+  saveCustomBackgroundFile,
+} from '@/features/theme/theme-background-cache';
 
 const MAX_CUSTOM_BACKGROUND_BYTES = 128 * 1024;
-const MAX_CUSTOM_BACKGROUND_DATA_URL_LENGTH = 180 * 1024;
 
-function applyTheme(theme: ThemePreferences) {
+function applyTheme(theme: ThemePreferences, backgroundUrl: string | null) {
   document.documentElement.dataset.themeMode = theme.mode;
   document.documentElement.dataset.themePalette = theme.paletteId;
   document.documentElement.style.setProperty('--surface-opacity', `${theme.surfaceOpacity / 100}`);
   document.documentElement.style.setProperty(
     '--dashboard-background-image',
-    theme.customBackground ? `url("${theme.customBackground}")` : 'none',
+    backgroundUrl ? `url("${backgroundUrl}")` : 'none',
   );
 }
 
@@ -30,22 +34,55 @@ export function ThemeControls() {
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const [theme, setTheme] = useState<ThemePreferences | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const backgroundUrlRef = useRef<string | null>(null);
+
+  function replaceBackgroundUrl(nextUrl: string | null) {
+    if (backgroundUrlRef.current && backgroundUrlRef.current.startsWith('blob:')) {
+      URL.revokeObjectURL(backgroundUrlRef.current);
+    }
+    backgroundUrlRef.current = nextUrl;
+  }
+
+  async function getResolvedBackgroundUrl(token: string | null | undefined) {
+    try {
+      return await resolveCustomBackgroundUrl(token);
+    } catch {
+      return null;
+    }
+  }
 
   useEffect(() => {
     void Promise.all([getThemePreferences(), getLanguagePreference()]).then(
-      ([themePreferences, languagePreference]) => {
+      async ([themePreferences, languagePreference]) => {
+        const backgroundUrl = await getResolvedBackgroundUrl(themePreferences.customBackground);
+        replaceBackgroundUrl(backgroundUrl);
         setTheme(themePreferences);
         setLanguage(languagePreference);
-        applyTheme(themePreferences);
+        applyTheme(themePreferences, backgroundUrl);
         document.documentElement.lang = resolveLocale(languagePreference, navigator.language);
       },
     );
+    return () => {
+      replaceBackgroundUrl(null);
+    };
   }, []);
 
-  async function updateTheme(partial: Partial<ThemePreferences>) {
+  async function updateTheme(partial: Partial<ThemePreferences>, resolvedBackgroundUrl?: string | null) {
+    const previousToken = theme?.customBackground ?? null;
     const next = await saveThemePreferences({ ...(theme ?? {}), ...partial });
+    const backgroundUrl =
+      resolvedBackgroundUrl !== undefined
+        ? resolvedBackgroundUrl
+        : next.customBackground === previousToken
+          ? backgroundUrlRef.current
+          : await getResolvedBackgroundUrl(next.customBackground);
+
+    replaceBackgroundUrl(backgroundUrl ?? null);
     setTheme(next);
-    applyTheme(next);
+    applyTheme(next, backgroundUrl ?? null);
+    if (previousToken && previousToken !== next.customBackground) {
+      await deleteCustomBackground(previousToken);
+    }
     setErrorMessage(null);
   }
 
@@ -62,18 +99,18 @@ export function ThemeControls() {
       return;
     }
 
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.addEventListener('load', () => resolve(String(reader.result ?? '')));
-      reader.addEventListener('error', () => reject(new Error('Could not read background image.')));
-      reader.readAsDataURL(file);
-    });
-    if (dataUrl.length > MAX_CUSTOM_BACKGROUND_DATA_URL_LENGTH) {
-      setErrorMessage('Custom background image is too large to save.');
-      return;
-    }
+    let token: string | null = null;
+    let backgroundUrl: string | null = null;
 
-    await updateTheme({ customBackground: dataUrl });
+    try {
+      token = await saveCustomBackgroundFile(file);
+      backgroundUrl = await getResolvedBackgroundUrl(token);
+      await updateTheme({ customBackground: token }, backgroundUrl);
+    } catch (error) {
+      await deleteCustomBackground(token);
+      if (backgroundUrl && backgroundUrl.startsWith('blob:')) URL.revokeObjectURL(backgroundUrl);
+      setErrorMessage(error instanceof Error ? error.message : 'Could not save background image.');
+    }
   }
 
   if (!theme) return null;

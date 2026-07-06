@@ -33,6 +33,11 @@ const { getLanguagePreference, saveLanguagePreference } = vi.hoisted(() => ({
   getLanguagePreference: vi.fn(),
   saveLanguagePreference: vi.fn(),
 }));
+const { saveCustomBackgroundFile, resolveCustomBackgroundUrl, deleteCustomBackground } = vi.hoisted(() => ({
+  saveCustomBackgroundFile: vi.fn(),
+  resolveCustomBackgroundUrl: vi.fn(),
+  deleteCustomBackground: vi.fn(),
+}));
 
 vi.mock('@/lib/messages', () => ({
   sendExtensionMessage,
@@ -72,6 +77,12 @@ vi.mock('@/features/i18n/i18n', async () => {
     saveLanguagePreference,
   };
 });
+
+vi.mock('@/features/theme/theme-background-cache', () => ({
+  saveCustomBackgroundFile,
+  resolveCustomBackgroundUrl,
+  deleteCustomBackground,
+}));
 
 const SESSIONS: TabSession[] = [];
 const DUPLICATE_TABS: ActiveBrowserTab[] = [
@@ -147,6 +158,9 @@ describe('App', () => {
     saveThemePreferences.mockReset();
     getLanguagePreference.mockReset();
     saveLanguagePreference.mockReset();
+    saveCustomBackgroundFile.mockReset();
+    resolveCustomBackgroundUrl.mockReset();
+    deleteCustomBackground.mockReset();
     getActiveWorkspaceState.mockResolvedValue(defaultWorkspace());
     updateActiveWorkspaceState.mockImplementation(
       async (state: {
@@ -172,6 +186,9 @@ describe('App', () => {
     saveThemePreferences.mockImplementation(async (preferences: unknown) => preferences);
     getLanguagePreference.mockResolvedValue('auto');
     saveLanguagePreference.mockImplementation(async (language: unknown) => language);
+    saveCustomBackgroundFile.mockResolvedValue('theme-bg:token-1');
+    resolveCustomBackgroundUrl.mockResolvedValue('blob:theme-bg-token-1');
+    deleteCustomBackground.mockResolvedValue(undefined);
     promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
     document.documentElement.removeAttribute('data-theme-mode');
     document.documentElement.removeAttribute('data-theme-palette');
@@ -234,9 +251,10 @@ describe('App', () => {
       mode: 'dark',
       paletteId: 'sage',
       surfaceOpacity: 84,
-      customBackground: null,
+      customBackground: 'theme-bg:stored',
     });
     getLanguagePreference.mockResolvedValue('zh-CN');
+    resolveCustomBackgroundUrl.mockResolvedValue('blob:stored-background');
 
     await renderApp();
 
@@ -248,6 +266,7 @@ describe('App', () => {
     expect(document.documentElement.dataset.themeMode).toBe('dark');
     expect(document.documentElement.dataset.themePalette).toBe('sage');
     expect(document.documentElement.lang).toBe('zh-CN');
+    expect(resolveCustomBackgroundUrl).toHaveBeenCalledWith('theme-bg:stored');
   });
 
   it('adds and removes quick links through the utility panel', async () => {
@@ -348,6 +367,36 @@ describe('App', () => {
     ]);
   });
 
+  it('saves only a lightweight custom background token in theme preferences', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    await renderApp();
+    const backgroundInput = screen().getByLabelText('Custom background');
+    const upload = new File(['small-background'], 'wallpaper.png', { type: 'image/png' });
+
+    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
+      mode: 'system',
+      paletteId: 'paper',
+      surfaceOpacity: 92,
+      customBackground: (preferences as { customBackground: string }).customBackground,
+    }));
+    saveCustomBackgroundFile.mockResolvedValue('theme-bg:upload-1');
+    resolveCustomBackgroundUrl.mockResolvedValue('blob:upload-1');
+
+    await uploadFile(backgroundInput, upload);
+
+    expect(saveCustomBackgroundFile).toHaveBeenCalledWith(upload);
+    expect(saveThemePreferences).toHaveBeenCalledWith(
+      expect.objectContaining({
+        customBackground: 'theme-bg:upload-1',
+      }),
+    );
+    expect(
+      saveThemePreferences.mock.calls.some((call) =>
+        String((call[0] as { customBackground?: string }).customBackground ?? '').startsWith('data:'),
+      ),
+    ).toBe(false);
+  });
+
   it('rejects oversized custom background uploads before saving theme preferences', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     await renderApp();
@@ -357,6 +406,7 @@ describe('App', () => {
     await uploadFile(backgroundInput, oversizedFile);
 
     expect(saveThemePreferences).not.toHaveBeenCalled();
+    expect(saveCustomBackgroundFile).not.toHaveBeenCalled();
     expect(screen().getByRole('alert').textContent).toBe('Custom background image is too large to save.');
   });
 

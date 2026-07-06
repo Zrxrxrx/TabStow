@@ -18,11 +18,18 @@ describe('theme preferences', () => {
   it('normalizes theme preferences', async () => {
     const { normalizeThemePreferences } = await import('./theme-preferences');
 
-    expect(normalizeThemePreferences({ mode: 'dark', paletteId: 'sage', surfaceOpacity: 84 })).toEqual({
+    expect(
+      normalizeThemePreferences({
+        mode: 'dark',
+        paletteId: 'sage',
+        surfaceOpacity: 84,
+        customBackground: 'theme-bg:123',
+      }),
+    ).toEqual({
       mode: 'dark',
       paletteId: 'sage',
       surfaceOpacity: 84,
-      customBackground: null,
+      customBackground: 'theme-bg:123',
     });
   });
 
@@ -38,7 +45,7 @@ describe('theme preferences', () => {
       mode: 'twilight',
       paletteId: 'dawn',
       surfaceOpacity: '12',
-      customBackground: 'https://example.com/background.png',
+      customBackground: 'data:image/png;base64,abc',
     });
 
     const { getThemePreferences } = await import('./theme-preferences');
@@ -56,7 +63,7 @@ describe('theme preferences', () => {
       mode: 'light',
       paletteId: 'dawn',
       surfaceOpacity: 99,
-      customBackground: 'https://example.com/background.png',
+      customBackground: 'theme-bg:wallpaper-1',
     } as unknown as Parameters<typeof import('./theme-preferences').saveThemePreferences>[0];
 
     const { saveThemePreferences } = await import('./theme-preferences');
@@ -65,12 +72,27 @@ describe('theme preferences', () => {
       mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 99,
-      customBackground: null,
+      customBackground: 'theme-bg:wallpaper-1',
     });
     expect(storageMocks.setItem).toHaveBeenCalledWith('local:tabstow-theme-preferences', {
       mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 99,
+      customBackground: 'theme-bg:wallpaper-1',
+    });
+  });
+
+  it('rejects persisted raw data urls for custom backgrounds', async () => {
+    const { normalizeThemePreferences } = await import('./theme-preferences');
+
+    expect(
+      normalizeThemePreferences({
+        customBackground: 'data:image/png;base64,abc',
+      }),
+    ).toEqual({
+      mode: 'system',
+      paletteId: 'paper',
+      surfaceOpacity: 92,
       customBackground: null,
     });
   });

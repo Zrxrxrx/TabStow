@@ -45,10 +45,12 @@ export function QuickLinks() {
     setLinks(
       await saveQuickLinks([...links, createQuickLink({ url: tab.url, label: getTabLabel(tab) })]),
     );
+    setErrorMessage(null);
   }
 
   async function remove(id: string) {
     setLinks(await saveQuickLinks(links.filter((link) => link.id !== id)));
+    setErrorMessage(null);
   }
 
   return (

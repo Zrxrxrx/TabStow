@@ -1,4 +1,5 @@
 import { storage } from '#imports';
+import { isThemeBackgroundToken } from './theme-background-cache';
 
 const THEME_KEY = 'local:tabstow-theme-preferences';
 const VALID_MODES = new Set(['system', 'light', 'dark']);
@@ -32,7 +33,7 @@ function normalizeSurfaceOpacity(value: unknown): number {
 }
 
 function normalizeCustomBackground(value: unknown): string | null {
-  return typeof value === 'string' && value.startsWith('data:image/') ? value : null;
+  return isThemeBackgroundToken(value) ? value : null;
 }
 
 export function normalizeThemePreferences(input: Partial<ThemePreferences> | null | undefined): ThemePreferences {
