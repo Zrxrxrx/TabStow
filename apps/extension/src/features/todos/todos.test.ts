@@ -91,6 +91,15 @@ describe('todos', () => {
     });
   });
 
+  it('repairs a missing completedAt timestamp when completing an already completed todo', () => {
+    const todos = normalizeTodos([{ id: 'a', title: 'Done', completed: true, completedAt: null }]);
+
+    expect(completeTodo(todos, 'a')[0]).toMatchObject({
+      completed: true,
+      completedAt: expect.any(String),
+    });
+  });
+
   it('searches title and description', () => {
     const todos = normalizeTodos([{ id: 'a', title: 'Review', description: 'Chrome groups' }]);
     expect(searchTodos(todos, 'groups')).toHaveLength(1);

@@ -80,7 +80,7 @@ export function completeTodo(todos: TodoItem[], id: string): TodoItem[] {
       ? {
           ...todo,
           completed: true,
-          completedAt: todo.completed ? todo.completedAt : new Date().toISOString(),
+          completedAt: todo.completed && todo.completedAt !== null ? todo.completedAt : new Date().toISOString(),
         }
       : todo,
   );
