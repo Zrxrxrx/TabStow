@@ -116,7 +116,7 @@ describe('App', () => {
     container.remove();
   });
 
-  it('renders the active workspace above saved sessions and shows the stow hint', async () => {
+  it('renders Chrome group controls below the active workspace header and before the stow hint', async () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
@@ -128,6 +128,12 @@ describe('App', () => {
 
     const mainText = container.textContent ?? '';
     expect(mainText.indexOf('Active tabs')).toBeLessThan(mainText.indexOf('No saved sessions yet.'));
+    const sectionHeader = container.querySelector('.active-workspace .section-header');
+    const controls = container.querySelector('.active-workspace .active-workspace-controls');
+    const hint = container.querySelector('.active-workspace .active-workspace-hint');
+
+    expect(sectionHeader?.nextElementSibling).toBe(controls);
+    expect(controls?.nextElementSibling).toBe(hint);
   });
 
   it('closes duplicate tabs from the active workspace action', async () => {
@@ -166,10 +172,15 @@ describe('App', () => {
     const duplicateClose = screen().getByRole('button', { name: 'Close 2 duplicates' });
     const groupClose = screen().getByLabelText('Close github com tabs');
     const singleClose = screen().getByLabelText('Close openai/tabstow Issue #10');
+    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace-controls input[type="checkbox"]');
 
     expect(duplicateClose).toHaveProperty('disabled', true);
     expect(groupClose).toHaveProperty('disabled', true);
     expect(singleClose).toHaveProperty('disabled', true);
+    expect(syncToggle).not.toBeNull();
+    expect(syncToggle).toHaveProperty('disabled', true);
+    expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
+    expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
     expect(closeCalls()).toHaveLength(1);
 
     await click(groupClose);
@@ -259,6 +270,7 @@ describe('App', () => {
         mappings: [],
       },
     });
+    expect(screen().getByText('Chrome tab groups enabled.')).not.toBeNull();
   });
 
   it('imports existing Chrome tab groups into the active workspace state', async () => {
@@ -364,7 +376,12 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByText('Stow current window'));
 
+    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace-controls input[type="checkbox"]');
     expect(screen().getByText('Stow this window')).toHaveProperty('disabled', true);
+    expect(syncToggle).not.toBeNull();
+    expect(syncToggle).toHaveProperty('disabled', true);
+    expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
+    expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
 
     pendingStow.resolve({
       ok: true,

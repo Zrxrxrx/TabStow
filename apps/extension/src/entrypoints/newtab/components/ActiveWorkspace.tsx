@@ -99,6 +99,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
   }
 
   const closeDisabled = busy || closePending;
+  const chromeGroupControlsDisabled = busy || closePending;
 
   async function focusTab(tab: ActiveBrowserTab) {
     if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') return;
@@ -138,7 +139,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
   }
 
   async function toggleChromeTabGroups() {
-    if (!workspace) return;
+    if (!workspace || busy || closePendingRef.current) return;
     const nextState = {
       ...workspace.chromeTabGroups,
       enabled: !workspace.chromeTabGroups.enabled,
@@ -157,7 +158,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
   }
 
   async function importExistingChromeGroups() {
-    if (!workspace) return;
+    if (!workspace || busy || closePendingRef.current) return;
     const response = await sendExtensionMessage<
       AppResult<{
         manualGroups: ActiveWorkspaceState['manualGroups'];
@@ -183,6 +184,7 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
   }
 
   async function collapseCurrentWindowGroups() {
+    if (busy || closePendingRef.current) return;
     const windowId = tabs.find((tab) => tab.active && typeof tab.windowId === 'number')?.windowId
       ?? tabs.find((tab) => typeof tab.windowId === 'number')?.windowId;
     if (typeof windowId !== 'number') return;
@@ -205,6 +207,36 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
         <span>{tabs.length} open</span>
       </div>
 
+      <div className="active-workspace-controls">
+        <label className="toggle-row">
+          <input
+            checked={Boolean(workspace?.chromeTabGroups.enabled)}
+            onChange={() => void toggleChromeTabGroups()}
+            type="checkbox"
+            disabled={chromeGroupControlsDisabled}
+          />
+          <span>Sync manual groups to Chrome tab groups</span>
+        </label>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void collapseCurrentWindowGroups()}
+          disabled={chromeGroupControlsDisabled}
+        >
+          <Layers size={16} aria-hidden="true" />
+          Collapse Chrome groups
+        </button>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void importExistingChromeGroups()}
+          disabled={chromeGroupControlsDisabled}
+        >
+          <Layers size={16} aria-hidden="true" />
+          Import Chrome groups
+        </button>
+      </div>
+
       <div className="active-workspace-hint">
         <p>Ready to clear this workspace? Stow the current window here or from the toolbar.</p>
         <button
@@ -215,25 +247,6 @@ export function ActiveWorkspace({ busy, onStatus, onStowCurrentWindow, refreshKe
         >
           <Archive size={16} aria-hidden="true" />
           Stow this window
-        </button>
-      </div>
-
-      <div className="active-workspace-controls">
-        <label className="toggle-row">
-          <input
-            checked={Boolean(workspace?.chromeTabGroups.enabled)}
-            onChange={() => void toggleChromeTabGroups()}
-            type="checkbox"
-          />
-          <span>Sync manual groups to Chrome tab groups</span>
-        </label>
-        <button type="button" className="secondary-button" onClick={() => void collapseCurrentWindowGroups()}>
-          <Layers size={16} aria-hidden="true" />
-          Collapse Chrome groups
-        </button>
-        <button type="button" className="secondary-button" onClick={() => void importExistingChromeGroups()}>
-          <Layers size={16} aria-hidden="true" />
-          Import Chrome groups
         </button>
       </div>
 
