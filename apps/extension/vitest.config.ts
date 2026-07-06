@@ -5,6 +5,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': resolve(__dirname, 'src'),
+      '#imports': resolve(__dirname, 'src/tests/wxt-imports.ts'),
     },
   },
   test: {
