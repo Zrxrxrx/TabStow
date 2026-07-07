@@ -393,21 +393,6 @@ h3 {
   border-color: var(--accent);
 }
 
-.active-workspace-hint {
-  align-items: center;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  display: flex;
-  gap: 12px;
-  justify-content: space-between;
-  padding: 12px;
-}
-
-.active-workspace-hint p {
-  color: var(--muted);
-}
-
 .active-group-list,
 .tab-groups,
 .session-list,
@@ -795,11 +780,6 @@ h3 {
   }
 
   .section-header {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .active-workspace-hint {
     align-items: flex-start;
     flex-direction: column;
   }

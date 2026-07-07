@@ -21,7 +21,6 @@ type Props = {
   busy: boolean;
   locale: Locale;
   onStatus: (tone: 'success' | 'error', message: string) => void;
-  onStowCurrentWindow: () => Promise<void>;
   onStowTab: (tab: ActiveBrowserTab) => Promise<void>;
   refreshKey: number;
 };
@@ -30,7 +29,6 @@ export function ActiveWorkspace({
   busy,
   locale,
   onStatus,
-  onStowCurrentWindow,
   onStowTab,
   refreshKey,
 }: Props) {
@@ -246,19 +244,6 @@ export function ActiveWorkspace({
         >
           <Layers size={16} aria-hidden="true" />
           {t(locale, 'importChromeGroups')}
-        </button>
-      </div>
-
-      <div className="active-workspace-hint">
-        <p>Ready to clear this workspace? Stow the current window here or from the toolbar.</p>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void onStowCurrentWindow()}
-          disabled={busy}
-        >
-          <Archive size={16} aria-hidden="true" />
-          {t(locale, 'stowThisWindow')}
         </button>
       </div>
 

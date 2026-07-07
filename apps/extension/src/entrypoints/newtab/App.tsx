@@ -210,16 +210,6 @@ export function App() {
             locale={locale}
             onStatus={(tone, message) => setStatus({ tone, message })}
             refreshKey={activeWorkspaceRefreshKey}
-            onStowCurrentWindow={() =>
-              runAction(
-                'stow',
-                () =>
-                  sendExtensionMessage<AppResult<StowResult>>({
-                    type: 'sessions:stow-current-window',
-                  }),
-                (result) => `Stowed ${result.savedTabCount} tabs and closed ${result.closedTabCount}.`,
-              )
-            }
             onStowTab={(tab) => {
               const tabId = tab.id;
               if (typeof tabId !== 'number') return Promise.resolve();

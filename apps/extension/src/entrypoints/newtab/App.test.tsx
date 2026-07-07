@@ -250,13 +250,12 @@ describe('App', () => {
     container.remove();
   });
 
-  it('renders Chrome group controls below the active workspace header and before the stow hint', async () => {
+  it('renders Chrome group controls below the active workspace header without a duplicate stow hint', async () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
 
     expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
-    expect(screen().getByText('Stow this window')).not.toBeNull();
     expect(screen().getByText('1 open')).not.toBeNull();
     expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:list', 'sessions:list']));
 
@@ -265,7 +264,8 @@ describe('App', () => {
     expect(container.querySelector('.active-workspace .section-header')).not.toBeNull();
     expect(container.querySelector('.active-workspace .tabs-toolbar')).not.toBeNull();
     expect(container.querySelector('.active-workspace .meta-row')).not.toBeNull();
-    expect(container.querySelector('.active-workspace .active-workspace-hint')).not.toBeNull();
+    expect(() => screen().getByText('Stow this window')).toThrow();
+    expect(container.querySelector('.active-workspace .active-workspace-hint')).toBeNull();
   });
 
   it('renders utility panels from stored quick links, todos, and theme preferences', async () => {
@@ -1340,7 +1340,7 @@ describe('App', () => {
     await click(screen().getByText('Stow current window'));
 
     const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
-    expect(screen().getByText('Stow this window')).toHaveProperty('disabled', true);
+    expect(() => screen().getByText('Stow this window')).toThrow();
     expect(syncToggle).not.toBeNull();
     expect(syncToggle).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
