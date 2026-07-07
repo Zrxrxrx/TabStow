@@ -238,12 +238,10 @@ describe('App', () => {
 
     const mainText = container.textContent ?? '';
     expect(mainText.indexOf('Active tabs')).toBeLessThan(mainText.indexOf('No saved sessions yet.'));
-    const sectionHeader = container.querySelector('.active-workspace .section-header');
-    const controls = container.querySelector('.active-workspace .active-workspace-controls');
-    const hint = container.querySelector('.active-workspace .active-workspace-hint');
-
-    expect(sectionHeader?.nextElementSibling).toBe(controls);
-    expect(controls?.nextElementSibling).toBe(hint);
+    expect(container.querySelector('.active-workspace .section-header')).not.toBeNull();
+    expect(container.querySelector('.active-workspace .tabs-toolbar')).not.toBeNull();
+    expect(container.querySelector('.active-workspace .meta-row')).not.toBeNull();
+    expect(container.querySelector('.active-workspace .active-workspace-hint')).not.toBeNull();
   });
 
   it('renders utility panels from stored quick links, todos, and theme preferences', async () => {
@@ -302,7 +300,7 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '打开的标签页' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: '已收起的标签页' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Saved for later' })).not.toBeNull();
     expect(screen().getByLabelText('搜索网页')).not.toBeNull();
     expect(screen().getByLabelText('添加快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();
@@ -337,7 +335,10 @@ describe('App', () => {
     expect(screen().getByText('Example')).not.toBeNull();
 
     expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: 'Stowed sessions' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Saved for later' })).not.toBeNull();
+    expect(container.querySelector('.active-workspace.panel.column')).not.toBeNull();
+    expect(container.querySelector('.saved-sessions.panel.column')).not.toBeNull();
+    expect(container.querySelector('.meta-pill')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Todos' })).toThrow();
     expect(() => screen().getByRole('heading', { name: 'Appearance' })).toThrow();
 
@@ -689,7 +690,7 @@ describe('App', () => {
     const duplicateClose = screen().getByRole('button', { name: 'Close 2 duplicates' });
     const groupClose = screen().getByLabelText('Close github com tabs');
     const singleClose = screen().getByLabelText('Close openai/tabstow Issue #10');
-    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace-controls input[type="checkbox"]');
+    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
 
     expect(duplicateClose).toHaveProperty('disabled', true);
     expect(groupClose).toHaveProperty('disabled', true);
@@ -715,7 +716,7 @@ describe('App', () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
-    await click(screen().getByRole('button', { name: 'Inbox - Gmail' }));
+    await click(screen().getByText('Inbox - Gmail'));
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'active-tabs:focus',
@@ -887,7 +888,7 @@ describe('App', () => {
 
     await renderApp();
 
-    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace-controls input[type="checkbox"]');
+    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
     expect(syncToggle).not.toBeNull();
     expect(syncToggle).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
@@ -1010,7 +1011,7 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByText('Stow current window'));
 
-    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace-controls input[type="checkbox"]');
+    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
     expect(screen().getByText('Stow this window')).toHaveProperty('disabled', true);
     expect(syncToggle).not.toBeNull();
     expect(syncToggle).toHaveProperty('disabled', true);

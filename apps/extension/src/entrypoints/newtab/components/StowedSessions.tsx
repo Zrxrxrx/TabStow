@@ -1,10 +1,10 @@
-import { Archive, RefreshCcw, RotateCcw, Settings, Trash2, UploadCloud } from 'lucide-react';
+import { RefreshCcw, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
 import { useMemo } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { StatusMessage } from '@/components/StatusMessage';
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
-import { sendExtensionMessage, type StowResult, type SyncResult } from '@/lib/messages';
+import { sendExtensionMessage, type SyncResult } from '@/lib/messages';
 
 type StatusState = {
   tone: 'info' | 'success' | 'error';
@@ -16,7 +16,6 @@ type Props = {
   locale: Locale;
   sessions: TabSession[];
   status: StatusState;
-  onOpenOptions: () => void;
   onRunAction: <T>(
     actionId: string,
     action: () => Promise<AppResult<T>>,
@@ -49,7 +48,6 @@ function sessionPreview(session: TabSession): string {
 export function StowedSessions({
   busyAction,
   locale,
-  onOpenOptions,
   onRunAction,
   sessions,
   status,
@@ -60,12 +58,21 @@ export function StowedSessions({
   );
 
   return (
-    <>
+    <section className="panel column saved-sessions" aria-labelledby="saved-title" data-od-id="saved-tabs-column">
       <header className="section-header">
-        <h2>{t(locale, 'stowedSessions')}</h2>
+        <div>
+          <h2 id="saved-title" data-od-id="saved-tabs-title">
+            Saved for later
+          </h2>
+          <p className="subtle">Durable stowed sessions sorted newest first. Restoring keeps the saved copy.</p>
+        </div>
+        <span className="meta-row" id="saved-count" aria-label="Saved sessions and tabs count">
+          <span className="meta-pill">{sessions.length} sessions</span>
+          <span className="meta-pill">{totalTabs} tabs</span>
+        </span>
       </header>
 
-      <section className="header-actions" aria-label="Session controls">
+      <section className="session-toolbar" aria-label="Session controls" data-od-id="saved-actions">
         <button
           type="button"
           className="secondary-button"
@@ -96,37 +103,6 @@ export function StowedSessions({
           <UploadCloud size={16} aria-hidden="true" />
           {t(locale, 'push')}
         </button>
-        <button
-          type="button"
-          className="icon-button"
-          onClick={onOpenOptions}
-          aria-label={t(locale, 'openSettings')}
-        >
-          <Settings size={18} aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          className="primary-button"
-          onClick={() =>
-            void onRunAction<StowResult>(
-              'stow',
-              () =>
-                sendExtensionMessage<AppResult<StowResult>>({
-                  type: 'sessions:stow-current-window',
-                }),
-              (result) => `Stowed ${result.savedTabCount} tabs and closed ${result.closedTabCount}.`,
-            )
-          }
-          disabled={busyAction !== null}
-        >
-          <Archive size={16} aria-hidden="true" />
-          {t(locale, 'stowCurrentWindow')}
-        </button>
-      </section>
-
-      <section className="stats-row" aria-label="Session summary">
-        <span>{sessions.length} sessions</span>
-        <span>{totalTabs} tabs stored</span>
       </section>
 
       <StatusMessage message={status.message} tone={status.tone} />
@@ -136,60 +112,62 @@ export function StowedSessions({
           <div className="empty-state">{t(locale, 'noSavedSessions')}</div>
         ) : (
           sessions.map((session) => (
-            <article className="session-row" key={session.id}>
-              <div className="session-main">
-                <h2>{session.title}</h2>
-                <p>
-                  {formatDate(session.createdAt)} · {session.tabs.length}{' '}
-                  {session.tabs.length === 1 ? 'tab' : 'tabs'}
-                </p>
-                <p className="session-preview">{sessionPreview(session)}</p>
-              </div>
-              <div className="session-actions">
-                <button
-                  type="button"
-                  className="secondary-button"
-                  onClick={() =>
-                    void onRunAction(
-                      `restore-${session.id}`,
-                      () =>
-                        sendExtensionMessage<AppResult<{ restored: true; tabCount: number }>>({
-                          type: 'sessions:restore',
-                          sessionId: session.id,
-                          mode: 'current-window',
-                        }),
-                      (result) => `Restored ${result.tabCount} tabs.`,
-                    )
-                  }
-                  disabled={busyAction !== null}
-                >
-                  <RotateCcw size={16} aria-hidden="true" />
-                  {t(locale, 'restore')}
-                </button>
-                <button
-                  type="button"
-                  className="danger-button"
-                  onClick={() =>
-                    void onRunAction(
-                      `delete-${session.id}`,
-                      () =>
-                        sendExtensionMessage<AppResult<{ deleted: true }>>({
-                          type: 'sessions:delete',
-                          sessionId: session.id,
-                        }),
-                      () => 'Deleted saved session.',
-                    )
-                  }
-                  disabled={busyAction !== null}
-                >
-                  <Trash2 size={16} aria-hidden="true" />
-                  {t(locale, 'delete')}
-                </button>
-              </div>
+            <article className="session-card" key={session.id}>
+              <header>
+                <div className="tab-copy">
+                  <span className="session-title">{session.title}</span>
+                  <span className="session-preview">
+                    {formatDate(session.createdAt)} · {session.tabs.length}{' '}
+                    {session.tabs.length === 1 ? 'tab' : 'tabs'}
+                  </span>
+                  <span className="session-preview">{sessionPreview(session)}</span>
+                </div>
+                <div className="row-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() =>
+                      void onRunAction(
+                        `restore-${session.id}`,
+                        () =>
+                          sendExtensionMessage<AppResult<{ restored: true; tabCount: number }>>({
+                            type: 'sessions:restore',
+                            sessionId: session.id,
+                            mode: 'current-window',
+                          }),
+                        (result) => `Restored ${result.tabCount} tabs.`,
+                      )
+                    }
+                    disabled={busyAction !== null}
+                  >
+                    <RotateCcw size={16} aria-hidden="true" />
+                    {t(locale, 'restore')}
+                  </button>
+                  <button
+                    type="button"
+                    className="danger-button"
+                    onClick={() =>
+                      void onRunAction(
+                        `delete-${session.id}`,
+                        () =>
+                          sendExtensionMessage<AppResult<{ deleted: true }>>({
+                            type: 'sessions:delete',
+                            sessionId: session.id,
+                          }),
+                        () => 'Deleted saved session.',
+                      )
+                    }
+                    disabled={busyAction !== null}
+                  >
+                    <Trash2 size={16} aria-hidden="true" />
+                    {t(locale, 'delete')}
+                  </button>
+                </div>
+              </header>
             </article>
           ))
         )}
       </section>
-    </>
+    </section>
   );
 }

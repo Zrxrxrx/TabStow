@@ -182,7 +182,6 @@ export function App() {
           <StowedSessions
             busyAction={busyAction}
             locale={locale}
-            onOpenOptions={openOptions}
             onRunAction={runAction}
             sessions={sessions}
             status={status}

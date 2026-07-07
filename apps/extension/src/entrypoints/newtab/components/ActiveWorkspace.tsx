@@ -1,4 +1,4 @@
-import { Archive, ExternalLink, Layers, Trash2, X } from 'lucide-react';
+import { Archive, Layers, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildActiveTabGroups,
@@ -219,13 +219,20 @@ export function ActiveWorkspace({ busy, locale, onStatus, onStowCurrentWindow, r
   }
 
   return (
-    <section className="active-workspace" aria-labelledby="active-tabs-title">
+    <section className="panel column active-workspace" aria-labelledby="active-tabs-title" data-od-id="active-tabs-column">
       <div className="section-header">
-        <h2 id="active-tabs-title">{t(locale, 'activeTabs')}</h2>
-        <span>{tabs.length} open</span>
+        <div>
+          <h2 id="active-tabs-title" data-od-id="active-tabs-title">
+            {t(locale, 'activeTabs')}
+          </h2>
+          <p className="subtle">Equivalent to open Chrome tabs, grouped by domain or manual workspace.</p>
+        </div>
+        <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
+          {tabs.length} open
+        </span>
       </div>
 
-      <div className="active-workspace-controls">
+      <div className="meta-row" data-od-id="active-actions">
         <label className="toggle-row">
           <input
             checked={Boolean(workspace?.chromeTabGroups.enabled)}
@@ -291,7 +298,7 @@ export function ActiveWorkspace({ busy, locale, onStatus, onStowCurrentWindow, r
       <div className="active-group-list">
         {groups.map((group) => (
           <article
-            className="active-group"
+            className="tab-group"
             key={group.key}
             ref={(node) => {
               if (node) {
@@ -322,38 +329,45 @@ export function ActiveWorkspace({ busy, locale, onStatus, onStowCurrentWindow, r
             </header>
             <div className="active-tab-list">
               {group.tabs.map((tab) => (
-                <div className="active-tab-row" key={tab.id ?? tab.url}>
-                  <button type="button" onClick={() => void focusTab(tab)}>
-                    <ExternalLink size={14} aria-hidden="true" />
-                    <span>{getTabLabel(tab)}</span>
+                <div className="tab-row" key={tab.id ?? tab.url}>
+                  <button className="tab-open-button" type="button" onClick={() => void focusTab(tab)}>
+                    <span className="favicon tone-blue" aria-hidden="true">
+                      {(getTabLabel(tab).match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
+                    </span>
+                    <span className="tab-copy">
+                      <span className="tab-title">{getTabLabel(tab)}</span>
+                      <span className="tab-url">{tab.url ?? ''}</span>
+                    </span>
                   </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={t(locale, 'moveToManualGroup')}
-                    onClick={() => void createManualGroupForTab(tab)}
-                  >
-                    <Archive size={14} aria-hidden="true" />
-                  </button>
-                  {group.kind === 'manual' && (
+                  <div className="row-actions">
                     <button
                       type="button"
                       className="icon-button"
-                      aria-label={t(locale, 'moveToDomainGroup')}
-                      onClick={() => void removeTabFromManualGroup(tab)}
+                      aria-label={t(locale, 'moveToManualGroup')}
+                      onClick={() => void createManualGroupForTab(tab)}
                     >
-                      <X size={14} aria-hidden="true" />
+                      <Archive size={14} aria-hidden="true" />
                     </button>
-                  )}
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={`Close ${getTabLabel(tab)}`}
-                    onClick={() => typeof tab.id === 'number' && void closeTabs([tab.id])}
-                    disabled={closeDisabled}
-                  >
-                    <Trash2 size={14} aria-hidden="true" />
-                  </button>
+                    {group.kind === 'manual' && (
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={t(locale, 'moveToDomainGroup')}
+                        onClick={() => void removeTabFromManualGroup(tab)}
+                      >
+                        <X size={14} aria-hidden="true" />
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      className="icon-button"
+                      aria-label={`Close ${getTabLabel(tab)}`}
+                      onClick={() => typeof tab.id === 'number' && void closeTabs([tab.id])}
+                      disabled={closeDisabled}
+                    >
+                      <Trash2 size={14} aria-hidden="true" />
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
