@@ -11,6 +11,7 @@ import {
   type TodoItem,
 } from '@/features/todos/todos';
 import { getTodos, saveTodos } from '@/features/todos/todos-storage';
+import { FormDialog } from './FormDialog';
 
 type Props = {
   locale: Locale;
@@ -19,6 +20,11 @@ type Props = {
 export function TodosPanel({ locale }: Props) {
   const [query, setQuery] = useState('');
   const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [todoDialogOpen, setTodoDialogOpen] = useState(false);
+  const [todoTitle, setTodoTitle] = useState('');
+  const [todoDescription, setTodoDescription] = useState('');
+  const [todoError, setTodoError] = useState<string | null>(null);
+  const [todoSubmitting, setTodoSubmitting] = useState(false);
 
   useEffect(() => {
     void getTodos().then(setTodos);
@@ -29,12 +35,28 @@ export function TodosPanel({ locale }: Props) {
     [todos, query],
   );
 
-  async function addTodo() {
-    const title = window.prompt('Todo title');
-    if (!title) return;
+  function openTodoDialog() {
+    setTodoTitle('');
+    setTodoDescription('');
+    setTodoError(null);
+    setTodoSubmitting(false);
+    setTodoDialogOpen(true);
+  }
 
-    const description = window.prompt('Todo details') ?? '';
-    setTodos(await saveTodos(createTodo(todos, { title, description })));
+  async function addTodo() {
+    setTodoError(null);
+    setTodoSubmitting(true);
+
+    try {
+      setTodos(await saveTodos(createTodo(todos, { title: todoTitle, description: todoDescription })));
+      setTodoDialogOpen(false);
+      setTodoTitle('');
+      setTodoDescription('');
+    } catch (error) {
+      setTodoError(error instanceof Error ? error.message : 'Todo title is required.');
+    } finally {
+      setTodoSubmitting(false);
+    }
   }
 
   async function moveTodo(id: string, direction: -1 | 1) {
@@ -64,7 +86,7 @@ export function TodosPanel({ locale }: Props) {
     <section className="utility-panel" aria-labelledby="todos-title">
       <header>
         <h2 id="todos-title">{t(locale, 'todos')}</h2>
-        <button type="button" className="icon-button" aria-label={t(locale, 'addTodo')} onClick={() => void addTodo()}>
+        <button type="button" className="icon-button" aria-label={t(locale, 'addTodo')} onClick={openTodoDialog}>
           <Plus size={16} aria-hidden="true" />
         </button>
       </header>
@@ -128,6 +150,40 @@ export function TodosPanel({ locale }: Props) {
       <button type="button" className="secondary-button" onClick={() => void clearCompleted()}>
         {t(locale, 'clearCompleted')}
       </button>
+
+      {todoDialogOpen ? (
+        <FormDialog
+          cancelLabel={t(locale, 'cancel')}
+          errorMessage={todoError}
+          onCancel={() => setTodoDialogOpen(false)}
+          onSubmit={addTodo}
+          submitLabel={t(locale, 'add')}
+          submitting={todoSubmitting}
+          title={t(locale, 'addTodo')}
+        >
+          <div className="field-stack">
+            <label className="field-label">
+              {t(locale, 'todoTitle')}
+              <input
+                aria-label={t(locale, 'todoTitle')}
+                className="dialog-input"
+                onChange={(event) => setTodoTitle(event.target.value)}
+                type="text"
+                value={todoTitle}
+              />
+            </label>
+            <label className="field-label">
+              {t(locale, 'todoDetails')}
+              <textarea
+                aria-label={t(locale, 'todoDetails')}
+                className="dialog-textarea"
+                onChange={(event) => setTodoDescription(event.target.value)}
+                value={todoDescription}
+              />
+            </label>
+          </div>
+        </FormDialog>
+      ) : null}
     </section>
   );
 }

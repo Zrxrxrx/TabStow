@@ -151,6 +151,16 @@ const UNIQUE_TAB: ActiveBrowserTab = {
   url: 'https://docs.example.com/spec',
   windowId: 4,
 };
+const INVALID_QUICK_LINK_TAB: ActiveBrowserTab = {
+  active: false,
+  groupId: -1,
+  id: 13,
+  index: 0,
+  pinned: false,
+  title: 'Settings',
+  url: 'chrome://settings',
+  windowId: 4,
+};
 
 let container: HTMLDivElement;
 let root: Root;
@@ -386,13 +396,14 @@ describe('App', () => {
   it('adds and removes quick links through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
-    promptSpy
-      .mockReturnValueOnce('https://example.com')
-      .mockReturnValueOnce('Example');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
+    await change(screen().getByLabelText('Quick link label'), 'Example');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).toHaveBeenCalledWith([
       expect.objectContaining({
         url: 'https://example.com/',
@@ -404,6 +415,68 @@ describe('App', () => {
     await click(screen().getByLabelText('Remove Example'));
 
     expect(saveQuickLinks).toHaveBeenLastCalledWith([]);
+  });
+
+  it('adds a quick link from a bare domain through the utility panel', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+
+    await renderApp();
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'google.com');
+    await change(screen().getByLabelText('Quick link label'), 'Google');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://google.com/',
+        label: 'Google',
+      }),
+    ]);
+    expect(screen().getByText('Google')).not.toBeNull();
+  });
+
+  it('adds a quick link from an open-tab chooser', async () => {
+    mockMessages({ activeTabs: [INVALID_QUICK_LINK_TAB, UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Add open tab' }));
+    expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
+    expect(document.activeElement).toBe(screen().getByRole('button', { name: 'Spec draft' }));
+    expect(() => screen().getByRole('button', { name: 'Settings' })).toThrow();
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://docs.example.com/spec',
+        label: 'Spec draft',
+      }),
+    ]);
+    expect(screen().getByText('Spec draft')).not.toBeNull();
+  });
+
+  it('does not use browser prompt for integrated input actions', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    saveTodos.mockImplementation(async (todos: unknown) => todos);
+
+    await renderApp();
+
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'example.com');
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+
+    await click(screen().getByRole('button', { name: 'Add open tab' }));
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByLabelText('Add todo'));
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
   });
 
   it('edits quick link label and icon metadata through the utility panel', async () => {
@@ -418,13 +491,14 @@ describe('App', () => {
       },
     ]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
-    promptSpy
-      .mockReturnValueOnce('Example docs')
-      .mockReturnValueOnce('*');
 
     await renderApp();
     await click(screen().getByLabelText('Edit Example'));
+    await change(screen().getByLabelText('Quick link label'), 'Example docs');
+    await change(screen().getByLabelText('Quick link icon'), '*');
+    await click(screen().getByRole('button', { name: 'Save' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).toHaveBeenCalledWith([
       expect.objectContaining({
         id: 'link-1',
@@ -476,13 +550,14 @@ describe('App', () => {
         createdAt: '2026-07-07T00:00:00.000Z',
       },
     ]);
-    promptSpy
-      .mockReturnValueOnce('notaurl')
-      .mockReturnValueOnce('Broken');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'notaurl');
+    await change(screen().getByLabelText('Quick link label'), 'Broken');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).not.toHaveBeenCalled();
     expect(screen().getByText('Example')).not.toBeNull();
     expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
@@ -499,13 +574,14 @@ describe('App', () => {
         createdAt: '2026-07-07T00:00:00.000Z',
       },
     ]);
-    promptSpy
-      .mockReturnValueOnce('javascript:alert(1)')
-      .mockReturnValueOnce('Bad Link');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'javascript:alert(1)');
+    await change(screen().getByLabelText('Quick link label'), 'Bad Link');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).not.toHaveBeenCalled();
     expect(screen().getByText('Example')).not.toBeNull();
     expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
@@ -601,6 +677,44 @@ describe('App', () => {
       expect.objectContaining({ id: 'todo-1', dismissed: false }),
       expect.objectContaining({ id: 'todo-2', dismissed: true }),
     ]);
+  });
+
+  it('adds a todo through an integrated form', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveTodos.mockImplementation(async (todos: unknown) => todos);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByLabelText('Add todo'));
+    await change(screen().getByLabelText('Todo title'), 'Review launch checklist');
+    await change(screen().getByLabelText('Todo details'), 'Remember the migration notes');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(saveTodos).toHaveBeenCalledWith([
+      expect.objectContaining({
+        title: 'Review launch checklist',
+        description: 'Remember the migration notes',
+        completed: false,
+        dismissed: false,
+      }),
+    ]);
+    expect(screen().getByText('Review launch checklist')).not.toBeNull();
+  });
+
+  it('closes the nested Add todo dialog without closing the Extra drawer on Escape', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByLabelText('Add todo'));
+
+    expect(screen().getByRole('dialog', { name: 'Add todo' })).not.toBeNull();
+
+    await keyDown('Escape');
+
+    expect(() => screen().getByRole('dialog', { name: 'Add todo' })).toThrow();
+    expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
   });
 
   it('saves only a lightweight custom background token in theme preferences', async () => {
@@ -1272,18 +1386,39 @@ async function renderApp() {
 
 async function click(element: HTMLElement) {
   await act(async () => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (element instanceof HTMLButtonElement && element.type === 'submit' && element.form) {
+      if (typeof element.form.requestSubmit === 'function') {
+        element.form.requestSubmit(element);
+        return;
+      }
+      element.click();
+      return;
+    }
+    element.click();
+  });
+}
+
+async function keyDown(key: string) {
+  await act(async () => {
+    const target =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : document.body;
+    target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
   });
 }
 
 async function change(element: HTMLElement, value: string) {
   await act(async () => {
-    if (
-      element instanceof HTMLInputElement
-      || element instanceof HTMLSelectElement
-      || element instanceof HTMLTextAreaElement
-    ) {
-      element.value = value;
+    if (element instanceof HTMLInputElement) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(element, value);
+    } else if (element instanceof HTMLSelectElement) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      setter?.call(element, value);
+    } else if (element instanceof HTMLTextAreaElement) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(element, value);
     }
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));
