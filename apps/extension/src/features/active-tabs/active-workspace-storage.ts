@@ -63,7 +63,7 @@ function normalizeChromeGroups(input: Partial<ChromeTabGroupsState> | undefined)
   const mappings = Array.isArray(input?.mappings) ? (input.mappings as unknown[]) : [];
 
   return {
-    enabled: Boolean(input?.enabled),
+    enabled: input?.enabled === false ? false : true,
     mappings: mappings
       .filter(
         (mapping): mapping is ChromeTabGroupMappingCandidate =>

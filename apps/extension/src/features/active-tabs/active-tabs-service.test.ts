@@ -4,6 +4,9 @@ const browserMocks = vi.hoisted(() => ({
   search: {
     query: vi.fn(),
   },
+  tabGroups: {
+    query: vi.fn(),
+  },
   tabs: {
     query: vi.fn(),
     remove: vi.fn(),
@@ -21,6 +24,7 @@ vi.mock('@/lib/browser', () => ({
 describe('active tabs service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserMocks.tabGroups.query.mockResolvedValue([]);
   });
 
   it('lists active browser tabs from all windows', async () => {
@@ -53,6 +57,46 @@ describe('active tabs service', () => {
     expect(result).toEqual({
       ok: true,
       data: [{ id: 1, windowId: 2, index: 0, url: 'https://example.com' }],
+    });
+  });
+
+  it('lists active tabs with Chrome tab-group metadata', async () => {
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' },
+    ]);
+    browserMocks.tabGroups.query.mockResolvedValue([
+      { id: 31, windowId: 2, title: 'Reading', color: 'blue', collapsed: false },
+    ]);
+
+    const { listActiveTabsSnapshot } = await import('./active-tabs-service');
+    const result = await listActiveTabsSnapshot();
+
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({});
+    expect(browserMocks.tabGroups.query).toHaveBeenCalledWith({});
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
+        chromeGroups: [{ id: 31, windowId: 2, title: 'Reading', color: 'blue', collapsed: false }],
+      },
+    });
+  });
+
+  it('keeps active tabs when Chrome group metadata cannot be read', async () => {
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' },
+    ]);
+    browserMocks.tabGroups.query.mockRejectedValue(new Error('tabGroups unavailable'));
+
+    const { listActiveTabsSnapshot } = await import('./active-tabs-service');
+    const result = await listActiveTabsSnapshot();
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
+        chromeGroups: [],
+      },
     });
   });
 

@@ -21,7 +21,7 @@ describe('active workspace storage', () => {
     await expect(getActiveWorkspaceState()).resolves.toEqual({
       manualGroups: { groups: [], assignments: {} },
       order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
-      chromeTabGroups: { enabled: false, mappings: [] },
+      chromeTabGroups: { enabled: true, mappings: [] },
     });
   });
 
@@ -53,6 +53,22 @@ describe('active workspace storage', () => {
     });
   });
 
+  it('preserves an explicit disabled Chrome group sync state', async () => {
+    storageMocks.getItem.mockResolvedValue({
+      chromeTabGroups: {
+        enabled: false,
+        mappings: [],
+      },
+    });
+
+    const { getActiveWorkspaceState } = await import('./active-workspace-storage');
+    await expect(getActiveWorkspaceState()).resolves.toEqual({
+      manualGroups: { groups: [], assignments: {} },
+      order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
+      chromeTabGroups: { enabled: false, mappings: [] },
+    });
+  });
+
   it('dedupes persisted order arrays while preserving first-seen order', async () => {
     storageMocks.getItem.mockResolvedValue({
       order: {
@@ -76,7 +92,7 @@ describe('active workspace storage', () => {
           'manual:1': ['tab-3'],
         },
       },
-      chromeTabGroups: { enabled: false, mappings: [] },
+      chromeTabGroups: { enabled: true, mappings: [] },
     });
   });
 });

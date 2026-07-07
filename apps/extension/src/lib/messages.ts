@@ -3,6 +3,7 @@ import type { ChromeTabGroupsState } from '@/features/active-tabs/active-workspa
 import type {
   ActiveBrowserTab,
   ActiveTabGroup,
+  ActiveTabsSnapshot,
   ManualGroupsState,
 } from '@/features/active-tabs/types';
 import type { ImportedChromeGroupsResult } from '@/features/chrome-tab-groups/chrome-tab-groups';
@@ -31,6 +32,7 @@ export type ExtensionMessage =
   | { type: 'sessions:restore'; sessionId: string; mode: RestoreMode }
   | { type: 'sessions:delete'; sessionId: string }
   | { type: 'active-tabs:list' }
+  | { type: 'active-tabs:snapshot' }
   | { type: 'active-tabs:focus'; tabId: number; windowId: number }
   | { type: 'active-tabs:close'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
@@ -52,6 +54,7 @@ export type ExtensionMessageResponse =
   | AppResult<TabSession>
   | AppResult<StowResult>
   | AppResult<ActiveBrowserTab[]>
+  | AppResult<ActiveTabsSnapshot>
   | AppResult<ExtensionSettings>
   | AppResult<SyncResult>
   | AppResult<ChromeTabGroupsState>

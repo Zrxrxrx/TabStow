@@ -47,6 +47,38 @@ describe('active tab groups', () => {
     expect(groups.find((group) => group.key === 'domain:github.com')).toBeUndefined();
   });
 
+  it('prefers native Chrome group membership over stale manual assignments', () => {
+    const groups = buildActiveTabGroups(
+      [
+        {
+          id: 2,
+          windowId: 7,
+          groupId: 31,
+          index: 1,
+          active: true,
+          pinned: false,
+          title: 'Issue tracker',
+          url: 'https://github.com/openai/tabstow/issues/10',
+        },
+      ],
+      {
+        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-06T00:00:00.000Z' }],
+        assignments: { '2': 'manual-1' },
+      },
+      { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
+      [{ id: 31, windowId: 7, title: 'Reading', color: 'blue', collapsed: false }],
+    );
+
+    expect(groups).toEqual([
+      expect.objectContaining({
+        key: 'chrome:7:31',
+        kind: 'chrome',
+        title: 'Reading',
+        tabs: [expect.objectContaining({ id: 2 })],
+      }),
+    ]);
+  });
+
   it('finds duplicate tabs by exact URL and keeps the first tab out of the close list', () => {
     expect(findDuplicateTabGroups(tabs)).toEqual([
       {

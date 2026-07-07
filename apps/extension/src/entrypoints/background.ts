@@ -7,6 +7,7 @@ import {
   closeActiveTabs,
   focusActiveTab,
   listActiveTabs,
+  listActiveTabsSnapshot,
   runDefaultSearch,
 } from '@/features/active-tabs/active-tabs-service';
 import {
@@ -45,6 +46,8 @@ async function handleMessage(
         return ok({ deleted: true });
       case 'active-tabs:list':
         return listActiveTabs();
+      case 'active-tabs:snapshot':
+        return listActiveTabsSnapshot();
       case 'active-tabs:focus':
         return focusActiveTab(message.tabId, message.windowId);
       case 'active-tabs:close':

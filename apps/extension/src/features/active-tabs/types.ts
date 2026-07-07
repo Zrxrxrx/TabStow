@@ -20,7 +20,17 @@ export type ActiveWorkspaceOrderState = {
   groupTabOrder: Record<string, string[]>;
 };
 
-export type ActiveTabGroupKind = 'landing' | 'manual' | 'domain';
+export type ChromeTabGroupInfo = Pick<
+  chrome.tabGroups.TabGroup,
+  'id' | 'windowId' | 'title' | 'color' | 'collapsed'
+>;
+
+export type ActiveTabsSnapshot = {
+  tabs: ActiveBrowserTab[];
+  chromeGroups: ChromeTabGroupInfo[];
+};
+
+export type ActiveTabGroupKind = 'chrome' | 'landing' | 'manual' | 'domain';
 
 export type ActiveTabGroup = {
   key: string;

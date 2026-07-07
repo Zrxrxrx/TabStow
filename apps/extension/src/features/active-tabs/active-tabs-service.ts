@@ -1,7 +1,7 @@
 import { browser } from '@/lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
-import type { ActiveBrowserTab } from './types';
+import type { ActiveBrowserTab, ActiveTabsSnapshot, ChromeTabGroupInfo } from './types';
 
 export async function listActiveTabs(): Promise<AppResult<ActiveBrowserTab[]>> {
   try {
@@ -10,6 +10,24 @@ export async function listActiveTabs(): Promise<AppResult<ActiveBrowserTab[]>> {
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }
+}
+
+async function listChromeTabGroups(): Promise<ChromeTabGroupInfo[]> {
+  try {
+    return await browser.tabGroups.query({});
+  } catch {
+    return [];
+  }
+}
+
+export async function listActiveTabsSnapshot(): Promise<AppResult<ActiveTabsSnapshot>> {
+  const response = await listActiveTabs();
+  if (!response.ok) return response;
+
+  return ok({
+    tabs: response.data,
+    chromeGroups: await listChromeTabGroups(),
+  });
 }
 
 export async function focusActiveTab(

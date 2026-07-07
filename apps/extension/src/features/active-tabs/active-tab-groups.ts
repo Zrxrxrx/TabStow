@@ -3,6 +3,7 @@ import type {
   ActiveBrowserTab,
   ActiveTabGroup,
   ActiveWorkspaceOrderState,
+  ChromeTabGroupInfo,
   DuplicateTabGroup,
   ManualGroupsState,
 } from './types';
@@ -39,32 +40,55 @@ function orderGroups(groups: ActiveTabGroup[], orderState: ActiveWorkspaceOrderS
   return all.sort((a, b) => Number(b.pinned) - Number(a.pinned));
 }
 
+function chromeGroupKey(tab: ActiveBrowserTab): string | null {
+  if (typeof tab.groupId !== 'number' || tab.groupId < 0 || typeof tab.windowId !== 'number') return null;
+  return `chrome:${tab.windowId}:${tab.groupId}`;
+}
+
+function chromeGroupsByKey(groups: ChromeTabGroupInfo[]): Map<string, ChromeTabGroupInfo> {
+  return new Map(groups.map((group) => [`chrome:${group.windowId}:${group.id}`, group]));
+}
+
 export function buildActiveTabGroups(
   tabs: ActiveBrowserTab[],
   manualState: ManualGroupsState,
   orderState: ActiveWorkspaceOrderState,
+  chromeGroups: ChromeTabGroupInfo[] = [],
 ): ActiveTabGroup[] {
   const groups = new Map<string, ActiveTabGroup>();
   const manualGroupsById = new Map(manualState.groups.map((group) => [group.id, group]));
+  const nativeGroupsByKey = chromeGroupsByKey(chromeGroups);
 
   for (const tab of tabs) {
     if (tab.id == null || !tab.url) continue;
 
-    const manualGroupId = manualState.assignments[String(tab.id)];
+    const nativeKey = chromeGroupKey(tab);
+    const nativeGroup = nativeKey ? nativeGroupsByKey.get(nativeKey) : undefined;
+    const manualGroupId = nativeGroup ? undefined : manualState.assignments[String(tab.id)];
     const manualGroup = manualGroupId ? manualGroupsById.get(manualGroupId) : undefined;
-    const key = manualGroup
-      ? `manual:${manualGroup.id}`
-      : isLandingPage(tab.url)
-        ? LANDING_GROUP_KEY
-        : `domain:${getTabHostname(tab) || 'unknown'}`;
+    const key = nativeGroup
+      ? (nativeKey as string)
+      : manualGroup
+        ? `manual:${manualGroup.id}`
+        : isLandingPage(tab.url)
+          ? LANDING_GROUP_KEY
+          : `domain:${getTabHostname(tab) || 'unknown'}`;
 
-    const title = manualGroup
-      ? manualGroup.name
-      : key === LANDING_GROUP_KEY
-        ? 'Homepages'
-        : friendlyDomain(key.replace(/^domain:/, '')) || 'Other';
+    const title = nativeGroup
+      ? nativeGroup.title?.trim() || `Chrome group ${nativeGroup.id}`
+      : manualGroup
+        ? manualGroup.name
+        : key === LANDING_GROUP_KEY
+          ? 'Homepages'
+          : friendlyDomain(key.replace(/^domain:/, '')) || 'Other';
 
-    const kind = manualGroup ? 'manual' : key === LANDING_GROUP_KEY ? 'landing' : 'domain';
+    const kind: ActiveTabGroup['kind'] = nativeGroup
+      ? 'chrome'
+      : manualGroup
+        ? 'manual'
+        : key === LANDING_GROUP_KEY
+          ? 'landing'
+          : 'domain';
     const current = groups.get(key) ?? { key, kind, title, tabs: [], pinned: false };
     current.tabs.push(tab);
     groups.set(key, current);
