@@ -1,0 +1,127 @@
+import { X } from 'lucide-react';
+import {
+  type FormEvent,
+  type ReactNode,
+  type RefObject,
+  useEffect,
+  useId,
+  useRef,
+} from 'react';
+
+export type FormDialogProps = {
+  cancelLabel: string;
+  children: ReactNode;
+  description?: string;
+  errorMessage?: string | null;
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  onCancel: () => void;
+  onSubmit: () => void | Promise<void>;
+  submitLabel: string;
+  submitting?: boolean;
+  title: string;
+};
+
+export function FormDialog({
+  cancelLabel,
+  children,
+  description,
+  errorMessage,
+  initialFocusRef,
+  onCancel,
+  onSubmit,
+  submitLabel,
+  submitting = false,
+  title,
+}: FormDialogProps) {
+  const titleId = useId();
+  const descriptionId = useId();
+  const errorId = useId();
+  const dialogRef = useRef<HTMLFormElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const describedBy = [description ? descriptionId : null, errorMessage ? errorId : null]
+    .filter(Boolean)
+    .join(' ')
+    || undefined;
+
+  useEffect(() => {
+    previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const fallbackFocus =
+      dialogRef.current?.querySelector<HTMLElement>(
+        'input, textarea, select, [tabindex]:not([tabindex="-1"])',
+      ) ??
+      dialogRef.current?.querySelector<HTMLElement>('button:not([disabled])');
+    const target = initialFocusRef?.current ?? fallbackFocus;
+    target?.focus();
+
+    return () => {
+      previousFocusRef.current?.focus();
+    };
+  }, [initialFocusRef]);
+
+  useEffect(() => {
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.stopPropagation();
+      onCancel();
+    }
+
+    document.addEventListener('keydown', closeOnEscape);
+    return () => document.removeEventListener('keydown', closeOnEscape);
+  }, [onCancel]);
+
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (submitting) return;
+    void onSubmit();
+  }
+
+  return (
+    <div
+      className="dialog-backdrop"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onCancel();
+      }}
+    >
+      <form
+        aria-describedby={describedBy}
+        aria-labelledby={titleId}
+        aria-modal="true"
+        className="form-dialog"
+        onSubmit={submit}
+        ref={dialogRef}
+        role="dialog"
+      >
+        <header className="dialog-header">
+          <div>
+            <h2 id={titleId}>{title}</h2>
+            {description ? (
+              <p className="subtle" id={descriptionId}>
+                {description}
+              </p>
+            ) : null}
+          </div>
+          <button type="button" className="icon-button" aria-label={cancelLabel} onClick={onCancel}>
+            <X size={16} aria-hidden="true" />
+          </button>
+        </header>
+
+        <div className="dialog-body">{children}</div>
+
+        {errorMessage ? (
+          <p className="status-message status-message--error" id={errorId} role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
+
+        <div className="dialog-actions">
+          <button type="button" className="secondary-button" onClick={onCancel} disabled={submitting}>
+            {cancelLabel}
+          </button>
+          <button type="submit" className="primary-button" disabled={submitting}>
+            {submitLabel}
+          </button>
+        </div>
+      </form>
+    </div>
+  );
+}
