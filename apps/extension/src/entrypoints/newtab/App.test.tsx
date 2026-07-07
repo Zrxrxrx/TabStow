@@ -716,7 +716,9 @@ describe('App', () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
-    const focusButton = screen().getByRole('button', { name: /Inbox - Gmail/ });
+    const focusButton = screen().getByRole('button', {
+      name: 'IInbox - Gmailhttps://mail.google.com/mail/u/0/#inbox',
+    });
     expect(focusButton).toHaveProperty('className', expect.stringContaining('tab-open-button'));
 
     await click(focusButton);
