@@ -282,14 +282,18 @@ describe('App', () => {
     expect(container.querySelector('.quick-links-panel')).not.toBeNull();
     expect(container.querySelector('.quick-link-card')).not.toBeNull();
     expect(container.querySelector('.quick-link-card-actions')).not.toBeNull();
+    expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(document.documentElement.dataset.themePalette).toBe('sage');
+    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
+      'url("blob:stored-background")',
+    );
+    expect(document.documentElement.lang).toBe('zh-CN');
+    expect(resolveCustomBackgroundUrl).toHaveBeenCalledWith('theme-bg:stored');
+
     await click(screen().getByRole('button', { name: 'Extra' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
     expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
-    expect(document.documentElement.dataset.themeMode).toBe('dark');
-    expect(document.documentElement.dataset.themePalette).toBe('sage');
-    expect(document.documentElement.lang).toBe('zh-CN');
-    expect(resolveCustomBackgroundUrl).toHaveBeenCalledWith('theme-bg:stored');
   });
 
   it('renders migrated dashboard labels in Simplified Chinese when selected', async () => {
@@ -300,11 +304,12 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '打开的标签页' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: 'Saved for later' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '稍后查看' })).not.toBeNull();
     expect(screen().getByLabelText('搜索网页')).not.toBeNull();
     expect(screen().getByLabelText('添加快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
+    expect(() => screen().getByRole('heading', { name: 'Saved for later' })).toThrow();
 
     await click(screen().getByRole('button', { name: 'Extra' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
@@ -627,6 +632,32 @@ describe('App', () => {
         String((call[0] as { customBackground?: string }).customBackground ?? '').startsWith('data:'),
       ),
     ).toBe(false);
+  });
+
+  it('keeps the applied custom background after closing the Extra drawer', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getThemePreferences.mockResolvedValue({
+      mode: 'dark',
+      paletteId: 'mist',
+      surfaceOpacity: 88,
+      customBackground: 'theme-bg:stored',
+    });
+    resolveCustomBackgroundUrl.mockResolvedValue('blob:stored-background');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    await renderApp();
+
+    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
+      'url("blob:stored-background")',
+    );
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByRole('button', { name: 'Close extra drawer' }));
+
+    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
+      'url("blob:stored-background")',
+    );
+    expect(revokeObjectURL).not.toHaveBeenCalled();
   });
 
   it('rejects oversized custom background uploads before saving theme preferences', async () => {

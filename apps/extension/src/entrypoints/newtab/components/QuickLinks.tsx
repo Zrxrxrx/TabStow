@@ -195,7 +195,7 @@ export function QuickLinks({ locale }: Props) {
           <h2 id="quick-links-title" data-od-id="quick-links-title">
             {t(locale, 'quickLinks')}
           </h2>
-          <p className="subtle">Custom web icons stay one click away at the top of the new tab page.</p>
+          <p className="subtle">{t(locale, 'quickLinksSubtitle')}</p>
         </div>
         <div className="header-actions" data-od-id="quick-link-header-actions">
           <button

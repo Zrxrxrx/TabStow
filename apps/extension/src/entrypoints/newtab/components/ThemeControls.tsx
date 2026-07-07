@@ -31,12 +31,13 @@ function applyTheme(theme: ThemePreferences, backgroundUrl: string | null) {
 }
 
 type Props = {
+  controls: ReturnType<typeof useThemePreferencesController>;
   language: LanguagePreference;
   locale: Locale;
   onLanguageChange: (language: LanguagePreference) => void;
 };
 
-export function ThemeControls({ language, locale, onLanguageChange }: Props) {
+export function useThemePreferencesController() {
   const [theme, setTheme] = useState<ThemePreferences | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const backgroundUrlRef = useRef<string | null>(null);
@@ -89,11 +90,6 @@ export function ThemeControls({ language, locale, onLanguageChange }: Props) {
     setErrorMessage(null);
   }
 
-  async function updateLanguage(nextLanguage: LanguagePreference) {
-    const saved = await saveLanguagePreference(nextLanguage);
-    onLanguageChange(saved);
-  }
-
   async function updateBackground(file: File | undefined) {
     if (!file) return;
     if (file.size > MAX_CUSTOM_BACKGROUND_BYTES) {
@@ -113,6 +109,22 @@ export function ThemeControls({ language, locale, onLanguageChange }: Props) {
       if (backgroundUrl && backgroundUrl.startsWith('blob:')) URL.revokeObjectURL(backgroundUrl);
       setErrorMessage(error instanceof Error ? error.message : 'Could not save background image.');
     }
+  }
+
+  return {
+    errorMessage,
+    theme,
+    updateBackground,
+    updateTheme,
+  };
+}
+
+export function ThemeControls({ controls, language, locale, onLanguageChange }: Props) {
+  const { errorMessage, theme, updateBackground, updateTheme } = controls;
+
+  async function updateLanguage(nextLanguage: LanguagePreference) {
+    const saved = await saveLanguagePreference(nextLanguage);
+    onLanguageChange(saved);
   }
 
   if (!theme) return null;

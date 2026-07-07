@@ -13,7 +13,7 @@ import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
 import { SearchBox } from './components/SearchBox';
 import { StowedSessions } from './components/StowedSessions';
-import { ThemeControls } from './components/ThemeControls';
+import { ThemeControls, useThemePreferencesController } from './components/ThemeControls';
 import { TodosPanel } from './components/TodosPanel';
 
 type StatusState = {
@@ -30,6 +30,7 @@ export function App() {
   const [extraOpen, setExtraOpen] = useState(false);
   const busyActionRef = useRef<string | null>(null);
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
+  const themeControls = useThemePreferencesController();
 
   async function loadSessions() {
     const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
@@ -221,7 +222,12 @@ export function App() {
               </button>
             </header>
             <TodosPanel locale={locale} />
-            <ThemeControls language={language} locale={locale} onLanguageChange={setLanguage} />
+            <ThemeControls
+              controls={themeControls}
+              language={language}
+              locale={locale}
+              onLanguageChange={setLanguage}
+            />
           </section>
         </aside>
       ) : null}

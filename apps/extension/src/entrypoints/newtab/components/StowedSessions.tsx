@@ -62,9 +62,9 @@ export function StowedSessions({
       <header className="section-header">
         <div>
           <h2 id="saved-title" data-od-id="saved-tabs-title">
-            Saved for later
+            {t(locale, 'savedForLater')}
           </h2>
-          <p className="subtle">Durable stowed sessions sorted newest first. Restoring keeps the saved copy.</p>
+          <p className="subtle">{t(locale, 'savedSessionsSubtitle')}</p>
         </div>
         <span className="meta-row" id="saved-count" aria-label="Saved sessions and tabs count">
           <span className="meta-pill">{sessions.length} sessions</span>
