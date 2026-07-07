@@ -19,6 +19,11 @@ import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
 import {
+  reorderQuickLinks,
+  updateQuickLink,
+} from '@/features/quick-links/quick-links';
+import { updateQuickLinks } from '@/features/quick-links/quick-links-storage';
+import {
   restoreSession,
   saveCurrentWindowAsSession,
   saveTabsAsSession,
@@ -54,6 +59,20 @@ async function handleMessage(
         return closeActiveTabs(message.tabIds);
       case 'active-tabs:search':
         return runDefaultSearch(message.query);
+      case 'quick-links:add':
+        return ok(await updateQuickLinks((links) => [...links, message.link]));
+      case 'quick-links:update':
+        return ok(
+          await updateQuickLinks((links) =>
+            links.map((link) =>
+              link.id === message.linkId ? updateQuickLink(link, message.patch) : link,
+            ),
+          ),
+        );
+      case 'quick-links:remove':
+        return ok(await updateQuickLinks((links) => links.filter((link) => link.id !== message.linkId)));
+      case 'quick-links:reorder':
+        return ok(await updateQuickLinks((links) => reorderQuickLinks(links, message.orderedIds)));
       case 'chrome-tab-groups:sync':
         return syncChromeTabGroups(message.groups, message.state);
       case 'chrome-tab-groups:import':

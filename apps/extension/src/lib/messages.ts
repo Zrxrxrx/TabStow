@@ -7,6 +7,7 @@ import type {
   ManualGroupsState,
 } from '@/features/active-tabs/types';
 import type { ImportedChromeGroupsResult } from '@/features/chrome-tab-groups/chrome-tab-groups';
+import type { QuickLink, QuickLinkIcon } from '@/features/quick-links/quick-links';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
 
@@ -36,6 +37,10 @@ export type ExtensionMessage =
   | { type: 'active-tabs:focus'; tabId: number; windowId: number }
   | { type: 'active-tabs:close'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
+  | { type: 'quick-links:add'; link: QuickLink }
+  | { type: 'quick-links:update'; linkId: string; patch: { label?: string; icon?: QuickLinkIcon | null } }
+  | { type: 'quick-links:remove'; linkId: string }
+  | { type: 'quick-links:reorder'; orderedIds: string[] }
   | { type: 'chrome-tab-groups:sync'; groups: ActiveTabGroup[]; state: ChromeTabGroupsState }
   | {
       type: 'chrome-tab-groups:import';
@@ -55,6 +60,7 @@ export type ExtensionMessageResponse =
   | AppResult<StowResult>
   | AppResult<ActiveBrowserTab[]>
   | AppResult<ActiveTabsSnapshot>
+  | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>
   | AppResult<SyncResult>
   | AppResult<ChromeTabGroupsState>

@@ -11,20 +11,24 @@ import {
 import {
   createQuickLink,
   previewQuickLinkUrl,
-  reorderQuickLinks,
-  updateQuickLink,
   type QuickLink,
   type QuickLinkIcon,
 } from '@/features/quick-links/quick-links';
-import { getQuickLinks, updateQuickLinks } from '@/features/quick-links/quick-links-storage';
+import { getQuickLinks } from '@/features/quick-links/quick-links-storage';
 import type { AppResult } from '@/lib/errors';
-import { sendExtensionMessage } from '@/lib/messages';
+import { sendExtensionMessage, type ExtensionMessage } from '@/lib/messages';
 import { FormDialog } from './FormDialog';
 
 type Props = {
   disabled: boolean;
   locale: Locale;
+  refreshKey: number;
 };
+
+type QuickLinkWriteMessage = Extract<
+  ExtensionMessage,
+  { type: 'quick-links:add' | 'quick-links:update' | 'quick-links:remove' | 'quick-links:reorder' }
+>;
 
 function iconFromValue(value: string): QuickLinkIcon {
   return value.trim() ? { kind: 'emoji', value: value.trim() } : { kind: 'site', value: null };
@@ -162,7 +166,7 @@ function QuickLinkSiteIcon({ link }: { link: QuickLink }) {
   );
 }
 
-export function QuickLinks({ disabled, locale }: Props) {
+export function QuickLinks({ disabled, locale, refreshKey }: Props) {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dialog, setDialog] = useState<QuickLinkDialogState>(null);
@@ -173,15 +177,16 @@ export function QuickLinks({ disabled, locale }: Props) {
 
   useEffect(() => {
     void getQuickLinks().then(setLinks);
-  }, []);
+  }, [refreshKey]);
 
-  async function persistLinks(updateLinks: (currentLinks: QuickLink[]) => QuickLink[]) {
+  async function persistLinks(message: QuickLinkWriteMessage) {
     if (disabledRef.current) return null;
-    let previousImageTokens = new Set<string>();
-    const saved = await updateQuickLinks((currentLinks) => {
-      previousImageTokens = new Set(currentLinks.map((link) => getImageIconToken(link.icon)).filter(isImageIconToken));
-      return updateLinks(currentLinks);
-    });
+    const currentLinks = await getQuickLinks();
+    if (disabledRef.current) return null;
+    const previousImageTokens = new Set(currentLinks.map((link) => getImageIconToken(link.icon)).filter(isImageIconToken));
+    const response = await sendExtensionMessage<AppResult<QuickLink[]>>(message);
+    if (!response.ok) throw new Error(response.error.message);
+    const saved = response.data;
     if (disabledRef.current) return null;
     setLinks(saved);
     setErrorMessage(null);
@@ -228,14 +233,14 @@ export function QuickLinks({ disabled, locale }: Props) {
 
     try {
       const preview = dialog.preview ?? previewQuickLinkUrl(dialog.url);
-      const saved = await persistLinks((currentLinks) => [
-        ...currentLinks,
-        createQuickLink({
+      const saved = await persistLinks({
+        type: 'quick-links:add',
+        link: createQuickLink({
           url: preview.url,
           label: dialog.labelEdited ? dialog.label : preview.label,
           icon: preview.icon,
         }),
-      ]);
+      });
       if (!saved) {
         setDialog((current) => (current?.kind === 'add-url' ? { ...current, submitting: false } : current));
         return;
@@ -284,10 +289,10 @@ export function QuickLinks({ disabled, locale }: Props) {
     );
 
     try {
-      const saved = await persistLinks((currentLinks) => [
-        ...currentLinks,
-        createQuickLink({ url, label: getTabLabel(choice.tab) }),
-      ]);
+      const saved = await persistLinks({
+        type: 'quick-links:add',
+        link: createQuickLink({ url, label: getTabLabel(choice.tab) }),
+      });
       if (!saved) {
         setDialog((current) =>
           current?.kind === 'open-tabs' ? { ...current, submittingKey: null } : current,
@@ -317,7 +322,7 @@ export function QuickLinks({ disabled, locale }: Props) {
 
   async function remove(id: string) {
     if (disabledRef.current) return;
-    await persistLinks((currentLinks) => currentLinks.filter((link) => link.id !== id));
+    await persistLinks({ type: 'quick-links:remove', linkId: id });
   }
 
   function openEditDialog(link: QuickLink) {
@@ -338,13 +343,11 @@ export function QuickLinks({ disabled, locale }: Props) {
     setDialog({ ...dialog, error: null, submitting: true });
 
     try {
-      const saved = await persistLinks((currentLinks) =>
-        currentLinks.map((item) =>
-          item.id === dialog.linkId
-            ? updateQuickLink(item, { label: dialog.label, icon: iconFromValue(dialog.iconValue) })
-            : item,
-        ),
-      );
+      const saved = await persistLinks({
+        type: 'quick-links:update',
+        linkId: dialog.linkId,
+        patch: { label: dialog.label, icon: iconFromValue(dialog.iconValue) },
+      });
       if (!saved) {
         setDialog((current) => (current?.kind === 'edit' ? { ...current, submitting: false } : current));
         return;
@@ -371,11 +374,11 @@ export function QuickLinks({ disabled, locale }: Props) {
 
     try {
       token = await saveQuickLinkIcon(file);
-      await persistLinks((currentLinks) =>
-        currentLinks.map((item) =>
-          item.id === link.id ? updateQuickLink(item, { icon: { kind: 'image', value: token as string } }) : item,
-        ),
-      );
+      await persistLinks({
+        type: 'quick-links:update',
+        linkId: link.id,
+        patch: { icon: { kind: 'image', value: token as string } },
+      });
     } catch (error) {
       await deleteQuickLinkIcon(token);
       setErrorMessage(error instanceof Error ? error.message : 'Could not save quick link icon.');
@@ -390,7 +393,7 @@ export function QuickLinks({ disabled, locale }: Props) {
 
     const orderedIds = links.map((link) => link.id);
     [orderedIds[index], orderedIds[nextIndex]] = [orderedIds[nextIndex], orderedIds[index]];
-    await persistLinks((currentLinks) => reorderQuickLinks(currentLinks, orderedIds));
+    await persistLinks({ type: 'quick-links:reorder', orderedIds });
   }
 
   return (

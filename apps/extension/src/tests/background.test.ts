@@ -65,6 +65,12 @@ const chromeTabGroupMocks = vi.hoisted(() => ({
   syncChromeTabGroups: vi.fn(),
 }));
 
+const quickLinkMocks = vi.hoisted(() => ({
+  reorderQuickLinks: vi.fn(),
+  updateQuickLink: vi.fn(),
+  updateQuickLinks: vi.fn(),
+}));
+
 vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
@@ -77,6 +83,13 @@ vi.mock('@/features/sync/sync-service', () => syncMocks);
 vi.mock('@/features/tabs/session-service', () => sessionServiceMocks);
 vi.mock('@/features/active-tabs/active-tabs-service', () => activeTabsMocks);
 vi.mock('@/features/chrome-tab-groups/chrome-tab-groups', () => chromeTabGroupMocks);
+vi.mock('@/features/quick-links/quick-links', () => ({
+  reorderQuickLinks: quickLinkMocks.reorderQuickLinks,
+  updateQuickLink: quickLinkMocks.updateQuickLink,
+}));
+vi.mock('@/features/quick-links/quick-links-storage', () => ({
+  updateQuickLinks: quickLinkMocks.updateQuickLinks,
+}));
 
 describe('background message routing', () => {
   beforeEach(() => {
@@ -231,5 +244,31 @@ describe('background message routing', () => {
     await listener?.({ type: 'chrome-tab-groups:collapse-window', windowId: 17 }, {});
 
     expect(chromeTabGroupMocks.collapseChromeTabGroups).toHaveBeenCalledWith(17);
+  });
+
+  it('routes quick-link writes through the background update queue', async () => {
+    const existingLink = {
+      id: 'existing',
+      url: 'https://existing.example/',
+      label: 'Existing',
+      icon: null,
+      createdAt: '2026-07-07T00:00:00.000Z',
+    };
+    const newLink = {
+      id: 'new',
+      url: 'https://new.example/',
+      label: 'New',
+      icon: null,
+      createdAt: '2026-07-08T00:00:00.000Z',
+    };
+    quickLinkMocks.updateQuickLinks.mockImplementation(async (update) => update([existingLink]));
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+    const result = await listener?.({ type: 'quick-links:add', link: newLink }, {});
+
+    expect(quickLinkMocks.updateQuickLinks).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({ ok: true, data: [existingLink, newLink] });
   });
 });

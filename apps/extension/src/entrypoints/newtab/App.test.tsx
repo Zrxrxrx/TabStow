@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveWorkspaceState } from '@/features/active-tabs/active-workspace-storage';
 import type { ActiveBrowserTab, ActiveTabsSnapshot, ManualGroupsState } from '@/features/active-tabs/types';
+import { reorderQuickLinks, updateQuickLink, type QuickLink } from '@/features/quick-links/quick-links';
 import type { AppResult } from '@/lib/errors';
 import type { ExtensionMessage, StowResult } from '@/lib/messages';
 import { App } from './App';
@@ -1845,12 +1846,18 @@ describe('App', () => {
         };
       }
 
+      if (message.type === 'quick-links:add') {
+        const saved = await saveQuickLinks([...(await getQuickLinks()), message.link]);
+        return { ok: true, data: saved };
+      }
+
       throw new Error(`Unexpected message: ${message.type}`);
     });
 
     await renderApp();
     await click(screen().getByRole('button', { name: 'Pull' }));
     expect(screen().getByRole('status').textContent).toBe('Pulled 0 sessions and 1 quick links from Gist.');
+    expect(screen().getByText('Remote')).not.toBeNull();
 
     await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
@@ -1894,6 +1901,33 @@ function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveB
 
     if (message.type === 'active-tabs:focus') {
       return { ok: true, data: { focused: true } };
+    }
+
+    if (message.type === 'quick-links:add') {
+      const saved = await saveQuickLinks([...((await getQuickLinks()) as QuickLink[]), message.link]);
+      return { ok: true, data: saved };
+    }
+
+    if (message.type === 'quick-links:update') {
+      const currentLinks = (await getQuickLinks()) as QuickLink[];
+      const saved = await saveQuickLinks(
+        currentLinks.map((link) =>
+          link.id === message.linkId ? updateQuickLink(link, message.patch) : link,
+        ),
+      );
+      return { ok: true, data: saved };
+    }
+
+    if (message.type === 'quick-links:remove') {
+      const saved = await saveQuickLinks(
+        ((await getQuickLinks()) as QuickLink[]).filter((link) => link.id !== message.linkId),
+      );
+      return { ok: true, data: saved };
+    }
+
+    if (message.type === 'quick-links:reorder') {
+      const saved = await saveQuickLinks(reorderQuickLinks((await getQuickLinks()) as QuickLink[], message.orderedIds));
+      return { ok: true, data: saved };
     }
 
     if (message.type === 'chrome-tab-groups:sync') {
