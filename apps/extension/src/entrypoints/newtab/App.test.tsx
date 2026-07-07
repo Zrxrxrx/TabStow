@@ -22,6 +22,12 @@ const { getQuickLinks, saveQuickLinks } = vi.hoisted(() => ({
   getQuickLinks: vi.fn(),
   saveQuickLinks: vi.fn(),
 }));
+const { chromeRuntimeMocks } = vi.hoisted(() => ({
+  chromeRuntimeMocks: {
+    getURL: vi.fn((path: string) => `chrome-extension://tabstow-test${path}`),
+    openOptionsPage: vi.fn(),
+  },
+}));
 const { saveQuickLinkIcon, resolveQuickLinkIconUrl, deleteQuickLinkIcon, isQuickLinkIconToken } = vi.hoisted(() => ({
   saveQuickLinkIcon: vi.fn(),
   resolveQuickLinkIconUrl: vi.fn(),
@@ -226,6 +232,14 @@ describe('App', () => {
     document.documentElement.removeAttribute('lang');
     document.documentElement.style.removeProperty('--surface-opacity');
     document.documentElement.style.removeProperty('--dashboard-background-image');
+    chromeRuntimeMocks.getURL.mockClear();
+    chromeRuntimeMocks.openOptionsPage.mockClear();
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: {
+        runtime: chromeRuntimeMocks,
+      },
+    });
   });
 
   afterEach(async () => {
@@ -291,7 +305,7 @@ describe('App', () => {
     expect(screen().getByText('Example')).not.toBeNull();
     expect(container.querySelector('.quick-links-panel')).not.toBeNull();
     expect(container.querySelector('.quick-link-card')).not.toBeNull();
-    expect(container.querySelector('.quick-link-card-actions')).not.toBeNull();
+    expect(container.querySelector('.quick-link-card-actions')).toBeNull();
     expect(document.documentElement.dataset.themeMode).toBe('dark');
     expect(document.documentElement.dataset.themePalette).toBe('sage');
     expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
@@ -368,7 +382,7 @@ describe('App', () => {
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '稍后查看' })).not.toBeNull();
     expect(screen().getByLabelText('搜索网页')).not.toBeNull();
-    expect(screen().getByLabelText('添加快捷链接')).not.toBeNull();
+    expect(screen().getByLabelText('编辑快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
     expect(() => screen().getByRole('heading', { name: 'Saved for later' })).toThrow();
@@ -450,6 +464,7 @@ describe('App', () => {
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
     await change(screen().getByLabelText('Quick link label'), 'Example');
@@ -469,11 +484,38 @@ describe('App', () => {
     expect(saveQuickLinks).toHaveBeenLastCalledWith([]);
   });
 
+  it('keeps quick-link editing controls hidden until edit mode is enabled', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+
+    await renderApp();
+
+    expect(screen().getByText('Example')).not.toBeNull();
+    expect(container.querySelector('.quick-link-card-actions')).toBeNull();
+    expect(() => screen().getByLabelText('Add quick link')).toThrow();
+
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+
+    expect(screen().getByLabelText('Add quick link')).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Add open tab' })).not.toBeNull();
+    expect(container.querySelector('.quick-link-card-actions')).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Show quick links' })).not.toBeNull();
+  });
+
   it('adds a quick link from a bare domain through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'google.com');
     await change(screen().getByLabelText('Quick link label'), 'Google');
@@ -494,6 +536,7 @@ describe('App', () => {
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByRole('button', { name: 'Add open tab' }));
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
     expect(document.activeElement).toBe(screen().getByRole('button', { name: 'Spec draft' }));
@@ -517,6 +560,7 @@ describe('App', () => {
 
     await renderApp();
 
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'example.com');
     await click(screen().getByRole('button', { name: 'Cancel' }));
@@ -545,6 +589,7 @@ describe('App', () => {
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Edit Example'));
     await change(screen().getByLabelText('Quick link label'), 'Example docs');
     await change(screen().getByLabelText('Quick link icon'), '*');
@@ -583,6 +628,7 @@ describe('App', () => {
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Move B up'));
 
     expect(saveQuickLinks).toHaveBeenCalledWith([
@@ -604,6 +650,7 @@ describe('App', () => {
     ]);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'notaurl');
     await change(screen().getByLabelText('Quick link label'), 'Broken');
@@ -628,6 +675,7 @@ describe('App', () => {
     ]);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'javascript:alert(1)');
     await change(screen().getByLabelText('Quick link label'), 'Bad Link');
@@ -655,6 +703,7 @@ describe('App', () => {
     resolveQuickLinkIconUrl.mockResolvedValue('blob:quick-link-icon-upload-1');
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
 
     const uploadInput = container.querySelector<HTMLInputElement>('input[data-quick-link-upload-id="link-1"]');
     expect(uploadInput).not.toBeNull();
@@ -676,6 +725,34 @@ describe('App', () => {
     ).toBe(false);
     const image = container.querySelector<HTMLImageElement>('img.quick-link-image-icon');
     expect(image?.getAttribute('src')).toBe('blob:quick-link-icon-upload-1');
+  });
+
+  it('renders Chrome default favicons for site quick links and falls back to initials on image error', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/docs',
+        label: 'Example',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+
+    await renderApp();
+
+    const favicon = container.querySelector<HTMLImageElement>('img.quick-link-site-icon');
+    expect(favicon).not.toBeNull();
+    expect(favicon?.getAttribute('src')).toBe(
+      'chrome-extension://tabstow-test/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=32',
+    );
+
+    await act(async () => {
+      favicon?.dispatchEvent(new Event('error', { bubbles: true }));
+    });
+
+    expect(container.querySelector('img.quick-link-site-icon')).toBeNull();
+    expect(screen().getByText('E')).not.toBeNull();
   });
 
   it('updates theme controls and todo actions from the utility panels', async () => {

@@ -344,7 +344,8 @@ h3 {
   white-space: nowrap;
 }
 
-.quick-link-image-icon {
+.quick-link-image-icon,
+.quick-link-site-icon {
   width: 30px;
   height: 30px;
   border-radius: 9px;
