@@ -1,5 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import { createQuickLink, normalizeQuickLinks, reorderQuickLinks, updateQuickLink } from './quick-links';
+import {
+  createQuickLink,
+  mergeQuickLinksForPull,
+  mergeQuickLinksForPush,
+  normalizeQuickLinks,
+  previewQuickLinkUrl,
+  reorderQuickLinks,
+  toSyncedQuickLinks,
+  updateQuickLink,
+} from './quick-links';
 
 describe('quick links', () => {
   it('normalizes valid links and drops invalid links', () => {
@@ -154,6 +163,144 @@ describe('quick links', () => {
         label: 'Blog',
         icon: null,
         createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('previews a pasted URL without fetching page metadata', () => {
+    expect(previewQuickLinkUrl('example.com/docs')).toEqual({
+      url: 'https://example.com/docs',
+      label: 'example.com',
+      icon: { kind: 'site', value: null },
+    });
+  });
+
+  it('exports quick links for sync without uploaded image icons', () => {
+    expect(
+      toSyncedQuickLinks([
+        {
+          id: 'image-link',
+          url: 'https://example.com/',
+          label: 'Example',
+          icon: { kind: 'image', value: 'quick-link-icon:local-only' },
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        {
+          id: 'emoji-link',
+          url: 'https://emoji.example/',
+          label: 'Emoji',
+          icon: { kind: 'emoji', value: '*' },
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ]),
+    ).toEqual([
+      {
+        id: 'image-link',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'emoji-link',
+        url: 'https://emoji.example/',
+        label: 'Emoji',
+        icon: { kind: 'emoji', value: '*' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('merges quick links for push with local precedence and local order first', () => {
+    const local = [
+      { id: 'shared', url: 'https://local.example/', label: 'Local', icon: null, createdAt: '2026-07-07T00:00:00.000Z' },
+      {
+        id: 'local-only',
+        url: 'https://local-only.example/',
+        label: 'Local only',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ];
+    const remote = [
+      {
+        id: 'remote-only',
+        url: 'https://remote-only.example/',
+        label: 'Remote only',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'shared',
+        url: 'https://remote.example/',
+        label: 'Remote',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ];
+
+    expect(mergeQuickLinksForPush(remote, local).map((link) => [link.id, link.label])).toEqual([
+      ['shared', 'Local'],
+      ['local-only', 'Local only'],
+      ['remote-only', 'Remote only'],
+    ]);
+  });
+
+  it('merges quick links for pull with remote precedence and preserves local uploaded icons', () => {
+    const local = [
+      {
+        id: 'shared',
+        url: 'https://old.example/',
+        label: 'Old',
+        icon: { kind: 'image' as const, value: 'quick-link-icon:local-only' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+      {
+        id: 'local-only',
+        url: 'https://local-only.example/',
+        label: 'Local only',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ];
+    const remote = [
+      {
+        id: 'shared',
+        url: 'https://remote.example/',
+        label: 'Remote',
+        icon: { kind: 'site' as const, value: null },
+        createdAt: '2026-07-08T00:00:00.000Z',
+      },
+      {
+        id: 'remote-only',
+        url: 'https://remote-only.example/',
+        label: 'Remote only',
+        icon: { kind: 'site' as const, value: null },
+        createdAt: '2026-07-08T00:00:00.000Z',
+      },
+    ];
+
+    expect(mergeQuickLinksForPull(local, remote)).toEqual([
+      {
+        id: 'shared',
+        url: 'https://remote.example/',
+        label: 'Remote',
+        icon: { kind: 'image', value: 'quick-link-icon:local-only' },
+        createdAt: '2026-07-08T00:00:00.000Z',
+      },
+      {
+        id: 'remote-only',
+        url: 'https://remote-only.example/',
+        label: 'Remote only',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-08T00:00:00.000Z',
+      },
+      {
+        id: 'local-only',
+        url: 'https://local-only.example/',
+        label: 'Local only',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
       },
     ]);
   });

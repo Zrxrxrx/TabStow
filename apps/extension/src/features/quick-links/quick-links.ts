@@ -1,3 +1,4 @@
+import type { SyncedQuickLink } from '@tabstow/core';
 import { isQuickLinkIconToken } from './quick-link-icons-cache';
 
 export type QuickLinkIcon =
@@ -12,6 +13,10 @@ export type QuickLink = {
   icon: QuickLinkIcon | null;
   createdAt: string;
 };
+
+function hostnameLabel(url: string): string {
+  return new URL(url).hostname.replace(/^www\./, '');
+}
 
 function normalizeUrl(value: string): string | null {
   const trimmed = value.trim();
@@ -67,7 +72,7 @@ export function normalizeQuickLinks(input: unknown): QuickLink[] {
       return {
         id,
         url,
-        label: String(candidate.label ?? '').trim() || new URL(url).hostname.replace(/^www\./, ''),
+        label: String(candidate.label ?? '').trim() || hostnameLabel(url),
         icon: normalizeIcon(candidate.icon),
         createdAt: normalizeCreatedAt(candidate.createdAt),
       };
@@ -84,10 +89,66 @@ export function createQuickLink(
   return {
     id: createId(),
     url,
-    label: input.label?.trim() || new URL(url).hostname.replace(/^www\./, ''),
+    label: input.label?.trim() || hostnameLabel(url),
     icon: input.icon ?? null,
     createdAt: new Date().toISOString(),
   };
+}
+
+export function previewQuickLinkUrl(input: string): Pick<QuickLink, 'url' | 'label' | 'icon'> {
+  const url = normalizeUrl(input);
+  if (!url) throw new Error('Quick link URL is invalid.');
+  return {
+    url,
+    label: hostnameLabel(url),
+    icon: { kind: 'site', value: null },
+  };
+}
+
+export function toSyncedQuickLinks(links: QuickLink[]): SyncedQuickLink[] {
+  return normalizeQuickLinks(links).map((link) => ({
+    id: link.id,
+    url: link.url,
+    label: link.label,
+    icon: link.icon?.kind === 'emoji' ? link.icon : { kind: 'site', value: null },
+    createdAt: link.createdAt,
+  }));
+}
+
+export function fromSyncedQuickLinks(links: SyncedQuickLink[]): QuickLink[] {
+  return normalizeQuickLinks(
+    links.map((link) => ({
+      ...link,
+      icon: link.icon?.kind === 'emoji' ? link.icon : { kind: 'site', value: null },
+    })),
+  );
+}
+
+function appendMissingById(primary: QuickLink[], secondary: QuickLink[]): QuickLink[] {
+  const seen = new Set(primary.map((link) => link.id));
+  return [...primary, ...secondary.filter((link) => !seen.has(link.id))];
+}
+
+export function mergeQuickLinksForPush(
+  remoteLinks: SyncedQuickLink[],
+  localLinks: QuickLink[],
+): QuickLink[] {
+  return appendMissingById(normalizeQuickLinks(localLinks), fromSyncedQuickLinks(remoteLinks));
+}
+
+export function mergeQuickLinksForPull(
+  localLinks: QuickLink[],
+  remoteLinks: SyncedQuickLink[],
+): QuickLink[] {
+  const localById = new Map(normalizeQuickLinks(localLinks).map((link) => [link.id, link]));
+  const remoteNormalized = fromSyncedQuickLinks(remoteLinks).map((remoteLink) => {
+    const localLink = localById.get(remoteLink.id);
+    if (localLink?.icon?.kind === 'image' && remoteLink.icon?.kind !== 'emoji') {
+      return { ...remoteLink, icon: localLink.icon };
+    }
+    return remoteLink;
+  });
+  return appendMissingById(remoteNormalized, normalizeQuickLinks(localLinks));
 }
 
 export function updateQuickLink(
