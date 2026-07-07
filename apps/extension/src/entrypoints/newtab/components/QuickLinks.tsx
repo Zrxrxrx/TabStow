@@ -10,6 +10,7 @@ import {
 } from '@/features/quick-links/quick-link-icons-cache';
 import {
   createQuickLink,
+  previewQuickLinkUrl,
   reorderQuickLinks,
   updateQuickLink,
   type QuickLink,
@@ -34,7 +35,14 @@ type OpenTabChoice = {
 };
 
 type QuickLinkDialogState =
-  | { kind: 'add-url'; url: string; label: string; error: string | null; submitting: boolean }
+  | {
+      kind: 'add-url';
+      url: string;
+      label: string;
+      preview: { url: string; label: string; icon: QuickLinkIcon | null } | null;
+      error: string | null;
+      submitting: boolean;
+    }
   | { kind: 'edit'; linkId: string; label: string; iconValue: string; error: string | null; submitting: boolean }
   | {
       kind: 'open-tabs';
@@ -177,7 +185,27 @@ export function QuickLinks({ locale }: Props) {
 
   function openAddByUrlDialog() {
     setErrorMessage(null);
-    setDialog({ kind: 'add-url', url: '', label: '', error: null, submitting: false });
+    setDialog({ kind: 'add-url', url: '', label: '', preview: null, error: null, submitting: false });
+  }
+
+  function fetchAddByUrlPreview() {
+    if (!dialog || dialog.kind !== 'add-url') return;
+
+    try {
+      const preview = previewQuickLinkUrl(dialog.url);
+      setDialog({
+        ...dialog,
+        label: dialog.label.trim() || preview.label,
+        preview,
+        error: null,
+      });
+    } catch (error) {
+      setDialog({
+        ...dialog,
+        preview: null,
+        error: error instanceof Error ? error.message : 'Quick link URL is invalid.',
+      });
+    }
   }
 
   async function submitAddByUrl() {
@@ -185,7 +213,15 @@ export function QuickLinks({ locale }: Props) {
     setDialog({ ...dialog, error: null, submitting: true });
 
     try {
-      await persistLinks([...links, createQuickLink({ url: dialog.url, label: dialog.label })]);
+      const preview = dialog.preview ?? previewQuickLinkUrl(dialog.url);
+      await persistLinks([
+        ...links,
+        createQuickLink({
+          url: preview.url,
+          label: dialog.label || preview.label,
+          icon: preview.icon,
+        }),
+      ]);
       setDialog(null);
     } catch (error) {
       setDialog({
@@ -469,12 +505,38 @@ export function QuickLinks({ locale }: Props) {
                 inputMode="url"
                 onChange={(event) => {
                   const nextUrl = event.currentTarget.value;
-                  setDialog((current) => (current?.kind === 'add-url' ? { ...current, url: nextUrl } : current));
+                  setDialog((current) =>
+                    current?.kind === 'add-url' ? { ...current, url: nextUrl, preview: null } : current,
+                  );
                 }}
                 type="text"
                 value={dialog.url}
               />
             </label>
+            <button
+              type="button"
+              className="secondary-button quick-link-fetch-button"
+              onClick={fetchAddByUrlPreview}
+            >
+              {t(locale, 'fetchQuickLink')}
+            </button>
+            {dialog.preview ? (
+              <div className="quick-link-preview" aria-label={t(locale, 'quickLinkPreview')}>
+                <QuickLinkSiteIcon
+                  link={{
+                    id: 'preview',
+                    url: dialog.preview.url,
+                    label: dialog.label || dialog.preview.label,
+                    icon: { kind: 'site', value: null },
+                    createdAt: new Date().toISOString(),
+                  }}
+                />
+                <span className="tab-copy">
+                  <span className="tab-title">{dialog.label || dialog.preview.label}</span>
+                  <span className="tab-url">{dialog.preview.url}</span>
+                </span>
+              </div>
+            ) : null}
             <label className="field-label">
               {t(locale, 'quickLinkLabel')}
               <input

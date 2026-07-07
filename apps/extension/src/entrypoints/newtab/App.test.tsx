@@ -478,6 +478,7 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
+    await click(screen().getByRole('button', { name: 'Fetch' }));
     await change(screen().getByLabelText('Quick link label'), 'Example');
     await click(screen().getByRole('button', { name: 'Add' }));
 
@@ -529,6 +530,7 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByLabelText('Add quick link'));
     await change(screen().getByLabelText('Quick link URL'), 'google.com');
+    await click(screen().getByRole('button', { name: 'Fetch' }));
     await change(screen().getByLabelText('Quick link label'), 'Google');
     await click(screen().getByRole('button', { name: 'Add' }));
 
@@ -584,6 +586,33 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Cancel' }));
 
     expect(promptSpy).not.toHaveBeenCalled();
+  });
+
+  it('fetches a quick-link preview from a pasted URL before saving', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'example.com/docs');
+    await click(screen().getByRole('button', { name: 'Fetch' }));
+
+    expect(screen().getByText('example.com')).not.toBeNull();
+    expect(container.querySelector<HTMLImageElement>('img.quick-link-site-icon')?.getAttribute('src')).toBe(
+      'chrome-extension://tabstow-test/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=32',
+    );
+
+    await change(screen().getByLabelText('Quick link label'), 'Docs');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://example.com/docs',
+        label: 'Docs',
+        icon: { kind: 'site', value: null },
+      }),
+    ]);
   });
 
   it('edits quick link label and icon metadata through the utility panel', async () => {
