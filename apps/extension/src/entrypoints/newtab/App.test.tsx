@@ -716,7 +716,10 @@ describe('App', () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
-    await click(screen().getByText('Inbox - Gmail'));
+    const focusButton = screen().getByRole('button', { name: /Inbox - Gmail/ });
+    expect(focusButton).toHaveProperty('className', expect.stringContaining('tab-open-button'));
+
+    await click(focusButton);
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'active-tabs:focus',

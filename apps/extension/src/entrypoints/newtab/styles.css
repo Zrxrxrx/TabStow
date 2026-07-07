@@ -333,6 +333,170 @@ button:disabled {
   white-space: nowrap;
 }
 
+/* Task 3 transitional workspace styles: map v1 workspace class names onto the current shell. */
+.active-workspace.panel.column,
+.saved-sessions.panel.column {
+  background: rgba(var(--surface-rgb), var(--surface-opacity));
+  border: 1px solid var(--border, #d7dde6);
+  border-radius: 8px;
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+}
+
+.active-workspace.panel.column {
+  grid-area: active;
+}
+
+.saved-sessions.panel.column {
+  grid-area: stowed;
+}
+
+.active-workspace .section-header > div:first-child,
+.saved-sessions .section-header > div:first-child {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.active-workspace .subtle,
+.saved-sessions .subtle {
+  color: var(--muted-text);
+  font-size: 14px;
+  margin: 0;
+}
+
+.active-workspace .meta-row,
+.saved-sessions .meta-row,
+.saved-sessions .session-toolbar,
+.active-workspace .row-actions,
+.saved-sessions .row-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.active-workspace .meta-pill,
+.saved-sessions .meta-pill,
+.active-workspace .group-filter,
+.active-workspace .tab-group,
+.active-workspace .tab-row,
+.saved-sessions .session-card {
+  border: 1px solid var(--border, #d7dde6);
+  border-radius: 8px;
+}
+
+.active-workspace .meta-pill,
+.saved-sessions .meta-pill {
+  background: rgba(var(--surface-rgb), 0.56);
+  color: var(--muted-text);
+  display: inline-flex;
+  font-size: 14px;
+  min-height: 32px;
+  padding: 0 10px;
+}
+
+.active-workspace .tabs-toolbar {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+}
+
+.active-workspace .group-filter {
+  align-items: center;
+  background: rgba(var(--surface-rgb), 0.56);
+  color: inherit;
+  display: inline-flex;
+  gap: 8px;
+  min-height: 36px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.active-workspace .group-filter strong {
+  font-size: 14px;
+}
+
+.active-workspace .tab-group {
+  background: rgba(var(--surface-rgb), 0.56);
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.active-workspace .tab-group > header,
+.saved-sessions .session-card > header {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.active-workspace .tab-row {
+  align-items: center;
+  background: rgba(var(--surface-rgb), 0.36);
+  display: flex;
+  gap: 8px;
+  justify-content: space-between;
+  min-height: 52px;
+  padding: 8px;
+}
+
+.active-workspace .tab-open-button {
+  align-items: center;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  flex: 1;
+  gap: 10px;
+  justify-content: flex-start;
+  min-width: 0;
+  padding: 0;
+  text-align: left;
+}
+
+.active-workspace .tab-copy,
+.saved-sessions .tab-copy {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+
+.active-workspace .tab-title,
+.active-workspace .tab-url,
+.saved-sessions .session-title,
+.saved-sessions .session-preview {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.active-workspace .tab-title,
+.saved-sessions .session-title {
+  font-weight: 600;
+}
+
+.active-workspace .tab-url,
+.saved-sessions .session-preview {
+  color: var(--muted-text);
+  font-size: 14px;
+}
+
+.saved-sessions .session-toolbar {
+  margin-top: 4px;
+}
+
+.saved-sessions .session-card {
+  background: rgba(var(--surface-rgb), 0.56);
+  padding: 12px;
+}
+
+.saved-sessions .session-card > header {
+  align-items: center;
+}
+
 .utility-grid {
   display: grid;
   gap: 16px;
@@ -605,6 +769,12 @@ button:disabled {
 
   .session-row {
     grid-template-columns: 1fr;
+  }
+
+  .active-workspace .tab-row,
+  .saved-sessions .session-card > header {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .header-actions,
