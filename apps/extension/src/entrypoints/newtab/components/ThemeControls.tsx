@@ -43,6 +43,9 @@ export function useThemePreferencesController() {
   const backgroundUrlRef = useRef<string | null>(null);
 
   function replaceBackgroundUrl(nextUrl: string | null) {
+    if (nextUrl === backgroundUrlRef.current) {
+      return;
+    }
     if (backgroundUrlRef.current && backgroundUrlRef.current.startsWith('blob:')) {
       URL.revokeObjectURL(backgroundUrlRef.current);
     }

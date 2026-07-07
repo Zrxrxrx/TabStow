@@ -660,6 +660,40 @@ describe('App', () => {
     expect(revokeObjectURL).not.toHaveBeenCalled();
   });
 
+  it('keeps a stored custom background applied when changing palette', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getThemePreferences.mockResolvedValue({
+      mode: 'dark',
+      paletteId: 'mist',
+      surfaceOpacity: 88,
+      customBackground: 'theme-bg:stored',
+    });
+    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
+      mode: 'dark',
+      paletteId: (preferences as { paletteId: 'mist' | 'blush' }).paletteId,
+      surfaceOpacity: 88,
+      customBackground: 'theme-bg:stored',
+    }));
+    resolveCustomBackgroundUrl.mockResolvedValue('blob:stored-background');
+    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await change(screen().getByLabelText('Palette'), 'blush');
+
+    expect(saveThemePreferences).toHaveBeenCalledWith(
+      expect.objectContaining({
+        paletteId: 'blush',
+      }),
+    );
+    expect(resolveCustomBackgroundUrl).toHaveBeenCalledTimes(1);
+    expect(revokeObjectURL).not.toHaveBeenCalled();
+    expect(document.documentElement.dataset.themePalette).toBe('blush');
+    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
+      'url("blob:stored-background")',
+    );
+  });
+
   it('rejects oversized custom background uploads before saving theme preferences', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     await renderApp();
