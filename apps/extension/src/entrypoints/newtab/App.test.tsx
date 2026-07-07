@@ -386,13 +386,14 @@ describe('App', () => {
   it('adds and removes quick links through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
-    promptSpy
-      .mockReturnValueOnce('https://example.com')
-      .mockReturnValueOnce('Example');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
+    await change(screen().getByLabelText('Quick link label'), 'Example');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).toHaveBeenCalledWith([
       expect.objectContaining({
         url: 'https://example.com/',
@@ -409,11 +410,14 @@ describe('App', () => {
   it('adds a quick link from a bare domain through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
-    promptSpy.mockReturnValueOnce('google.com').mockReturnValueOnce('Google');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'google.com');
+    await change(screen().getByLabelText('Quick link label'), 'Google');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).toHaveBeenCalledWith([
       expect.objectContaining({
         url: 'https://google.com/',
@@ -421,6 +425,26 @@ describe('App', () => {
       }),
     ]);
     expect(screen().getByText('Google')).not.toBeNull();
+  });
+
+  it('adds a quick link from an open-tab chooser', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Add open tab' }));
+    expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
+
+    await click(screen().getByRole('button', { name: 'Spec draft' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://docs.example.com/spec',
+        label: 'Spec draft',
+      }),
+    ]);
+    expect(screen().getByText('Spec draft')).not.toBeNull();
   });
 
   it('edits quick link label and icon metadata through the utility panel', async () => {
@@ -435,13 +459,14 @@ describe('App', () => {
       },
     ]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
-    promptSpy
-      .mockReturnValueOnce('Example docs')
-      .mockReturnValueOnce('*');
 
     await renderApp();
     await click(screen().getByLabelText('Edit Example'));
+    await change(screen().getByLabelText('Quick link label'), 'Example docs');
+    await change(screen().getByLabelText('Quick link icon'), '*');
+    await click(screen().getByRole('button', { name: 'Save' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).toHaveBeenCalledWith([
       expect.objectContaining({
         id: 'link-1',
@@ -493,13 +518,14 @@ describe('App', () => {
         createdAt: '2026-07-07T00:00:00.000Z',
       },
     ]);
-    promptSpy
-      .mockReturnValueOnce('notaurl')
-      .mockReturnValueOnce('Broken');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'notaurl');
+    await change(screen().getByLabelText('Quick link label'), 'Broken');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).not.toHaveBeenCalled();
     expect(screen().getByText('Example')).not.toBeNull();
     expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
@@ -516,13 +542,14 @@ describe('App', () => {
         createdAt: '2026-07-07T00:00:00.000Z',
       },
     ]);
-    promptSpy
-      .mockReturnValueOnce('javascript:alert(1)')
-      .mockReturnValueOnce('Bad Link');
 
     await renderApp();
     await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'javascript:alert(1)');
+    await change(screen().getByLabelText('Quick link label'), 'Bad Link');
+    await click(screen().getByRole('button', { name: 'Add' }));
 
+    expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).not.toHaveBeenCalled();
     expect(screen().getByText('Example')).not.toBeNull();
     expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
@@ -1289,18 +1316,25 @@ async function renderApp() {
 
 async function click(element: HTMLElement) {
   await act(async () => {
-    element.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    if (element instanceof HTMLButtonElement && element.type === 'submit' && element.form) {
+      element.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      return;
+    }
+    element.click();
   });
 }
 
 async function change(element: HTMLElement, value: string) {
   await act(async () => {
-    if (
-      element instanceof HTMLInputElement
-      || element instanceof HTMLSelectElement
-      || element instanceof HTMLTextAreaElement
-    ) {
-      element.value = value;
+    if (element instanceof HTMLInputElement) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+      setter?.call(element, value);
+    } else if (element instanceof HTMLSelectElement) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value')?.set;
+      setter?.call(element, value);
+    } else if (element instanceof HTMLTextAreaElement) {
+      const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set;
+      setter?.call(element, value);
     }
     element.dispatchEvent(new Event('input', { bubbles: true }));
     element.dispatchEvent(new Event('change', { bubbles: true }));

@@ -18,14 +18,26 @@ import {
 import { getQuickLinks, saveQuickLinks } from '@/features/quick-links/quick-links-storage';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import { FormDialog } from './FormDialog';
 
 type Props = {
   locale: Locale;
 };
 
-function iconFromPrompt(value: string): QuickLinkIcon {
+function iconFromValue(value: string): QuickLinkIcon {
   return value.trim() ? { kind: 'emoji', value: value.trim() } : { kind: 'site', value: null };
 }
+
+type OpenTabChoice = {
+  key: string;
+  tab: ActiveBrowserTab;
+};
+
+type QuickLinkDialogState =
+  | { kind: 'add-url'; url: string; label: string; error: string | null; submitting: boolean }
+  | { kind: 'edit'; linkId: string; label: string; iconValue: string; error: string | null; submitting: boolean }
+  | { kind: 'open-tabs'; choices: OpenTabChoice[]; error: string | null; submittingKey: string | null }
+  | null;
 
 function getImageIconToken(icon: QuickLinkIcon | null | undefined): string | null {
   return icon?.kind === 'image' ? icon.value : null;
@@ -84,6 +96,7 @@ function QuickLinkImageIcon({ token, label }: { token: string; label: string }) 
 export function QuickLinks({ locale }: Props) {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<QuickLinkDialogState>(null);
   const uploadInputRefs = useRef(new Map<string, HTMLInputElement>());
 
   useEffect(() => {
@@ -106,36 +119,63 @@ export function QuickLinks({ locale }: Props) {
     return saved;
   }
 
-  async function addByUrl() {
-    const url = window.prompt('Quick link URL');
-    if (!url) return;
+  function openAddByUrlDialog() {
+    setErrorMessage(null);
+    setDialog({ kind: 'add-url', url: '', label: '', error: null, submitting: false });
+  }
 
-    const label = window.prompt('Quick link label') ?? '';
+  async function submitAddByUrl() {
+    if (!dialog || dialog.kind !== 'add-url') return;
+    setDialog({ ...dialog, error: null, submitting: true });
+
     try {
-      await persistLinks([...links, createQuickLink({ url, label })]);
+      await persistLinks([...links, createQuickLink({ url: dialog.url, label: dialog.label })]);
+      setDialog(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Quick link URL is invalid.');
+      setDialog({
+        ...dialog,
+        error: error instanceof Error ? error.message : 'Quick link URL is invalid.',
+        submitting: false,
+      });
     }
   }
 
-  async function addFromOpenTabs() {
+  async function openOpenTabsDialog() {
+    setErrorMessage(null);
     const response = await sendExtensionMessage<AppResult<ActiveBrowserTab[]>>({ type: 'active-tabs:list' });
-    if (!response.ok) return;
+    if (!response.ok) {
+      setErrorMessage(response.error.message);
+      return;
+    }
 
     const choices = response.data
       .filter((tab) => typeof tab.url === 'string' && tab.url.length > 0)
-      .map((tab, index) => ({ index: index + 1, tab }));
-    if (choices.length === 0) return;
+      .map((tab) => ({
+        key: String(tab.id ?? tab.url ?? getTabLabel(tab)),
+        tab,
+      }));
 
-    const menu = choices.map((choice) => `${choice.index}. ${getTabLabel(choice.tab)}`).join('\n');
-    const selected = Number(window.prompt(`Choose an open tab:\n${menu}`));
-    const tab = choices.find((choice) => choice.index === selected)?.tab;
-    if (!tab?.url) return;
+    if (choices.length === 0) {
+      setErrorMessage(t(locale, 'noOpenTabsForQuickLink'));
+      return;
+    }
+
+    setDialog({ kind: 'open-tabs', choices, error: null, submittingKey: null });
+  }
+
+  async function submitOpenTabChoice(choice: OpenTabChoice) {
+    if (!dialog || dialog.kind !== 'open-tabs' || !choice.tab.url) return;
+    setDialog({ ...dialog, error: null, submittingKey: choice.key });
 
     try {
-      await persistLinks([...links, createQuickLink({ url: tab.url, label: getTabLabel(tab) })]);
+      await persistLinks([...links, createQuickLink({ url: choice.tab.url, label: getTabLabel(choice.tab) })]);
+      setDialog(null);
     } catch (error) {
-      setErrorMessage(error instanceof Error ? error.message : 'Quick link URL is invalid.');
+      setDialog({
+        ...dialog,
+        error: error instanceof Error ? error.message : 'Quick link URL is invalid.',
+        submittingKey: null,
+      });
     }
   }
 
@@ -143,17 +183,37 @@ export function QuickLinks({ locale }: Props) {
     await persistLinks(links.filter((link) => link.id !== id));
   }
 
-  async function edit(link: QuickLink) {
-    const label = window.prompt('Quick link label', link.label);
-    if (label === null) return;
-    const currentIcon = link.icon?.kind === 'emoji' ? link.icon.value : '';
-    const iconValue = window.prompt('Quick link icon. Leave blank to use the site icon.', currentIcon);
-    if (iconValue === null) return;
+  function openEditDialog(link: QuickLink) {
+    setErrorMessage(null);
+    setDialog({
+      kind: 'edit',
+      linkId: link.id,
+      label: link.label,
+      iconValue: link.icon?.kind === 'emoji' ? link.icon.value : '',
+      error: null,
+      submitting: false,
+    });
+  }
 
-    const next = links.map((item) =>
-      item.id === link.id ? updateQuickLink(item, { label, icon: iconFromPrompt(iconValue) }) : item,
-    );
-    await persistLinks(next);
+  async function submitEdit() {
+    if (!dialog || dialog.kind !== 'edit') return;
+    setDialog({ ...dialog, error: null, submitting: true });
+
+    try {
+      const next = links.map((item) =>
+        item.id === dialog.linkId
+          ? updateQuickLink(item, { label: dialog.label, icon: iconFromValue(dialog.iconValue) })
+          : item,
+      );
+      await persistLinks(next);
+      setDialog(null);
+    } catch (error) {
+      setDialog({
+        ...dialog,
+        error: error instanceof Error ? error.message : 'Could not update quick link.',
+        submitting: false,
+      });
+    }
   }
 
   async function uploadIcon(link: QuickLink, file: File | undefined) {
@@ -202,11 +262,11 @@ export function QuickLinks({ locale }: Props) {
             type="button"
             className="icon-button"
             aria-label={t(locale, 'addQuickLink')}
-            onClick={() => void addByUrl()}
+            onClick={openAddByUrlDialog}
           >
             <Plus size={16} aria-hidden="true" />
           </button>
-          <button type="button" className="secondary-button" onClick={() => void addFromOpenTabs()}>
+          <button type="button" className="secondary-button" onClick={() => void openOpenTabsDialog()}>
             {t(locale, 'addOpenTab')}
           </button>
         </div>
@@ -278,7 +338,7 @@ export function QuickLinks({ locale }: Props) {
                   type="button"
                   className="icon-button"
                   aria-label={t(locale, 'editQuickLink', { label: link.label })}
-                  onClick={() => void edit(link)}
+                  onClick={() => openEditDialog(link)}
                 >
                   <Pencil size={14} aria-hidden="true" />
                 </button>
@@ -300,6 +360,127 @@ export function QuickLinks({ locale }: Props) {
         <p className="status-message status-message--error utility-status" role="alert">
           {errorMessage}
         </p>
+      ) : null}
+
+      {dialog?.kind === 'add-url' ? (
+        <FormDialog
+          cancelLabel={t(locale, 'cancel')}
+          errorMessage={dialog.error}
+          onCancel={() => setDialog(null)}
+          onSubmit={submitAddByUrl}
+          submitLabel={t(locale, 'add')}
+          submitting={dialog.submitting}
+          title={t(locale, 'addQuickLink')}
+        >
+          <div className="field-stack">
+            <label className="field-label">
+              {t(locale, 'quickLinkUrl')}
+              <input
+                aria-label={t(locale, 'quickLinkUrl')}
+                className="dialog-input"
+                onChange={(event) => {
+                  const nextUrl = event.currentTarget.value;
+                  setDialog((current) => (current?.kind === 'add-url' ? { ...current, url: nextUrl } : current));
+                }}
+                type="url"
+                value={dialog.url}
+              />
+            </label>
+            <label className="field-label">
+              {t(locale, 'quickLinkLabel')}
+              <input
+                aria-label={t(locale, 'quickLinkLabel')}
+                className="dialog-input"
+                onChange={(event) => {
+                  const nextLabel = event.currentTarget.value;
+                  setDialog((current) => (current?.kind === 'add-url' ? { ...current, label: nextLabel } : current));
+                }}
+                type="text"
+                value={dialog.label}
+              />
+            </label>
+          </div>
+        </FormDialog>
+      ) : null}
+
+      {dialog?.kind === 'edit' ? (
+        <FormDialog
+          cancelLabel={t(locale, 'cancel')}
+          description={t(locale, 'quickLinkIconHelp')}
+          errorMessage={dialog.error}
+          onCancel={() => setDialog(null)}
+          onSubmit={submitEdit}
+          submitLabel={t(locale, 'save')}
+          submitting={dialog.submitting}
+          title={t(locale, 'editQuickLink', { label: dialog.label })}
+        >
+          <div className="field-stack">
+            <label className="field-label">
+              {t(locale, 'quickLinkLabel')}
+              <input
+                aria-label={t(locale, 'quickLinkLabel')}
+                className="dialog-input"
+                onChange={(event) => {
+                  const nextLabel = event.currentTarget.value;
+                  setDialog((current) => (current?.kind === 'edit' ? { ...current, label: nextLabel } : current));
+                }}
+                type="text"
+                value={dialog.label}
+              />
+            </label>
+            <label className="field-label">
+              {t(locale, 'quickLinkIcon')}
+              <input
+                aria-label={t(locale, 'quickLinkIcon')}
+                className="dialog-input"
+                onChange={(event) => {
+                  const nextIconValue = event.currentTarget.value;
+                  setDialog((current) =>
+                    current?.kind === 'edit' ? { ...current, iconValue: nextIconValue } : current,
+                  );
+                }}
+                type="text"
+                value={dialog.iconValue}
+              />
+            </label>
+          </div>
+        </FormDialog>
+      ) : null}
+
+      {dialog?.kind === 'open-tabs' ? (
+        <FormDialog
+          cancelLabel={t(locale, 'cancel')}
+          errorMessage={dialog.error}
+          onCancel={() => setDialog(null)}
+          onSubmit={() => undefined}
+          submitLabel={t(locale, 'add')}
+          submitting={dialog.submittingKey !== null}
+          title={t(locale, 'chooseOpenTab')}
+        >
+          <div className="open-tab-chooser">
+            {dialog.choices.map((choice) => {
+              const tabLabel = getTabLabel(choice.tab);
+              return (
+                <button
+                  type="button"
+                  aria-label={tabLabel}
+                  className="open-tab-choice"
+                  disabled={dialog.submittingKey !== null}
+                  key={choice.key}
+                  onClick={() => void submitOpenTabChoice(choice)}
+                >
+                  <span className="favicon tone-blue" aria-hidden="true">
+                    {(tabLabel.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
+                  </span>
+                  <span className="tab-copy">
+                    <span className="tab-title">{tabLabel}</span>
+                    <span className="tab-url">{choice.tab.url ?? ''}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </FormDialog>
       ) : null}
     </section>
   );
