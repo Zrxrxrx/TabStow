@@ -457,6 +457,27 @@ describe('App', () => {
     expect(screen().getByText('Spec draft')).not.toBeNull();
   });
 
+  it('does not use browser prompt for integrated input actions', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    saveTodos.mockImplementation(async (todos: unknown) => todos);
+
+    await renderApp();
+
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'example.com');
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+
+    await click(screen().getByRole('button', { name: 'Add open tab' }));
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByLabelText('Add todo'));
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+  });
+
   it('edits quick link label and icon metadata through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([
