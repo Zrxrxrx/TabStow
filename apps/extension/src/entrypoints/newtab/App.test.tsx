@@ -335,11 +335,13 @@ describe('App', () => {
     await click(languageSwitch);
     expect(saveLanguagePreference).toHaveBeenCalledWith('zh-CN');
     expect(document.documentElement.lang).toBe('zh-CN');
+    expect(screen().getByRole('button', { name: 'Switch language' })).toBe(languageSwitch);
     expect(languageSwitch.textContent).toContain('简体中文');
 
     await click(themeSwitch);
     expect(saveThemePreferences).toHaveBeenCalledWith(expect.objectContaining({ mode: 'dark' }));
     expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(screen().getByRole('button', { name: 'Switch theme' })).toBe(themeSwitch);
 
     await click(screen().getByRole('button', { name: 'Extra' }));
     const languageSelect = screen().getByLabelText('语言');
