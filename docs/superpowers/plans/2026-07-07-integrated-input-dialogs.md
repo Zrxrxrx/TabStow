@@ -77,7 +77,7 @@ In `apps/extension/src/features/i18n/i18n.test.ts`, extend `includes Simplified 
 
 - [ ] **Step 2: Run the i18n test to verify it fails**
 
-Run: `rtk bun --cwd apps/extension run test -- src/features/i18n/i18n.test.ts -t "includes Simplified Chinese labels"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/features/i18n/i18n.test.ts -t "includes Simplified Chinese labels"'`
 
 Expected: FAIL with TypeScript/runtime errors or assertion failures for missing message keys.
 
@@ -119,7 +119,7 @@ In `apps/extension/src/features/i18n/i18n.ts`, add these keys inside `messages['
 
 - [ ] **Step 5: Run the i18n test to verify it passes**
 
-Run: `rtk bun --cwd apps/extension run test -- src/features/i18n/i18n.test.ts -t "includes Simplified Chinese labels"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/features/i18n/i18n.test.ts -t "includes Simplified Chinese labels"'`
 
 Expected: PASS.
 
@@ -286,7 +286,7 @@ function queryByRole(role: string): HTMLElement | null {
 
 - [ ] **Step 2: Run the dialog tests to verify they fail**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/components/FormDialog.test.tsx`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/components/FormDialog.test.tsx'`
 
 Expected: FAIL because `./FormDialog` does not exist.
 
@@ -543,7 +543,7 @@ Add these new classes near the drawer styles:
 
 - [ ] **Step 5: Run the dialog tests to verify they pass**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/components/FormDialog.test.tsx`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/components/FormDialog.test.tsx'`
 
 Expected: PASS.
 
@@ -690,7 +690,7 @@ Add this test after the bare-domain quick-link test:
 
 - [ ] **Step 4: Run the quick-link tests to verify they fail**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"'`
 
 Expected: FAIL because the UI still calls `window.prompt` and has no integrated quick-link fields.
 
@@ -967,7 +967,7 @@ Add this block before the closing `</section>` in `QuickLinks`:
 
 - [ ] **Step 8: Run quick-link tests to verify they pass**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"'`
 
 Expected: PASS.
 
@@ -1021,7 +1021,7 @@ In `apps/extension/src/entrypoints/newtab/App.test.tsx`, add this test near the 
 
 - [ ] **Step 2: Run the todo test to verify it fails**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx -t "adds a todo through an integrated form"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "adds a todo through an integrated form"'`
 
 Expected: FAIL because the todo add action still calls `window.prompt`.
 
@@ -1121,7 +1121,7 @@ Add this block before the closing `</section>` in `TodosPanel`:
 
 - [ ] **Step 5: Run the todo test to verify it passes**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx -t "adds a todo through an integrated form"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "adds a todo through an integrated form"'`
 
 Expected: PASS.
 
@@ -1175,7 +1175,7 @@ In `apps/extension/src/entrypoints/newtab/App.test.tsx`, add this test near the 
 
 - [ ] **Step 2: Run the no-prompt regression test**
 
-Run: `rtk bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx -t "does not use browser prompt"`
+Run: `rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "does not use browser prompt"'`
 
 Expected: PASS.
 
