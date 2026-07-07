@@ -11,3 +11,4 @@ apps/extension/dist/
 packages/core/dist/
 coverage/
 .superpowers/
+.worktrees/
