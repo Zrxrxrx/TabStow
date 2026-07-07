@@ -93,7 +93,11 @@ async function click(element: HTMLElement) {
 
 async function keyDown(key: string) {
   await act(async () => {
-    document.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
+    const target =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : document.body;
+    target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
   });
 }
 

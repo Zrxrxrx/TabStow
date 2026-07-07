@@ -76,6 +76,16 @@ describe('quick links', () => {
     });
   });
 
+  it('creates an https quick link from a bare domain with a port and path', () => {
+    expect(createQuickLink({ url: 'example.com:8080/path', label: 'Example' }, () => 'q-1')).toEqual({
+      id: 'q-1',
+      url: 'https://example.com:8080/path',
+      label: 'Example',
+      icon: null,
+      createdAt: expect.any(String),
+    });
+  });
+
   it('rejects quick links outside http and https', () => {
     expect(() => createQuickLink({ url: 'javascript:alert(1)' })).toThrow('Quick link URL is invalid.');
     expect(() => createQuickLink({ url: 'data:text/html,hello' })).toThrow('Quick link URL is invalid.');

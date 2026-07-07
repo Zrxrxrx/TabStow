@@ -408,11 +408,12 @@ export function QuickLinks({ locale }: Props) {
               <input
                 aria-label={t(locale, 'quickLinkUrl')}
                 className="dialog-input"
+                inputMode="url"
                 onChange={(event) => {
                   const nextUrl = event.currentTarget.value;
                   setDialog((current) => (current?.kind === 'add-url' ? { ...current, url: nextUrl } : current));
                 }}
-                type="url"
+                type="text"
                 value={dialog.url}
               />
             </label>

@@ -45,11 +45,13 @@ export function FormDialog({
 
   useEffect(() => {
     previousFocusRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const bodyFocusSelector =
+      '.dialog-body input:not([disabled]), .dialog-body textarea:not([disabled]), .dialog-body select:not([disabled]), .dialog-body button:not([disabled]), .dialog-body [tabindex]:not([tabindex="-1"])';
+    const dialogFocusSelector =
+      'input:not([disabled]), textarea:not([disabled]), select:not([disabled]), button:not([disabled]), [tabindex]:not([tabindex="-1"])';
     const fallbackFocus =
-      dialogRef.current?.querySelector<HTMLElement>(
-        'input, textarea, select, [tabindex]:not([tabindex="-1"])',
-      ) ??
-      dialogRef.current?.querySelector<HTMLElement>('button:not([disabled])');
+      dialogRef.current?.querySelector<HTMLElement>(bodyFocusSelector) ??
+      dialogRef.current?.querySelector<HTMLElement>(dialogFocusSelector);
     const target = initialFocusRef?.current ?? fallbackFocus;
     target?.focus();
 
@@ -61,12 +63,21 @@ export function FormDialog({
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
       if (event.key !== 'Escape') return;
+      if (
+        dialogRef.current &&
+        event.target instanceof Node &&
+        !dialogRef.current.contains(event.target)
+      ) {
+        return;
+      }
+
+      event.preventDefault();
       event.stopPropagation();
       onCancel();
     }
 
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
+    document.addEventListener('keydown', closeOnEscape, true);
+    return () => document.removeEventListener('keydown', closeOnEscape, true);
   }, [onCancel]);
 
   function submit(event: FormEvent<HTMLFormElement>) {

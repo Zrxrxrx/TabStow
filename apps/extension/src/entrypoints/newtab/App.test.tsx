@@ -444,6 +444,7 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByRole('button', { name: 'Add open tab' }));
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
+    expect(document.activeElement).toBe(screen().getByRole('button', { name: 'Spec draft' }));
     expect(() => screen().getByRole('button', { name: 'Settings' })).toThrow();
     await click(screen().getByRole('button', { name: 'Add' }));
 
@@ -699,6 +700,21 @@ describe('App', () => {
       }),
     ]);
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
+  });
+
+  it('closes the nested Add todo dialog without closing the Extra drawer on Escape', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByLabelText('Add todo'));
+
+    expect(screen().getByRole('dialog', { name: 'Add todo' })).not.toBeNull();
+
+    await keyDown('Escape');
+
+    expect(() => screen().getByRole('dialog', { name: 'Add todo' })).toThrow();
+    expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
   });
 
   it('saves only a lightweight custom background token in theme preferences', async () => {
@@ -1371,10 +1387,24 @@ async function renderApp() {
 async function click(element: HTMLElement) {
   await act(async () => {
     if (element instanceof HTMLButtonElement && element.type === 'submit' && element.form) {
-      element.form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+      if (typeof element.form.requestSubmit === 'function') {
+        element.form.requestSubmit(element);
+        return;
+      }
+      element.click();
       return;
     }
     element.click();
+  });
+}
+
+async function keyDown(key: string) {
+  await act(async () => {
+    const target =
+      document.activeElement instanceof HTMLElement && document.activeElement !== document.body
+        ? document.activeElement
+        : document.body;
+    target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key }));
   });
 }
 
