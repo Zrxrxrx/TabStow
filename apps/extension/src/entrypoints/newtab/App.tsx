@@ -202,7 +202,7 @@ export function App() {
           </div>
         </header>
 
-        <QuickLinks locale={locale} />
+        <QuickLinks disabled={busyAction !== null} locale={locale} />
 
         <section className="workspace-grid" aria-label="Tab workspace" data-od-id="workspace-grid">
           <ActiveWorkspace

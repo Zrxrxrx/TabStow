@@ -22,6 +22,7 @@ import { sendExtensionMessage } from '@/lib/messages';
 import { FormDialog } from './FormDialog';
 
 type Props = {
+  disabled: boolean;
   locale: Locale;
 };
 
@@ -157,21 +158,26 @@ function QuickLinkSiteIcon({ link }: { link: QuickLink }) {
   );
 }
 
-export function QuickLinks({ locale }: Props) {
+export function QuickLinks({ disabled, locale }: Props) {
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dialog, setDialog] = useState<QuickLinkDialogState>(null);
   const [editing, setEditing] = useState(false);
+  const disabledRef = useRef(disabled);
   const uploadInputRefs = useRef(new Map<string, HTMLInputElement>());
+  disabledRef.current = disabled;
 
   useEffect(() => {
     void getQuickLinks().then(setLinks);
   }, []);
 
   async function persistLinks(updateLinks: (currentLinks: QuickLink[]) => QuickLink[]) {
+    if (disabledRef.current) return null;
     const currentLinks = await getQuickLinks();
+    if (disabledRef.current) return null;
     const previousImageTokens = new Set(currentLinks.map((link) => getImageIconToken(link.icon)).filter(Boolean));
     const saved = await saveQuickLinks(updateLinks(currentLinks));
+    if (disabledRef.current) return null;
     setLinks(saved);
     setErrorMessage(null);
 
@@ -186,6 +192,7 @@ export function QuickLinks({ locale }: Props) {
   }
 
   function openAddByUrlDialog() {
+    if (disabledRef.current) return;
     setErrorMessage(null);
     setDialog({ kind: 'add-url', url: '', label: '', labelEdited: false, preview: null, error: null, submitting: false });
   }
@@ -211,12 +218,12 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function submitAddByUrl() {
-    if (!dialog || dialog.kind !== 'add-url') return;
+    if (!dialog || dialog.kind !== 'add-url' || disabledRef.current) return;
     setDialog({ ...dialog, error: null, submitting: true });
 
     try {
       const preview = dialog.preview ?? previewQuickLinkUrl(dialog.url);
-      await persistLinks((currentLinks) => [
+      const saved = await persistLinks((currentLinks) => [
         ...currentLinks,
         createQuickLink({
           url: preview.url,
@@ -224,6 +231,10 @@ export function QuickLinks({ locale }: Props) {
           icon: preview.icon,
         }),
       ]);
+      if (!saved) {
+        setDialog((current) => (current?.kind === 'add-url' ? { ...current, submitting: false } : current));
+        return;
+      }
       setDialog(null);
     } catch (error) {
       setDialog({
@@ -235,6 +246,7 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function openOpenTabsDialog() {
+    if (disabledRef.current) return;
     setErrorMessage(null);
     const response = await sendExtensionMessage<AppResult<ActiveBrowserTab[]>>({ type: 'active-tabs:list' });
     if (!response.ok) {
@@ -258,7 +270,7 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function submitOpenTabChoice(choice: OpenTabChoice) {
-    if (!choice.tab.url) return;
+    if (!choice.tab.url || disabledRef.current) return;
     const url = choice.tab.url;
     setDialog((current) =>
       current?.kind === 'open-tabs'
@@ -267,10 +279,16 @@ export function QuickLinks({ locale }: Props) {
     );
 
     try {
-      await persistLinks((currentLinks) => [
+      const saved = await persistLinks((currentLinks) => [
         ...currentLinks,
         createQuickLink({ url, label: getTabLabel(choice.tab) }),
       ]);
+      if (!saved) {
+        setDialog((current) =>
+          current?.kind === 'open-tabs' ? { ...current, submittingKey: null } : current,
+        );
+        return;
+      }
       setDialog(null);
     } catch (error) {
       setDialog((current) =>
@@ -286,17 +304,19 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function submitSelectedOpenTab() {
-    if (!dialog || dialog.kind !== 'open-tabs') return;
+    if (!dialog || dialog.kind !== 'open-tabs' || disabledRef.current) return;
     const choice = dialog.choices.find((item) => item.key === dialog.selectedKey);
     if (!choice) return;
     await submitOpenTabChoice(choice);
   }
 
   async function remove(id: string) {
+    if (disabledRef.current) return;
     await persistLinks((currentLinks) => currentLinks.filter((link) => link.id !== id));
   }
 
   function openEditDialog(link: QuickLink) {
+    if (disabledRef.current) return;
     setErrorMessage(null);
     setDialog({
       kind: 'edit',
@@ -309,17 +329,21 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function submitEdit() {
-    if (!dialog || dialog.kind !== 'edit') return;
+    if (!dialog || dialog.kind !== 'edit' || disabledRef.current) return;
     setDialog({ ...dialog, error: null, submitting: true });
 
     try {
-      await persistLinks((currentLinks) =>
+      const saved = await persistLinks((currentLinks) =>
         currentLinks.map((item) =>
           item.id === dialog.linkId
             ? updateQuickLink(item, { label: dialog.label, icon: iconFromValue(dialog.iconValue) })
             : item,
         ),
       );
+      if (!saved) {
+        setDialog((current) => (current?.kind === 'edit' ? { ...current, submitting: false } : current));
+        return;
+      }
       setDialog(null);
     } catch (error) {
       setDialog({
@@ -331,6 +355,7 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function uploadIcon(link: QuickLink, file: File | undefined) {
+    if (disabledRef.current) return;
     if (!file) return;
     if (!file.type.startsWith('image/')) {
       setErrorMessage('Quick link icon must be an image.');
@@ -353,6 +378,7 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function move(id: string, direction: -1 | 1) {
+    if (disabledRef.current) return;
     const index = links.findIndex((link) => link.id === id);
     const nextIndex = index + direction;
     if (index === -1 || nextIndex < 0 || nextIndex >= links.length) return;
@@ -378,6 +404,7 @@ export function QuickLinks({ locale }: Props) {
             aria-label={editing ? t(locale, 'showQuickLinksMode') : t(locale, 'editQuickLinksMode')}
             aria-pressed={editing}
             onClick={() => setEditing((value) => !value)}
+            disabled={disabled}
           >
             <PencilLine size={16} aria-hidden="true" />
           </button>
@@ -388,10 +415,16 @@ export function QuickLinks({ locale }: Props) {
                 className="icon-button"
                 aria-label={t(locale, 'addQuickLink')}
                 onClick={openAddByUrlDialog}
+                disabled={disabled}
               >
                 <Plus size={16} aria-hidden="true" />
               </button>
-              <button type="button" className="secondary-button" onClick={() => void openOpenTabsDialog()}>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => void openOpenTabsDialog()}
+                disabled={disabled}
+              >
                 {t(locale, 'addOpenTab')}
               </button>
             </>
@@ -424,7 +457,7 @@ export function QuickLinks({ locale }: Props) {
                     className="icon-button"
                     aria-label={t(locale, 'moveUp', { label: link.label })}
                     onClick={() => void move(link.id, -1)}
-                    disabled={index === 0}
+                    disabled={disabled || index === 0}
                   >
                     <ChevronUp size={14} aria-hidden="true" />
                   </button>
@@ -433,7 +466,7 @@ export function QuickLinks({ locale }: Props) {
                     className="icon-button"
                     aria-label={t(locale, 'moveDown', { label: link.label })}
                     onClick={() => void move(link.id, 1)}
-                    disabled={index === links.length - 1}
+                    disabled={disabled || index === links.length - 1}
                   >
                     <ChevronDown size={14} aria-hidden="true" />
                   </button>
@@ -442,6 +475,7 @@ export function QuickLinks({ locale }: Props) {
                     className="icon-button"
                     aria-label={t(locale, 'uploadQuickLinkIcon', { label: link.label })}
                     onClick={() => uploadInputRefs.current.get(link.id)?.click()}
+                    disabled={disabled}
                   >
                     <ImageUp size={14} aria-hidden="true" />
                   </button>
@@ -463,12 +497,14 @@ export function QuickLinks({ locale }: Props) {
                       event.target.value = '';
                     }}
                     type="file"
+                    disabled={disabled}
                   />
                   <button
                     type="button"
                     className="icon-button"
                     aria-label={t(locale, 'editQuickLink', { label: link.label })}
                     onClick={() => openEditDialog(link)}
+                    disabled={disabled}
                   >
                     <Pencil size={14} aria-hidden="true" />
                   </button>
@@ -477,6 +513,7 @@ export function QuickLinks({ locale }: Props) {
                     className="icon-button"
                     aria-label={t(locale, 'removeQuickLink', { label: link.label })}
                     onClick={() => void remove(link.id)}
+                    disabled={disabled}
                   >
                     <Trash2 size={14} aria-hidden="true" />
                   </button>
@@ -500,6 +537,7 @@ export function QuickLinks({ locale }: Props) {
           onCancel={() => setDialog(null)}
           onSubmit={submitAddByUrl}
           submitLabel={t(locale, 'add')}
+          submitDisabled={disabled}
           submitting={dialog.submitting}
           title={t(locale, 'addQuickLink')}
         >
@@ -578,6 +616,7 @@ export function QuickLinks({ locale }: Props) {
           onCancel={() => setDialog(null)}
           onSubmit={submitEdit}
           submitLabel={t(locale, 'save')}
+          submitDisabled={disabled}
           submitting={dialog.submitting}
           title={t(locale, 'editQuickLink', { label: dialog.label })}
         >
@@ -621,6 +660,7 @@ export function QuickLinks({ locale }: Props) {
           onCancel={() => setDialog(null)}
           onSubmit={submitSelectedOpenTab}
           submitLabel={t(locale, 'add')}
+          submitDisabled={disabled}
           submitting={dialog.submittingKey !== null}
           title={t(locale, 'chooseOpenTab')}
         >
@@ -633,7 +673,7 @@ export function QuickLinks({ locale }: Props) {
                   aria-label={tabLabel}
                   aria-pressed={dialog.selectedKey === choice.key}
                   className="open-tab-choice"
-                  disabled={dialog.submittingKey !== null}
+                  disabled={disabled || dialog.submittingKey !== null}
                   key={choice.key}
                   onClick={() => {
                     void submitOpenTabChoice(choice);

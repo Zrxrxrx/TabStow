@@ -17,6 +17,7 @@ export type FormDialogProps = {
   onCancel: () => void;
   onSubmit: () => void | Promise<void>;
   submitLabel: string;
+  submitDisabled?: boolean;
   submitting?: boolean;
   title: string;
 };
@@ -30,6 +31,7 @@ export function FormDialog({
   onCancel,
   onSubmit,
   submitLabel,
+  submitDisabled = false,
   submitting = false,
   title,
 }: FormDialogProps) {
@@ -82,7 +84,7 @@ export function FormDialog({
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (submitting) return;
+    if (submitting || submitDisabled) return;
     void onSubmit();
   }
 
@@ -128,7 +130,7 @@ export function FormDialog({
           <button type="button" className="secondary-button" onClick={onCancel} disabled={submitting}>
             {cancelLabel}
           </button>
-          <button type="submit" className="primary-button" disabled={submitting}>
+          <button type="submit" className="primary-button" disabled={submitting || submitDisabled}>
             {submitLabel}
           </button>
         </div>

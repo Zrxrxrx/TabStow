@@ -1680,6 +1680,85 @@ describe('App', () => {
     expect(container.textContent).not.toContain('1 open');
   });
 
+  it('disables quick-link writes while a sync pull is running', async () => {
+    const pendingPull = deferred<
+      AppResult<{ sessionCount: number; quickLinkCount: number; importedAt: string }>
+    >();
+
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://one.example/',
+        label: 'One',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+      {
+        id: 'link-2',
+        url: 'https://two.example/',
+        label: 'Two',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot };
+      }
+
+      if (message.type === 'active-tabs:list') {
+        return { ok: true, data: [UNIQUE_TAB] };
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'sync:pull') {
+        return pendingPull.promise;
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
+    await click(screen().getByRole('button', { name: 'Fetch' }));
+    await change(screen().getByLabelText('Quick link label'), 'Example');
+
+    await click(screen().getByRole('button', { name: 'Pull' }));
+
+    expect(screen().getByRole('button', { name: 'Show quick links' })).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Add quick link')).toHaveProperty('disabled', true);
+    expect(screen().getByRole('button', { name: 'Add open tab' })).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Move One down')).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Upload icon for One')).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Edit One')).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Remove One')).toHaveProperty('disabled', true);
+    expect(screen().getByRole('button', { name: 'Add' })).toHaveProperty('disabled', true);
+    expect(
+      container.querySelector<HTMLInputElement>('input[data-quick-link-upload-id="link-1"]')?.disabled,
+    ).toBe(true);
+
+    const dialog = container.querySelector('form.form-dialog');
+    expect(dialog).not.toBeNull();
+    await act(async () => {
+      dialog?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+    });
+
+    expect(saveQuickLinks).not.toHaveBeenCalled();
+
+    pendingPull.resolve({
+      ok: true,
+      data: { sessionCount: 0, quickLinkCount: 0, importedAt: '2026-07-08T00:00:00.000Z' },
+    });
+    await act(async () => {
+      await pendingPull.promise;
+    });
+  });
+
   it('preserves pulled quick links when adding a new link from stale new-tab state', async () => {
     let storedQuickLinks = [] as Awaited<ReturnType<typeof getQuickLinks>>;
     getQuickLinks.mockImplementation(async () => storedQuickLinks);
