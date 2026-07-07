@@ -36,7 +36,13 @@ type OpenTabChoice = {
 type QuickLinkDialogState =
   | { kind: 'add-url'; url: string; label: string; error: string | null; submitting: boolean }
   | { kind: 'edit'; linkId: string; label: string; iconValue: string; error: string | null; submitting: boolean }
-  | { kind: 'open-tabs'; choices: OpenTabChoice[]; error: string | null; submittingKey: string | null }
+  | {
+      kind: 'open-tabs';
+      choices: OpenTabChoice[];
+      error: string | null;
+      selectedKey: string;
+      submittingKey: string | null;
+    }
   | null;
 
 function getImageIconToken(icon: QuickLinkIcon | null | undefined): string | null {
@@ -160,7 +166,7 @@ export function QuickLinks({ locale }: Props) {
       return;
     }
 
-    setDialog({ kind: 'open-tabs', choices, error: null, submittingKey: null });
+    setDialog({ kind: 'open-tabs', choices, error: null, selectedKey: choices[0].key, submittingKey: null });
   }
 
   async function submitOpenTabChoice(choice: OpenTabChoice) {
@@ -177,6 +183,13 @@ export function QuickLinks({ locale }: Props) {
         submittingKey: null,
       });
     }
+  }
+
+  async function submitSelectedOpenTab() {
+    if (!dialog || dialog.kind !== 'open-tabs') return;
+    const choice = dialog.choices.find((item) => item.key === dialog.selectedKey);
+    if (!choice) return;
+    await submitOpenTabChoice(choice);
   }
 
   async function remove(id: string) {
@@ -452,7 +465,7 @@ export function QuickLinks({ locale }: Props) {
           cancelLabel={t(locale, 'cancel')}
           errorMessage={dialog.error}
           onCancel={() => setDialog(null)}
-          onSubmit={() => undefined}
+          onSubmit={submitSelectedOpenTab}
           submitLabel={t(locale, 'add')}
           submitting={dialog.submittingKey !== null}
           title={t(locale, 'chooseOpenTab')}
@@ -464,10 +477,16 @@ export function QuickLinks({ locale }: Props) {
                 <button
                   type="button"
                   aria-label={tabLabel}
+                  aria-pressed={dialog.selectedKey === choice.key}
                   className="open-tab-choice"
                   disabled={dialog.submittingKey !== null}
                   key={choice.key}
-                  onClick={() => void submitOpenTabChoice(choice)}
+                  onClick={() => {
+                    setDialog((current) =>
+                      current?.kind === 'open-tabs' ? { ...current, selectedKey: choice.key } : current,
+                    );
+                    void submitOpenTabChoice(choice);
+                  }}
                 >
                   <span className="favicon tone-blue" aria-hidden="true">
                     {(tabLabel.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}

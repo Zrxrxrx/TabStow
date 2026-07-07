@@ -434,8 +434,7 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByRole('button', { name: 'Add open tab' }));
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
-
-    await click(screen().getByRole('button', { name: 'Spec draft' }));
+    await click(screen().getByRole('button', { name: 'Add' }));
 
     expect(promptSpy).not.toHaveBeenCalled();
     expect(saveQuickLinks).toHaveBeenCalledWith([
