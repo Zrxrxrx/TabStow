@@ -1132,7 +1132,39 @@ describe('App', () => {
     expect(screen().getByText('Spec draft')).not.toBeNull();
   });
 
-  it('syncs cleared manual groups to Chrome groups when sync is enabled', async () => {
+  it('migrates a stored disabled Chrome group sync state on load', async () => {
+    const legacyChromeTabGroups: ActiveWorkspaceState['chromeTabGroups'] = {
+      enabled: false,
+      mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
+    };
+    let storedWorkspace: ActiveWorkspaceState = {
+      ...defaultWorkspace(),
+      chromeTabGroups: legacyChromeTabGroups,
+    };
+    getActiveWorkspaceState.mockImplementation(async () => storedWorkspace);
+    updateActiveWorkspaceState.mockImplementation(async (partial: Partial<ReturnType<typeof defaultWorkspace>>) => {
+      storedWorkspace = {
+        ...storedWorkspace,
+        ...partial,
+        manualGroups: partial.manualGroups ?? storedWorkspace.manualGroups,
+        order: partial.order ?? storedWorkspace.order,
+        chromeTabGroups: partial.chromeTabGroups ?? storedWorkspace.chromeTabGroups,
+      };
+      return storedWorkspace;
+    });
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+
+    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
+      chromeTabGroups: {
+        enabled: true,
+        mappings: legacyChromeTabGroups.mappings,
+      },
+    });
+  });
+
+  it('syncs cleared manual groups to Chrome groups with legacy disabled sync state forced on', async () => {
     const syncedChromeGroups: ActiveWorkspaceState['chromeTabGroups'] = {
       enabled: true,
       mappings: [],
@@ -1144,7 +1176,7 @@ describe('App', () => {
         assignments: { '12': 'manual-1' },
       },
       chromeTabGroups: {
-        enabled: true,
+        enabled: false,
         mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
       },
     };
@@ -1175,6 +1207,12 @@ describe('App', () => {
       type: 'chrome-tab-groups:sync',
       groups: expect.any(Array),
       state: expect.objectContaining({ enabled: true }),
+    });
+    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
+      chromeTabGroups: {
+        enabled: true,
+        mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
+      },
     });
     expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
       chromeTabGroups: syncedChromeGroups,

@@ -40,6 +40,18 @@ export function ActiveWorkspace({
   const closePendingRef = useRef(false);
   const refreshTokenRef = useRef(0);
 
+  function enableChromeTabGroups(state: ActiveWorkspaceState): ActiveWorkspaceState {
+    if (state.chromeTabGroups.enabled) return state;
+
+    return {
+      ...state,
+      chromeTabGroups: {
+        ...state.chromeTabGroups,
+        enabled: true,
+      },
+    };
+  }
+
   async function refresh() {
     const refreshToken = ++refreshTokenRef.current;
     const [tabsResponse, state] = await Promise.all([
@@ -59,10 +71,16 @@ export function ActiveWorkspace({
       .map((tab) => tab.id)
       .filter((id): id is number => typeof id === 'number');
     const prunedManualGroups = pruneManualGroups(state.manualGroups, openIds);
+    const manualGroupsChanged = JSON.stringify(prunedManualGroups) !== JSON.stringify(state.manualGroups);
+    const enabledChromeGroupsState = enableChromeTabGroups(state);
+    const chromeGroupsChanged = enabledChromeGroupsState !== state;
     const nextState =
-      JSON.stringify(prunedManualGroups) === JSON.stringify(state.manualGroups)
-        ? state
-        : await updateActiveWorkspaceState({ manualGroups: prunedManualGroups });
+      manualGroupsChanged || chromeGroupsChanged
+        ? await updateActiveWorkspaceState({
+            ...(manualGroupsChanged ? { manualGroups: prunedManualGroups } : {}),
+            ...(chromeGroupsChanged ? { chromeTabGroups: enabledChromeGroupsState.chromeTabGroups } : {}),
+          })
+        : state;
 
     if (refreshToken !== refreshTokenRef.current) return;
 
@@ -167,12 +185,17 @@ export function ActiveWorkspace({
   }
 
   async function syncChromeGroupsForWorkspace(nextWorkspace: ActiveWorkspaceState) {
-    if (!nextWorkspace.chromeTabGroups.enabled) return;
+    const syncedInputWorkspace = enableChromeTabGroups(nextWorkspace);
+    const workspaceForSync =
+      syncedInputWorkspace === nextWorkspace
+        ? nextWorkspace
+        : await updateActiveWorkspaceState({ chromeTabGroups: syncedInputWorkspace.chromeTabGroups });
+    if (workspaceForSync !== nextWorkspace) setWorkspace(workspaceForSync);
     const nextGroups = buildActiveTabGroups(tabs, nextWorkspace.manualGroups, nextWorkspace.order);
     const response = await sendExtensionMessage<AppResult<ActiveWorkspaceState['chromeTabGroups']>>({
       type: 'chrome-tab-groups:sync',
       groups: nextGroups,
-      state: nextWorkspace.chromeTabGroups,
+      state: workspaceForSync.chromeTabGroups,
     });
     if (response.ok) {
       const syncedWorkspace = await updateActiveWorkspaceState({ chromeTabGroups: response.data });
