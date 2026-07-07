@@ -11,7 +11,7 @@ import {
 } from '@/features/active-tabs/active-workspace-storage';
 import { clearTabManualGroup, pruneManualGroups } from '@/features/active-tabs/manual-groups';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
-import type { ActiveBrowserTab } from '@/features/active-tabs/types';
+import type { ActiveBrowserTab, ActiveTabsSnapshot, ChromeTabGroupInfo } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
@@ -33,6 +33,7 @@ export function ActiveWorkspace({
   refreshKey,
 }: Props) {
   const [tabs, setTabs] = useState<ActiveBrowserTab[]>([]);
+  const [chromeGroups, setChromeGroups] = useState<ChromeTabGroupInfo[]>([]);
   const [workspace, setWorkspace] = useState<ActiveWorkspaceState | null>(null);
   const [closePending, setClosePending] = useState(false);
   const groupRefs = useRef(new Map<string, HTMLElement>());
@@ -42,7 +43,7 @@ export function ActiveWorkspace({
   async function refresh() {
     const refreshToken = ++refreshTokenRef.current;
     const [tabsResponse, state] = await Promise.all([
-      sendExtensionMessage<AppResult<ActiveBrowserTab[]>>({ type: 'active-tabs:list' }),
+      sendExtensionMessage<AppResult<ActiveTabsSnapshot>>({ type: 'active-tabs:snapshot' }),
       getActiveWorkspaceState(),
     ]);
 
@@ -53,7 +54,8 @@ export function ActiveWorkspace({
       return;
     }
 
-    const openIds = tabsResponse.data
+    const snapshot = tabsResponse.data;
+    const openIds = snapshot.tabs
       .map((tab) => tab.id)
       .filter((id): id is number => typeof id === 'number');
     const prunedManualGroups = pruneManualGroups(state.manualGroups, openIds);
@@ -64,7 +66,8 @@ export function ActiveWorkspace({
 
     if (refreshToken !== refreshTokenRef.current) return;
 
-    setTabs(tabsResponse.data);
+    setTabs(snapshot.tabs);
+    setChromeGroups(snapshot.chromeGroups);
     setWorkspace(nextState);
   }
 
@@ -72,9 +75,44 @@ export function ActiveWorkspace({
     void refresh();
   }, [refreshKey]);
 
+  useEffect(() => {
+    if (typeof chrome === 'undefined') return;
+
+    const tabsApi = chrome?.tabs;
+    const tabGroupsApi = chrome?.tabGroups;
+    let timeoutId: number | null = null;
+
+    function scheduleRefresh() {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      timeoutId = window.setTimeout(() => {
+        timeoutId = null;
+        void refresh();
+      }, 150);
+    }
+
+    tabsApi?.onCreated?.addListener(scheduleRefresh);
+    tabsApi?.onUpdated?.addListener(scheduleRefresh);
+    tabsApi?.onRemoved?.addListener(scheduleRefresh);
+    tabsApi?.onMoved?.addListener(scheduleRefresh);
+    tabGroupsApi?.onCreated?.addListener(scheduleRefresh);
+    tabGroupsApi?.onUpdated?.addListener(scheduleRefresh);
+    tabGroupsApi?.onRemoved?.addListener(scheduleRefresh);
+
+    return () => {
+      if (timeoutId !== null) window.clearTimeout(timeoutId);
+      tabsApi?.onCreated?.removeListener(scheduleRefresh);
+      tabsApi?.onUpdated?.removeListener(scheduleRefresh);
+      tabsApi?.onRemoved?.removeListener(scheduleRefresh);
+      tabsApi?.onMoved?.removeListener(scheduleRefresh);
+      tabGroupsApi?.onCreated?.removeListener(scheduleRefresh);
+      tabGroupsApi?.onUpdated?.removeListener(scheduleRefresh);
+      tabGroupsApi?.onRemoved?.removeListener(scheduleRefresh);
+    };
+  }, []);
+
   const groups = useMemo(
-    () => (workspace ? buildActiveTabGroups(tabs, workspace.manualGroups, workspace.order) : []),
-    [tabs, workspace],
+    () => (workspace ? buildActiveTabGroups(tabs, workspace.manualGroups, workspace.order, chromeGroups) : []),
+    [chromeGroups, tabs, workspace],
   );
   const duplicateGroups = useMemo(() => findDuplicateTabGroups(tabs), [tabs]);
   const currentWindowId = tabs.find((tab) => tab.active && typeof tab.windowId === 'number')?.windowId
@@ -144,25 +182,6 @@ export function ActiveWorkspace({
     onStatus('error', response.error.message);
   }
 
-  async function toggleChromeTabGroups() {
-    if (!workspace || busy || closePendingRef.current) return;
-    const nextState = {
-      ...workspace.chromeTabGroups,
-      enabled: !workspace.chromeTabGroups.enabled,
-    };
-    const response = await sendExtensionMessage<AppResult<ActiveWorkspaceState['chromeTabGroups']>>({
-      type: 'chrome-tab-groups:sync',
-      groups,
-      state: nextState,
-    });
-    if (response.ok) {
-      setWorkspace(await updateActiveWorkspaceState({ chromeTabGroups: response.data }));
-      onStatus('success', response.data.enabled ? 'Chrome tab groups enabled.' : 'Chrome tab groups disabled.');
-      return;
-    }
-    onStatus('error', response.error.message);
-  }
-
   async function importExistingChromeGroups() {
     if (!workspace || busy || closePendingRef.current) return;
     const response = await sendExtensionMessage<
@@ -174,7 +193,7 @@ export function ActiveWorkspace({
       type: 'chrome-tab-groups:import',
       tabs,
       manualGroups: workspace.manualGroups,
-      state: workspace.chromeTabGroups,
+      state: { ...workspace.chromeTabGroups, enabled: true },
     });
     if (response.ok) {
       setWorkspace(
@@ -218,15 +237,16 @@ export function ActiveWorkspace({
       </div>
 
       <div className="meta-row" data-od-id="active-actions">
-        <label className="toggle-row">
-          <input
-            checked={Boolean(workspace?.chromeTabGroups.enabled)}
-            onChange={() => void toggleChromeTabGroups()}
-            type="checkbox"
-            disabled={chromeGroupControlsDisabled}
-          />
-          <span>{t(locale, 'syncManualGroups')}</span>
-        </label>
+        <span className="status-pill">{t(locale, 'chromeGroupsSynced')}</span>
+        <button
+          type="button"
+          className="secondary-button"
+          onClick={() => void refresh()}
+          disabled={chromeGroupControlsDisabled}
+        >
+          <Layers size={16} aria-hidden="true" />
+          {t(locale, 'refreshChromeGroups')}
+        </button>
         <button
           type="button"
           className="secondary-button"

@@ -57,7 +57,7 @@ describe('chrome tab groups', () => {
     const result = await syncChromeTabGroups(groups, { enabled: true, mappings: [] });
 
     expect(browserMocks.tabs.group).toHaveBeenCalledWith({ tabIds: [10, 11] });
-    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(99, { title: 'Launch', collapsed: true });
+    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(99, { title: 'Launch' });
     expect(result).toEqual({
       ok: true,
       data: { enabled: true, mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 99 }] },
@@ -82,8 +82,8 @@ describe('chrome tab groups', () => {
 
     expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(1, { tabIds: [10, 11] });
     expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(2, { tabIds: [21, 22] });
-    expect(browserMocks.tabGroups.update).toHaveBeenNthCalledWith(1, 99, { title: 'Launch', collapsed: true });
-    expect(browserMocks.tabGroups.update).toHaveBeenNthCalledWith(2, 199, { title: 'Launch', collapsed: true });
+    expect(browserMocks.tabGroups.update).toHaveBeenNthCalledWith(1, 99, { title: 'Launch' });
+    expect(browserMocks.tabGroups.update).toHaveBeenNthCalledWith(2, 199, { title: 'Launch' });
     expect(result).toEqual({
       ok: true,
       data: {
@@ -109,7 +109,7 @@ describe('chrome tab groups', () => {
 
     expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(1, { groupId: 88, tabIds: [10, 11] });
     expect(browserMocks.tabs.group).toHaveBeenNthCalledWith(2, { tabIds: [10, 11] });
-    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(123, { title: 'Launch', collapsed: true });
+    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(123, { title: 'Launch' });
     expect(result).toEqual({
       ok: true,
       data: { enabled: true, mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 123 }] },
@@ -134,7 +134,7 @@ describe('chrome tab groups', () => {
     expect(browserMocks.tabs.group).toHaveBeenCalledWith({ groupId: 88, tabIds: [10, 11] });
     expect(browserMocks.tabs.query).toHaveBeenCalledWith({ groupId: 88 });
     expect(browserMocks.tabs.ungroup).toHaveBeenCalledWith(12);
-    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(88, { title: 'Launch', collapsed: true });
+    expect(browserMocks.tabGroups.update).toHaveBeenCalledWith(88, { title: 'Launch' });
     expect(result).toEqual({
       ok: true,
       data: { enabled: true, mappings: [{ virtualGroupKey: 'manual:launch', windowId: 2, chromeGroupId: 88 }] },

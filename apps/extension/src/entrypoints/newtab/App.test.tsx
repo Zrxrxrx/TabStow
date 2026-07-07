@@ -3,7 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveWorkspaceState } from '@/features/active-tabs/active-workspace-storage';
-import type { ActiveBrowserTab, ManualGroupsState } from '@/features/active-tabs/types';
+import type { ActiveBrowserTab, ActiveTabsSnapshot, ManualGroupsState } from '@/features/active-tabs/types';
 import type { AppResult } from '@/lib/errors';
 import type { ExtensionMessage, StowResult } from '@/lib/messages';
 import { App } from './App';
@@ -257,7 +257,7 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
     expect(screen().getByText('1 open')).not.toBeNull();
-    expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:list', 'sessions:list']));
+    expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:snapshot', 'sessions:list']));
 
     const mainText = container.textContent ?? '';
     expect(mainText.indexOf('Active tabs')).toBeLessThan(mainText.indexOf('No saved sessions yet.'));
@@ -434,6 +434,16 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Close extra drawer' }));
 
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
+  });
+
+  it('shows Chrome group sync as a default passive status instead of a checkbox', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+
+    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
+    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
+    expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:snapshot', 'sessions:list']));
   });
 
   it('keeps v1 layout class contract stable for CSS', async () => {
@@ -1006,6 +1016,10 @@ describe('App', () => {
   it('disables active workspace close controls and guards close reentry while a close is pending', async () => {
     const pendingClose = deferred<AppResult<{ closed: true; tabCount: number }>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: DUPLICATE_TABS, chromeGroups: [] } };
+      }
+
       if (message.type === 'active-tabs:list') {
         return { ok: true, data: DUPLICATE_TABS };
       }
@@ -1027,13 +1041,11 @@ describe('App', () => {
     const duplicateClose = screen().getByRole('button', { name: 'Close 2 duplicates' });
     const groupClose = screen().getByLabelText('Close github com tabs');
     const singleClose = screen().getByLabelText('Close openai/tabstow Issue #10');
-    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
-
     expect(duplicateClose).toHaveProperty('disabled', true);
     expect(groupClose).toHaveProperty('disabled', true);
     expect(singleClose).toHaveProperty('disabled', true);
-    expect(syncToggle).not.toBeNull();
-    expect(syncToggle).toHaveProperty('disabled', true);
+    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
+    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
     expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
     expect(closeCalls()).toHaveLength(1);
@@ -1087,6 +1099,7 @@ describe('App', () => {
       deviceId: 'device-1',
     };
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') return { ok: true, data: { tabs: activeTabs, chromeGroups: [] } };
       if (message.type === 'active-tabs:list') return { ok: true, data: activeTabs };
       if (message.type === 'sessions:list') return { ok: true, data: sessions };
       if (message.type === 'sessions:stow-tab') {
@@ -1113,7 +1126,7 @@ describe('App', () => {
       type: 'sessions:stow-tab',
       tabId: 12,
     });
-    expect(sentMessageTypes().filter((type) => type === 'active-tabs:list')).toHaveLength(2);
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
     expect(sentMessageTypes().filter((type) => type === 'sessions:list')).toHaveLength(2);
     expect(screen().getByText('0 open')).not.toBeNull();
     expect(screen().getByText('Spec draft')).not.toBeNull();
@@ -1147,7 +1160,9 @@ describe('App', () => {
       return storedWorkspace;
     });
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
-      if (message.type === 'active-tabs:list') return { ok: true, data: [UNIQUE_TAB] };
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } };
+      }
       if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
       if (message.type === 'chrome-tab-groups:sync') return { ok: true, data: syncedChromeGroups };
       throw new Error(`Unexpected message: ${message.type}`);
@@ -1187,29 +1202,6 @@ describe('App', () => {
     });
   });
 
-  it('toggles Chrome tab group sync from the active workspace controls', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-
-    await renderApp();
-    await click(screen().getByText('Sync manual groups to Chrome tab groups'));
-
-    expect(sendExtensionMessage).toHaveBeenCalledWith({
-      type: 'chrome-tab-groups:sync',
-      groups: expect.any(Array),
-      state: {
-        enabled: true,
-        mappings: [],
-      },
-    });
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      chromeTabGroups: {
-        enabled: true,
-        mappings: [],
-      },
-    });
-    expect(screen().getByText('Chrome tab groups enabled.')).not.toBeNull();
-  });
-
   it('disables Chrome group controls while the active workspace state is loading', async () => {
     const pendingWorkspace = deferred<ReturnType<typeof defaultWorkspace>>();
     mockMessages({ activeTabs: [UNIQUE_TAB] });
@@ -1217,9 +1209,9 @@ describe('App', () => {
 
     await renderApp();
 
-    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
-    expect(syncToggle).not.toBeNull();
-    expect(syncToggle).toHaveProperty('disabled', true);
+    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
+    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
+    expect(screen().getByText('Refresh Chrome groups')).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
     expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
 
@@ -1251,7 +1243,7 @@ describe('App', () => {
         assignments: {},
       },
       state: {
-        enabled: false,
+        enabled: true,
         mappings: [],
       },
     });
@@ -1261,7 +1253,7 @@ describe('App', () => {
         assignments: {},
       },
       chromeTabGroups: {
-        enabled: false,
+        enabled: true,
         mappings: [],
       },
     });
@@ -1294,6 +1286,10 @@ describe('App', () => {
   it('refreshes active tabs after stowing from saved sessions', async () => {
     let activeTabs = [UNIQUE_TAB];
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: activeTabs, chromeGroups: [] } };
+      }
+
       if (message.type === 'active-tabs:list') {
         return { ok: true, data: activeTabs };
       }
@@ -1315,13 +1311,17 @@ describe('App', () => {
 
     await click(screen().getByText('Stow current window'));
 
-    expect(sentMessageTypes().filter((type) => type === 'active-tabs:list')).toHaveLength(2);
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
     expect(screen().getByText('0 open')).not.toBeNull();
   });
 
   it('disables active workspace stow while another app action is busy', async () => {
     const pendingStow = deferred<AppResult<StowResult>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } };
+      }
+
       if (message.type === 'active-tabs:list') {
         return { ok: true, data: [UNIQUE_TAB] };
       }
@@ -1340,10 +1340,10 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByText('Stow current window'));
 
-    const syncToggle = container.querySelector<HTMLInputElement>('.active-workspace .meta-row input[type="checkbox"]');
     expect(() => screen().getByText('Stow this window')).toThrow();
-    expect(syncToggle).not.toBeNull();
-    expect(syncToggle).toHaveProperty('disabled', true);
+    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
+    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
+    expect(screen().getByText('Refresh Chrome groups')).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
     expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
 
@@ -1370,8 +1370,8 @@ describe('App', () => {
   it('guards same-frame stow reentry and only sends one stow message', async () => {
     const pendingStow = deferred<AppResult<StowResult>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
-      if (message.type === 'active-tabs:list') {
-        return { ok: true, data: [UNIQUE_TAB] };
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } };
       }
 
       if (message.type === 'sessions:list') {
@@ -1416,12 +1416,12 @@ describe('App', () => {
   });
 
   it('keeps only the latest active workspace refresh result when refreshes race', async () => {
-    const firstRefresh = deferred<AppResult<ActiveBrowserTab[]>>();
-    const secondRefresh = deferred<AppResult<ActiveBrowserTab[]>>();
+    const firstRefresh = deferred<AppResult<ActiveTabsSnapshot>>();
+    const secondRefresh = deferred<AppResult<ActiveTabsSnapshot>>();
     let refreshCount = 0;
 
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
-      if (message.type === 'active-tabs:list') {
+      if (message.type === 'active-tabs:snapshot') {
         refreshCount += 1;
         return refreshCount === 1 ? firstRefresh.promise : secondRefresh.promise;
       }
@@ -1440,13 +1440,13 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByText('Stow current window'));
 
-    secondRefresh.resolve({ ok: true, data: [] });
+    secondRefresh.resolve({ ok: true, data: { tabs: [], chromeGroups: [] } });
     await act(async () => {
       await secondRefresh.promise;
     });
     expect(screen().getByText('0 open')).not.toBeNull();
 
-    firstRefresh.resolve({ ok: true, data: [UNIQUE_TAB] });
+    firstRefresh.resolve({ ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } });
     await act(async () => {
       await firstRefresh.promise;
     });
@@ -1460,12 +1460,16 @@ function defaultWorkspace(): ActiveWorkspaceState {
   return {
     manualGroups: { groups: [], assignments: {} },
     order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
-    chromeTabGroups: { enabled: false, mappings: [] },
+    chromeTabGroups: { enabled: true, mappings: [] },
   };
 }
 
 function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveBrowserTab[]; sessions?: TabSession[] }) {
   sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+    if (message.type === 'active-tabs:snapshot') {
+      return { ok: true, data: { tabs: activeTabs, chromeGroups: [] } satisfies ActiveTabsSnapshot };
+    }
+
     if (message.type === 'active-tabs:list') {
       return { ok: true, data: activeTabs };
     }

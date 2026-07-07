@@ -122,7 +122,7 @@ export async function syncChromeTabGroups(
           }
         }
 
-        await browser.tabGroups.update(chromeGroupId, { title: group.title, collapsed: true });
+        await browser.tabGroups.update(chromeGroupId, { title: group.title });
         nextMappings.push({
           virtualGroupKey: group.key,
           windowId,
