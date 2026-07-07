@@ -4,6 +4,7 @@ import {
   type ExtensionSettings,
   type SafeSyncSettings,
   type SyncDocument,
+  type SyncedQuickLink,
   type TabSession,
 } from './schemas';
 
@@ -25,12 +26,14 @@ export function buildSyncDocument(input: {
   exportedAt: string;
   sessions: TabSession[];
   settings: ExtensionSettings;
+  quickLinks?: SyncedQuickLink[];
 }): SyncDocument {
   return syncDocumentSchema.parse({
     schemaVersion: 1,
     deviceId: input.deviceId,
     exportedAt: input.exportedAt,
     sessions: input.sessions,
+    quickLinks: input.quickLinks ?? [],
     settings: toSafeSyncSettings(input.settings),
   });
 }

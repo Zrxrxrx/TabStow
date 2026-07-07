@@ -59,6 +59,35 @@ describe('sync documents', () => {
     expect(parseSyncDocument(document).sessions).toHaveLength(1);
   });
 
+  it('builds and parses sync documents with quick links', () => {
+    const document = buildSyncDocument({
+      deviceId: 'device-1',
+      exportedAt: '2026-07-06T00:00:00.000Z',
+      sessions: [session],
+      settings,
+      quickLinks: [
+        {
+          id: 'quick-1',
+          url: 'https://example.com/',
+          label: 'Example',
+          icon: { kind: 'site', value: null },
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+      ],
+    });
+
+    expect(document.quickLinks).toEqual([
+      {
+        id: 'quick-1',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+    expect(parseSyncDocument(document).quickLinks).toHaveLength(1);
+  });
+
   it('parses legacy sync documents that still contain theme without importing it', () => {
     const document = parseSyncDocument({
       schemaVersion: 1,
