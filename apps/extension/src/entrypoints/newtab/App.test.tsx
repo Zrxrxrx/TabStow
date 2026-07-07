@@ -354,6 +354,30 @@ describe('App', () => {
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
   });
 
+  it('keeps v1 layout class contract stable for CSS', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+
+    const requiredSelectors = [
+      '.page-shell',
+      '.topbar',
+      '.brand-lockup',
+      '.mark',
+      '.quick-links-panel',
+      '.workspace-grid',
+      '.active-workspace.panel.column',
+      '.saved-sessions.panel.column',
+    ];
+
+    for (const selector of requiredSelectors) {
+      expect(container.querySelector(selector), selector).not.toBeNull();
+    }
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    expect(container.querySelector('.extra-drawer')).not.toBeNull();
+  });
+
   it('adds and removes quick links through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
@@ -553,6 +577,7 @@ describe('App', () => {
     saveTodos.mockImplementation(async (todos: unknown) => todos);
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
 
     await change(screen().getByLabelText('Palette'), 'blush');
     expect(saveThemePreferences).toHaveBeenCalledWith(
@@ -576,6 +601,7 @@ describe('App', () => {
   it('saves only a lightweight custom background token in theme preferences', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
     const backgroundInput = screen().getByLabelText('Custom background');
     const upload = new File(['small-background'], 'wallpaper.png', { type: 'image/png' });
 
@@ -606,6 +632,7 @@ describe('App', () => {
   it('rejects oversized custom background uploads before saving theme preferences', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
     const backgroundInput = screen().getByLabelText('Custom background');
     const oversizedFile = new File(['a'.repeat(129 * 1024)], 'wallpaper.png', { type: 'image/png' });
 
@@ -639,6 +666,7 @@ describe('App', () => {
     });
 
     await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
     const backgroundInput = screen().getByLabelText('Custom background');
     const upload = new File(['replacement-background'], 'replacement.png', { type: 'image/png' });
 
