@@ -406,6 +406,23 @@ describe('App', () => {
     expect(saveQuickLinks).toHaveBeenLastCalledWith([]);
   });
 
+  it('adds a quick link from a bare domain through the utility panel', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    promptSpy.mockReturnValueOnce('google.com').mockReturnValueOnce('Google');
+
+    await renderApp();
+    await click(screen().getByLabelText('Add quick link'));
+
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://google.com/',
+        label: 'Google',
+      }),
+    ]);
+    expect(screen().getByText('Google')).not.toBeNull();
+  });
+
   it('edits quick link label and icon metadata through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([

@@ -14,11 +14,17 @@ export type QuickLink = {
 };
 
 function normalizeUrl(value: string): string | null {
+  const trimmed = value.trim();
   try {
-    const url = new URL(value);
+    const url = new URL(trimmed);
     return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
   } catch {
-    return null;
+    try {
+      const url = new URL(`https://${trimmed}`);
+      return url.hostname.includes('.') ? url.toString() : null;
+    } catch {
+      return null;
+    }
   }
 }
 
