@@ -12,6 +12,7 @@ vi.mock('#imports', () => ({
 
 describe('quick link storage', () => {
   beforeEach(() => {
+    vi.resetModules();
     vi.clearAllMocks();
   });
 
@@ -98,5 +99,52 @@ describe('quick link storage', () => {
         createdAt: '2026-07-06T00:00:00.000Z',
       },
     ]);
+  });
+
+  it('serializes updates against the latest stored quick links', async () => {
+    const firstLink: QuickLink = {
+      id: 'first',
+      url: 'https://first.example/',
+      label: 'First',
+      icon: null,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    };
+    const secondLink: QuickLink = {
+      id: 'second',
+      url: 'https://second.example/',
+      label: 'Second',
+      icon: null,
+      createdAt: '2026-07-06T00:00:00.000Z',
+    };
+    let storedLinks: QuickLink[] = [];
+    let releaseFirstWrite = () => {};
+    const firstWriteStarted = new Promise<void>((resolve) => {
+      storageMocks.setItem.mockImplementationOnce(
+        () =>
+          new Promise<void>((release) => {
+            releaseFirstWrite = () => {
+              storedLinks = [firstLink];
+              release();
+            };
+            resolve();
+          }),
+      );
+    });
+    storageMocks.getItem.mockImplementation(async () => storedLinks);
+    storageMocks.setItem.mockImplementation(async (_key, links: QuickLink[]) => {
+      storedLinks = links;
+    });
+
+    const { updateQuickLinks } = await import('./quick-links-storage');
+    const firstUpdate = updateQuickLinks((currentLinks) => [...currentLinks, firstLink]);
+    const secondUpdate = updateQuickLinks((currentLinks) => [...currentLinks, secondLink]);
+
+    await firstWriteStarted;
+    expect(storedLinks).toEqual([]);
+
+    releaseFirstWrite();
+    await Promise.all([firstUpdate, secondUpdate]);
+
+    expect(storedLinks.map((link) => link.id)).toEqual(['first', 'second']);
   });
 });

@@ -18,9 +18,10 @@ const { getActiveWorkspaceState, updateActiveWorkspaceState } = vi.hoisted(() =>
   getActiveWorkspaceState: vi.fn(),
   updateActiveWorkspaceState: vi.fn(),
 }));
-const { getQuickLinks, saveQuickLinks } = vi.hoisted(() => ({
+const { getQuickLinks, saveQuickLinks, updateQuickLinks } = vi.hoisted(() => ({
   getQuickLinks: vi.fn(),
   saveQuickLinks: vi.fn(),
+  updateQuickLinks: vi.fn(),
 }));
 const { chromeRuntimeMocks } = vi.hoisted(() => ({
   chromeRuntimeMocks: {
@@ -64,6 +65,7 @@ vi.mock('@/features/active-tabs/active-workspace-storage', () => ({
 vi.mock('@/features/quick-links/quick-links-storage', () => ({
   getQuickLinks,
   saveQuickLinks,
+  updateQuickLinks,
 }));
 
 vi.mock('@/features/quick-links/quick-link-icons-cache', () => ({
@@ -182,6 +184,7 @@ describe('App', () => {
     updateActiveWorkspaceState.mockReset();
     getQuickLinks.mockReset();
     saveQuickLinks.mockReset();
+    updateQuickLinks.mockReset();
     saveQuickLinkIcon.mockReset();
     resolveQuickLinkIconUrl.mockReset();
     deleteQuickLinkIcon.mockReset();
@@ -209,6 +212,12 @@ describe('App', () => {
     );
     getQuickLinks.mockResolvedValue([]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    updateQuickLinks.mockImplementation(async (update: (currentLinks: unknown[]) => unknown[] | Promise<unknown[]>) => {
+      const currentLinks = await getQuickLinks();
+      const nextLinks = await update(currentLinks);
+      await saveQuickLinks(nextLinks);
+      return nextLinks;
+    });
     saveQuickLinkIcon.mockResolvedValue('quick-link-icon:token-1');
     resolveQuickLinkIconUrl.mockResolvedValue('blob:quick-link-icon-token-1');
     deleteQuickLinkIcon.mockResolvedValue(undefined);

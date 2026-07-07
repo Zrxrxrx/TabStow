@@ -16,7 +16,7 @@ import {
   type QuickLink,
   type QuickLinkIcon,
 } from '@/features/quick-links/quick-links';
-import { getQuickLinks, saveQuickLinks } from '@/features/quick-links/quick-links-storage';
+import { getQuickLinks, updateQuickLinks } from '@/features/quick-links/quick-links-storage';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import { FormDialog } from './FormDialog';
@@ -66,6 +66,10 @@ function canCreateQuickLink(url: string): boolean {
 
 function getImageIconToken(icon: QuickLinkIcon | null | undefined): string | null {
   return icon?.kind === 'image' ? icon.value : null;
+}
+
+function isImageIconToken(value: string | null): value is string {
+  return Boolean(value);
 }
 
 function hostnameInitial(url: string): string {
@@ -173,15 +177,16 @@ export function QuickLinks({ disabled, locale }: Props) {
 
   async function persistLinks(updateLinks: (currentLinks: QuickLink[]) => QuickLink[]) {
     if (disabledRef.current) return null;
-    const currentLinks = await getQuickLinks();
-    if (disabledRef.current) return null;
-    const previousImageTokens = new Set(currentLinks.map((link) => getImageIconToken(link.icon)).filter(Boolean));
-    const saved = await saveQuickLinks(updateLinks(currentLinks));
+    let previousImageTokens = new Set<string>();
+    const saved = await updateQuickLinks((currentLinks) => {
+      previousImageTokens = new Set(currentLinks.map((link) => getImageIconToken(link.icon)).filter(isImageIconToken));
+      return updateLinks(currentLinks);
+    });
     if (disabledRef.current) return null;
     setLinks(saved);
     setErrorMessage(null);
 
-    const nextImageTokens = new Set(saved.map((link) => getImageIconToken(link.icon)).filter(Boolean));
+    const nextImageTokens = new Set(saved.map((link) => getImageIconToken(link.icon)).filter(isImageIconToken));
     for (const token of previousImageTokens) {
       if (token && !nextImageTokens.has(token)) {
         void deleteQuickLinkIcon(token).catch(() => undefined);

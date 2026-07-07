@@ -16,6 +16,7 @@ const settingsMocks = vi.hoisted(() => ({
 const quickLinkMocks = vi.hoisted(() => ({
   getQuickLinks: vi.fn(),
   saveQuickLinks: vi.fn(),
+  updateQuickLinks: vi.fn(),
 }));
 
 const gistMocks = vi.hoisted(() => {
@@ -72,6 +73,12 @@ describe('sync service', () => {
     vi.clearAllMocks();
     quickLinkMocks.getQuickLinks.mockResolvedValue([]);
     quickLinkMocks.saveQuickLinks.mockImplementation(async (links: unknown) => links);
+    quickLinkMocks.updateQuickLinks.mockImplementation(async (update: (currentLinks: unknown[]) => unknown[] | Promise<unknown[]>) => {
+      const currentLinks = await quickLinkMocks.getQuickLinks();
+      const nextLinks = await update(currentLinks);
+      await quickLinkMocks.saveQuickLinks(nextLinks);
+      return nextLinks;
+    });
     settingsMocks.getSettings.mockResolvedValue(SETTINGS);
     settingsMocks.updateSettings.mockResolvedValue(SETTINGS);
   });

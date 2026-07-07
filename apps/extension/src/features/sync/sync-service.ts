@@ -13,7 +13,7 @@ import {
 } from '@/features/quick-links/quick-links';
 import {
   getQuickLinks,
-  saveQuickLinks,
+  updateQuickLinks,
 } from '@/features/quick-links/quick-links-storage';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
@@ -112,10 +112,11 @@ export async function pullFromGist(): Promise<AppResult<SyncResult>> {
     const content = await client.getFileContent(required.data.gistId, required.data.gistFileName);
     const document = parseSyncDocument(JSON.parse(content));
     const merged = mergeSessionsById(await listSessions(), document.sessions);
-    const mergedQuickLinks = mergeQuickLinksForPull(await getQuickLinks(), document.quickLinks);
+    const mergedQuickLinks = await updateQuickLinks((currentQuickLinks) =>
+      mergeQuickLinksForPull(currentQuickLinks, document.quickLinks),
+    );
 
     await importSessions(merged);
-    await saveQuickLinks(mergedQuickLinks);
     await updateSettings(toImportableSettings(document.settings));
 
     return ok({
