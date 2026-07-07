@@ -143,7 +143,7 @@ export function App() {
               type="button"
               className="preference-switch"
               onClick={() => void toggleLanguage()}
-              aria-label="Switch language"
+              aria-label={t(locale, 'switchLanguage')}
             >
               <Languages size={16} aria-hidden="true" />
               <span>{currentLanguageLabel}</span>
@@ -152,7 +152,7 @@ export function App() {
               type="button"
               className="preference-switch"
               onClick={() => void toggleTheme()}
-              aria-label="Switch theme"
+              aria-label={t(locale, 'switchTheme')}
               disabled={!themeControls.theme}
             >
               {currentThemeMode === 'dark' ? (
