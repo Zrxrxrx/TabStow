@@ -43,6 +43,16 @@ describe('i18n', () => {
     expect(t('zh-CN', 'syncManualGroups')).toBe('同步手动分组到 Chrome 标签页分组');
     expect(t('zh-CN', 'moveToManualGroup')).toBe('移至手动分组');
     expect(t('zh-CN', 'saveTabForLater', { label: '示例' })).toBe('保存 示例 到稍后查看');
+    expect(t('zh-CN', 'quickLinkUrl')).toBe('快捷链接网址');
+    expect(t('zh-CN', 'quickLinkLabel')).toBe('快捷链接名称');
+    expect(t('zh-CN', 'quickLinkIcon')).toBe('快捷链接图标');
+    expect(t('zh-CN', 'quickLinkIconHelp')).toBe('留空以使用网站图标。');
+    expect(t('zh-CN', 'chooseOpenTab')).toBe('选择打开的标签页');
+    expect(t('zh-CN', 'todoTitle')).toBe('待办标题');
+    expect(t('zh-CN', 'todoDetails')).toBe('待办详情');
+    expect(t('zh-CN', 'cancel')).toBe('取消');
+    expect(t('zh-CN', 'save')).toBe('保存');
+    expect(t('zh-CN', 'add')).toBe('添加');
   });
 
   it('interpolates variables in message templates', async () => {
