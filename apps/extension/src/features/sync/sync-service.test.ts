@@ -13,6 +13,11 @@ const settingsMocks = vi.hoisted(() => ({
   updateSettings: vi.fn(),
 }));
 
+const quickLinkMocks = vi.hoisted(() => ({
+  getQuickLinks: vi.fn(),
+  saveQuickLinks: vi.fn(),
+}));
+
 const gistMocks = vi.hoisted(() => {
   class GistFileNotFoundError extends Error {}
 
@@ -24,6 +29,7 @@ const gistMocks = vi.hoisted(() => {
 });
 
 vi.mock('@/db/db', () => dbMocks);
+vi.mock('@/features/quick-links/quick-links-storage', () => quickLinkMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
 vi.mock('./gist-client', () => ({
   GistClient: class {
@@ -64,6 +70,8 @@ function createSession(id: string, title: string, updatedAt: string): TabSession
 describe('sync service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    quickLinkMocks.getQuickLinks.mockResolvedValue([]);
+    quickLinkMocks.saveQuickLinks.mockImplementation(async (links: unknown) => links);
     settingsMocks.getSettings.mockResolvedValue(SETTINGS);
     settingsMocks.updateSettings.mockResolvedValue(SETTINGS);
   });
@@ -99,6 +107,7 @@ describe('sync service', () => {
       ok: true,
       data: {
         sessionCount: 3,
+        quickLinkCount: 0,
         exportedAt: expect.any(String),
       },
     });
@@ -129,6 +138,7 @@ describe('sync service', () => {
       ok: true,
       data: {
         sessionCount: 1,
+        quickLinkCount: 0,
         exportedAt: expect.any(String),
       },
     });
@@ -154,6 +164,100 @@ describe('sync service', () => {
       },
     });
     expect(gistMocks.updateFile).not.toHaveBeenCalled();
+  });
+
+  it('pushes quick links while excluding uploaded image icon tokens', async () => {
+    const localOnly = createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z');
+
+    dbMocks.exportSessions.mockResolvedValue([localOnly]);
+    quickLinkMocks.getQuickLinks.mockResolvedValue([
+      {
+        id: 'quick-image',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: { kind: 'image', value: 'quick-link-icon:local-only' },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+    gistMocks.getFileContent.mockRejectedValue(
+      new gistMocks.GistFileNotFoundError('Gist file was not found.'),
+    );
+    gistMocks.updateFile.mockResolvedValue(undefined);
+
+    const result = await pushToGist();
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sessionCount: 1,
+        quickLinkCount: 1,
+        exportedAt: expect.any(String),
+      },
+    });
+
+    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
+    expect(pushedDocument.quickLinks).toEqual([
+      {
+        id: 'quick-image',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: { kind: 'site', value: null },
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('pulls and saves merged quick links from the configured gist', async () => {
+    dbMocks.listSessions.mockResolvedValue([]);
+    dbMocks.importSessions.mockResolvedValue([]);
+    quickLinkMocks.getQuickLinks.mockResolvedValue([
+      {
+        id: 'local-only',
+        url: 'https://local.example/',
+        label: 'Local',
+        icon: null,
+        createdAt: '2026-07-06T00:00:00.000Z',
+      },
+    ]);
+    gistMocks.getFileContent.mockResolvedValue(
+      JSON.stringify({
+        schemaVersion: 1,
+        deviceId: 'remote-device',
+        exportedAt: '2026-07-09T00:00:00.000Z',
+        sessions: [],
+        quickLinks: [
+          {
+            id: 'remote-only',
+            url: 'https://remote.example/',
+            label: 'Remote',
+            icon: { kind: 'site', value: null },
+            createdAt: '2026-07-09T00:00:00.000Z',
+          },
+        ],
+        settings: {
+          deviceId: 'remote-device',
+          gistId: 'gist-1',
+          gistFileName: 'tabstow.sync.json',
+          includePinnedTabs: false,
+          closePinnedTabs: false,
+        },
+      }),
+    );
+
+    const result = await pullFromGist();
+
+    expect(quickLinkMocks.saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'remote-only', label: 'Remote' }),
+      expect.objectContaining({ id: 'local-only', label: 'Local' }),
+    ]);
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sessionCount: 0,
+        quickLinkCount: 2,
+        importedAt: expect.any(String),
+      },
+    });
   });
 
   it('classifies zod validation failures during pull as invalid sync documents', async () => {

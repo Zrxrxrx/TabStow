@@ -19,6 +19,7 @@ export type StowResult = {
 
 export type SyncResult = {
   sessionCount: number;
+  quickLinkCount: number;
   exportedAt?: string;
   importedAt?: string;
 };

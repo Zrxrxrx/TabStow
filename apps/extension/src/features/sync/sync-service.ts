@@ -6,6 +6,15 @@ import {
   toImportableSettings,
 } from '@tabstow/core';
 import { exportSessions, importSessions, listSessions } from '@/db/db';
+import {
+  mergeQuickLinksForPull,
+  mergeQuickLinksForPush,
+  toSyncedQuickLinks,
+} from '@/features/quick-links/quick-links';
+import {
+  getQuickLinks,
+  saveQuickLinks,
+} from '@/features/quick-links/quick-links-storage';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import type { SyncResult } from '@/lib/messages';
@@ -37,9 +46,11 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
     if (!required.ok) return required;
 
     const localSessions = await exportSessions();
+    const localQuickLinks = await getQuickLinks();
     const exportedAt = new Date().toISOString();
     const client = new GistClient(required.data.githubToken);
     let sessionsToPush = localSessions;
+    let quickLinksToPush = localQuickLinks;
 
     try {
       const remoteContent = await client.getFileContent(
@@ -48,6 +59,7 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
       );
       const remoteDocument = parseSyncDocument(JSON.parse(remoteContent));
       sessionsToPush = mergeSessionsById(remoteDocument.sessions, localSessions);
+      quickLinksToPush = mergeQuickLinksForPush(remoteDocument.quickLinks, localQuickLinks);
     } catch (error) {
       if (!(error instanceof GistFileNotFoundError)) {
         if (error instanceof SyntaxError) {
@@ -70,6 +82,7 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
       deviceId: settings.deviceId,
       exportedAt,
       sessions: sessionsToPush,
+      quickLinks: toSyncedQuickLinks(quickLinksToPush),
       settings,
     });
 
@@ -79,7 +92,11 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
       JSON.stringify(document, null, 2),
     );
 
-    return ok({ sessionCount: sessionsToPush.length, exportedAt });
+    return ok({
+      sessionCount: sessionsToPush.length,
+      quickLinkCount: quickLinksToPush.length,
+      exportedAt,
+    });
   } catch (error) {
     return err('github-api-error', toErrorMessage(error));
   }
@@ -95,12 +112,15 @@ export async function pullFromGist(): Promise<AppResult<SyncResult>> {
     const content = await client.getFileContent(required.data.gistId, required.data.gistFileName);
     const document = parseSyncDocument(JSON.parse(content));
     const merged = mergeSessionsById(await listSessions(), document.sessions);
+    const mergedQuickLinks = mergeQuickLinksForPull(await getQuickLinks(), document.quickLinks);
 
     await importSessions(merged);
+    await saveQuickLinks(mergedQuickLinks);
     await updateSettings(toImportableSettings(document.settings));
 
     return ok({
       sessionCount: merged.length,
+      quickLinkCount: mergedQuickLinks.length,
       importedAt: new Date().toISOString(),
     });
   } catch (error) {
