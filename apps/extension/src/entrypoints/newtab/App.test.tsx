@@ -209,7 +209,7 @@ describe('App', () => {
     getTodos.mockResolvedValue([]);
     saveTodos.mockImplementation(async (todos: unknown) => todos);
     getThemePreferences.mockResolvedValue({
-      mode: 'system',
+      mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 92,
       customBackground: null,
@@ -304,6 +304,56 @@ describe('App', () => {
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
     expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+  });
+
+  it('renders top-bar language and light-dark switches without auto or system choices', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getLanguagePreference.mockResolvedValue('en');
+    getThemePreferences.mockResolvedValue({
+      mode: 'light',
+      paletteId: 'paper',
+      surfaceOpacity: 92,
+      customBackground: null,
+    });
+    saveLanguagePreference.mockImplementation(async (language: unknown) => language);
+    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
+      mode: (preferences as { mode: 'light' | 'dark' }).mode,
+      paletteId: 'paper',
+      surfaceOpacity: 92,
+      customBackground: null,
+    }));
+
+    await renderApp();
+
+    const languageSwitch = screen().getByRole('button', { name: 'Switch language' });
+    const themeSwitch = screen().getByRole('button', { name: 'Switch theme' });
+    expect(languageSwitch.querySelector('svg')).not.toBeNull();
+    expect(themeSwitch.querySelector('svg')).not.toBeNull();
+    expect(languageSwitch.textContent).toContain('English');
+    expect(themeSwitch.textContent).toContain('Light');
+
+    await click(languageSwitch);
+    expect(saveLanguagePreference).toHaveBeenCalledWith('zh-CN');
+    expect(document.documentElement.lang).toBe('zh-CN');
+    expect(languageSwitch.textContent).toContain('简体中文');
+
+    await click(themeSwitch);
+    expect(saveThemePreferences).toHaveBeenCalledWith(expect.objectContaining({ mode: 'dark' }));
+    expect(document.documentElement.dataset.themeMode).toBe('dark');
+
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    const languageSelect = screen().getByLabelText('语言');
+    const themeSelect = screen().getByLabelText('主题模式');
+    expect(Array.from(languageSelect.querySelectorAll('option')).map((option) => option.value)).toEqual([
+      'en',
+      'zh-CN',
+    ]);
+    expect(Array.from(themeSelect.querySelectorAll('option')).map((option) => option.value)).toEqual([
+      'light',
+      'dark',
+    ]);
+    expect(container.textContent).not.toContain('Auto');
+    expect(container.textContent).not.toContain('System');
   });
 
   it('renders migrated dashboard labels in Simplified Chinese when selected', async () => {
@@ -725,7 +775,7 @@ describe('App', () => {
     const upload = new File(['small-background'], 'wallpaper.png', { type: 'image/png' });
 
     saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
-      mode: 'system',
+      mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 92,
       customBackground: (preferences as { customBackground: string }).customBackground,
@@ -825,7 +875,7 @@ describe('App', () => {
   it('keeps a successful new background upload when old background cleanup fails', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getThemePreferences.mockResolvedValue({
-      mode: 'system',
+      mode: 'system' as never,
       paletteId: 'paper',
       surfaceOpacity: 92,
       customBackground: 'theme-bg:old-token',
@@ -835,7 +885,7 @@ describe('App', () => {
       .mockResolvedValueOnce('blob:new-token');
     saveCustomBackgroundFile.mockResolvedValue('theme-bg:new-token');
     saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
-      mode: 'system',
+      mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 92,
       customBackground: (preferences as { customBackground: string }).customBackground,

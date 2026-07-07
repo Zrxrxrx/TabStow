@@ -220,9 +220,26 @@ h3 {
 }
 
 .secondary-button,
+.preference-switch,
 .icon-button {
   background: var(--surface);
   border: 1px solid var(--border);
+}
+
+.preference-switch {
+  min-height: 38px;
+  padding: 0 10px;
+  color: var(--fg);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.preference-switch span {
+  max-width: 96px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .danger-button {
@@ -721,32 +738,6 @@ h3 {
 
 :root[data-theme-mode="dark"] {
   color-scheme: dark;
-}
-
-:root[data-theme-mode="system"] {
-  color-scheme: light dark;
-}
-
-@media (prefers-color-scheme: light) {
-  :root[data-theme-mode="system"] {
-    --bg: #ffffff;
-    --surface: #ffffff;
-    --surface-warm: #f6f8fb;
-    --fg: #111827;
-    --fg-2: #334155;
-    --muted: #64748b;
-    --meta: #2563eb;
-    --border: #d8e0ec;
-    --border-soft: #e7ecf4;
-    --accent: #2563eb;
-    --accent-on: #ffffff;
-    --success: #16a34a;
-    --warn: #d97706;
-    --danger: #dc2626;
-    --page-background: var(--bg);
-    --text-color: var(--fg);
-    --surface-rgb: 255, 255, 255;
-  }
 }
 
 :root[data-theme-palette="sage"] {

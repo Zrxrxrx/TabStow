@@ -146,7 +146,6 @@ export function ThemeControls({ controls, language, locale, onLanguageChange }: 
             value={theme.mode}
             onChange={(event) => void updateTheme({ mode: event.target.value as ThemeMode })}
           >
-            <option value="system">{t(locale, 'system')}</option>
             <option value="light">{t(locale, 'light')}</option>
             <option value="dark">{t(locale, 'dark')}</option>
           </select>
@@ -182,12 +181,11 @@ export function ThemeControls({ controls, language, locale, onLanguageChange }: 
           <span>{t(locale, 'language')}</span>
           <select
             aria-label={t(locale, 'language')}
-            value={language}
+            value={language === 'auto' ? locale : language}
             onChange={(event) => void updateLanguage(event.target.value as LanguagePreference)}
           >
-            <option value="auto">{t(locale, 'auto')}</option>
             <option value="en">English</option>
-            <option value="zh-CN">Simplified Chinese</option>
+            <option value="zh-CN">简体中文</option>
           </select>
         </label>
 

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
-import { Archive, Settings, SlidersHorizontal, X } from 'lucide-react';
+import { Archive, Languages, Moon, Settings, SlidersHorizontal, Sun, X } from 'lucide-react';
 import {
   getLanguagePreference,
   resolveLocale,
+  saveLanguagePreference,
   t,
   type LanguagePreference,
 } from '@/features/i18n/i18n';
@@ -97,6 +98,24 @@ export function App() {
     chrome.runtime.openOptionsPage();
   }
 
+  async function updateLanguage(nextLanguage: Exclude<LanguagePreference, 'auto'>) {
+    const saved = await saveLanguagePreference(nextLanguage);
+    setLanguage(saved);
+  }
+
+  async function toggleLanguage() {
+    await updateLanguage(locale === 'en' ? 'zh-CN' : 'en');
+  }
+
+  async function toggleTheme() {
+    const currentMode = themeControls.theme?.mode ?? 'light';
+    await themeControls.updateTheme({ mode: currentMode === 'dark' ? 'light' : 'dark' });
+  }
+
+  const currentThemeMode = themeControls.theme?.mode ?? 'light';
+  const currentLanguageLabel = locale === 'zh-CN' ? '简体中文' : 'English';
+  const currentThemeLabel = currentThemeMode === 'dark' ? t(locale, 'dark') : t(locale, 'light');
+
   return (
     <>
       <main className="page-shell" data-od-id="newtab-shell">
@@ -120,6 +139,29 @@ export function App() {
           />
 
           <div className="header-actions" data-od-id="topbar-actions">
+            <button
+              type="button"
+              className="preference-switch"
+              onClick={() => void toggleLanguage()}
+              aria-label={t(locale, 'switchLanguage')}
+            >
+              <Languages size={16} aria-hidden="true" />
+              <span>{currentLanguageLabel}</span>
+            </button>
+            <button
+              type="button"
+              className="preference-switch"
+              onClick={() => void toggleTheme()}
+              aria-label={t(locale, 'switchTheme')}
+              disabled={!themeControls.theme}
+            >
+              {currentThemeMode === 'dark' ? (
+                <Moon size={16} aria-hidden="true" />
+              ) : (
+                <Sun size={16} aria-hidden="true" />
+              )}
+              <span>{currentThemeLabel}</span>
+            </button>
             <button
               type="button"
               className="secondary-button"
