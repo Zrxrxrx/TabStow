@@ -39,6 +39,7 @@ type QuickLinkDialogState =
       kind: 'add-url';
       url: string;
       label: string;
+      labelEdited: boolean;
       preview: { url: string; label: string; icon: QuickLinkIcon | null } | null;
       error: string | null;
       submitting: boolean;
@@ -185,7 +186,7 @@ export function QuickLinks({ locale }: Props) {
 
   function openAddByUrlDialog() {
     setErrorMessage(null);
-    setDialog({ kind: 'add-url', url: '', label: '', preview: null, error: null, submitting: false });
+    setDialog({ kind: 'add-url', url: '', label: '', labelEdited: false, preview: null, error: null, submitting: false });
   }
 
   function fetchAddByUrlPreview() {
@@ -195,7 +196,7 @@ export function QuickLinks({ locale }: Props) {
       const preview = previewQuickLinkUrl(dialog.url);
       setDialog({
         ...dialog,
-        label: dialog.label.trim() || preview.label,
+        label: dialog.labelEdited ? dialog.label : preview.label,
         preview,
         error: null,
       });
@@ -218,7 +219,7 @@ export function QuickLinks({ locale }: Props) {
         ...links,
         createQuickLink({
           url: preview.url,
-          label: dialog.label || preview.label,
+          label: dialog.labelEdited ? dialog.label : preview.label,
           icon: preview.icon,
         }),
       ]);
@@ -506,7 +507,14 @@ export function QuickLinks({ locale }: Props) {
                 onChange={(event) => {
                   const nextUrl = event.currentTarget.value;
                   setDialog((current) =>
-                    current?.kind === 'add-url' ? { ...current, url: nextUrl, preview: null } : current,
+                    current?.kind === 'add-url'
+                      ? {
+                          ...current,
+                          url: nextUrl,
+                          label: current.labelEdited ? current.label : '',
+                          preview: null,
+                        }
+                      : current,
                   );
                 }}
                 type="text"
@@ -544,7 +552,9 @@ export function QuickLinks({ locale }: Props) {
                 className="dialog-input"
                 onChange={(event) => {
                   const nextLabel = event.currentTarget.value;
-                  setDialog((current) => (current?.kind === 'add-url' ? { ...current, label: nextLabel } : current));
+                  setDialog((current) =>
+                    current?.kind === 'add-url' ? { ...current, label: nextLabel, labelEdited: true } : current,
+                  );
                 }}
                 type="text"
                 value={dialog.label}

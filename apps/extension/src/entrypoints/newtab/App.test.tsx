@@ -615,6 +615,27 @@ describe('App', () => {
     ]);
   });
 
+  it('uses a fresh derived label when the URL changes after fetching', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'example.com/docs');
+    await click(screen().getByRole('button', { name: 'Fetch' }));
+    await change(screen().getByLabelText('Quick link URL'), 'openai.com/research');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://openai.com/research',
+        label: 'openai.com',
+        icon: { kind: 'site', value: null },
+      }),
+    ]);
+  });
+
   it('edits quick link label and icon metadata through the utility panel', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([
