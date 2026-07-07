@@ -141,7 +141,7 @@ Also update the existing `rejects persisted raw data urls for custom backgrounds
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/features/theme/theme-preferences.test.ts
+rtk bun run --cwd apps/extension test src/features/theme/theme-preferences.test.ts
 ```
 
 Expected: FAIL because `normalizeMode` still returns `system`.
@@ -169,7 +169,7 @@ function normalizeMode(value: unknown): ThemeMode {
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/features/theme/theme-preferences.test.ts
+rtk bun run --cwd apps/extension test src/features/theme/theme-preferences.test.ts
 ```
 
 Expected: PASS.
@@ -203,7 +203,7 @@ Add these English assertions to `falls back to English messages`:
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/features/i18n/i18n.test.ts
+rtk bun run --cwd apps/extension test src/features/i18n/i18n.test.ts
 ```
 
 Expected: FAIL because the new message keys are missing.
@@ -239,7 +239,7 @@ Keep `LanguagePreference = 'auto' | 'en' | 'zh-CN'` so legacy stored `auto` valu
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/features/i18n/i18n.test.ts
+rtk bun run --cwd apps/extension test src/features/i18n/i18n.test.ts
 ```
 
 Expected: PASS.
@@ -288,7 +288,7 @@ Add this test:
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/tests/manifest.test.ts
+rtk bun run --cwd apps/extension test src/tests/manifest.test.ts
 ```
 
 Expected: FAIL because `favicon` is not in `permissions`.
@@ -308,7 +308,7 @@ Do not change `host_permissions`.
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/features/theme/theme-preferences.test.ts src/features/i18n/i18n.test.ts src/tests/manifest.test.ts
+rtk bun run --cwd apps/extension test src/features/theme/theme-preferences.test.ts src/features/i18n/i18n.test.ts src/tests/manifest.test.ts
 ```
 
 Expected: PASS.
@@ -402,7 +402,7 @@ In `apps/extension/src/entrypoints/newtab/App.test.tsx`, add this test after `re
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx -t "renders top-bar language"
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx -t "renders top-bar language"
 ```
 
 Expected: FAIL because the top-bar switch buttons do not exist and Appearance still contains `auto`/`system`.
@@ -602,7 +602,7 @@ Update `saveThemePreferences` mocks that return `mode: 'system'` to return `mode
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx -t "renders top-bar language"
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx -t "renders top-bar language"
 ```
 
 Expected: PASS.
@@ -612,7 +612,7 @@ Expected: PASS.
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx
 ```
 
 Expected: PASS.
@@ -743,7 +743,7 @@ Add this test near the quick-link image upload test:
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx -t "quick-link"
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx -t "quick-link"
 ```
 
 Expected: FAIL because quick-link controls are always visible, edit toggle is missing, and favicon images are not rendered.
@@ -914,7 +914,7 @@ Remove the old standalone `.quick-link-image-icon` block after replacing it.
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx -t "quick-link"
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx -t "quick-link"
 ```
 
 Expected: PASS for quick-link-focused tests.
@@ -924,7 +924,7 @@ Expected: PASS for quick-link-focused tests.
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx
 ```
 
 Expected: failures, if any, should be in tests still assuming quick-link edit controls exist before edit mode. Add the `Edit quick links` click to those tests only.
@@ -1004,7 +1004,7 @@ Replace it with:
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx -t "duplicate stow hint"
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx -t "duplicate stow hint"
 ```
 
 Expected: FAIL because the hint still exists.
@@ -1110,7 +1110,7 @@ Also delete this mobile block:
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test src/entrypoints/newtab/App.test.tsx -t "stow|workspace|hint"
+rtk bun run --cwd apps/extension test src/entrypoints/newtab/App.test.tsx -t "stow|workspace|hint"
 ```
 
 Expected: PASS.
@@ -1142,7 +1142,7 @@ Expected: commit succeeds.
 Run:
 
 ```bash
-rtk bun --cwd apps/extension run test
+rtk bun run --cwd apps/extension test
 ```
 
 Expected: PASS.
@@ -1194,7 +1194,7 @@ Expected: commit succeeds when cleanup changes exist. If no cleanup changes exis
 Include these exact results in the implementation summary:
 
 ```text
-bun --cwd apps/extension run test: PASS
+bun run --cwd apps/extension test: PASS
 bun run test: PASS
 bun run typecheck: PASS
 ```
