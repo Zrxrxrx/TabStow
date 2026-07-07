@@ -1172,9 +1172,19 @@ describe('App', () => {
       'https://docs.example.com/favicon.ico',
     );
     expect(screen().getByRole('button', { name: 'Restore all' })).not.toBeNull();
-    expect(container.querySelector<HTMLAnchorElement>('a.saved-tab-row')?.getAttribute('href')).toBe(
-      'https://docs.example.com/path',
-    );
+    const savedTabLink = container.querySelector<HTMLAnchorElement>('a.saved-tab-row');
+    expect(savedTabLink?.getAttribute('href')).toBe('https://docs.example.com/path');
+    expect(savedTabLink?.getAttribute('target')).toBe('_blank');
+    expect(savedTabLink?.querySelector('img.saved-tab-favicon')).not.toBeNull();
+
+    await act(async () => {
+      savedTabLink?.querySelector<HTMLImageElement>('img.saved-tab-favicon')?.dispatchEvent(
+        new Event('error', { bubbles: true }),
+      );
+    });
+
+    expect(savedTabLink?.querySelector('img.saved-tab-favicon')).toBeNull();
+    expect(screen().getByText('E')).not.toBeNull();
   });
 
   it('migrates a stored disabled Chrome group sync state on load', async () => {

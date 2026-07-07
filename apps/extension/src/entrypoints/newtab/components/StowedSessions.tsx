@@ -1,5 +1,5 @@
 import { RefreshCcw, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { StatusMessage } from '@/components/StatusMessage';
 import { t, type Locale } from '@/features/i18n/i18n';
@@ -43,17 +43,27 @@ function faviconUrlForSavedTab(tab: TabSession['tabs'][number]): string | null {
   }
 }
 
+function savedTabFallbackLabel(tab: TabSession['tabs'][number]): string {
+  return (tab.title.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase();
+}
+
 function SavedTabFavicon({ tab }: { tab: TabSession['tabs'][number] }) {
-  const src = faviconUrlForSavedTab(tab);
+  const [failed, setFailed] = useState(false);
+  const src = failed ? null : faviconUrlForSavedTab(tab);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [tab.favIconUrl, tab.url]);
+
   if (!src) {
     return (
       <span className="favicon tone-blue saved-tab-fallback" aria-hidden="true">
-        {(tab.title.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
+        {savedTabFallbackLabel(tab)}
       </span>
     );
   }
 
-  return <img alt="" aria-hidden="true" className="saved-tab-favicon" src={src} />;
+  return <img alt="" aria-hidden="true" className="saved-tab-favicon" onError={() => setFailed(true)} src={src} />;
 }
 
 export function StowedSessions({
