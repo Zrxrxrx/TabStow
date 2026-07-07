@@ -31,8 +31,6 @@ function formatDate(value: string): string {
 }
 
 function faviconUrlForSavedTab(tab: TabSession['tabs'][number]): string | null {
-  if (tab.favIconUrl) return tab.favIconUrl;
-
   try {
     const url = new URL(tab.url);
     if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
@@ -53,7 +51,7 @@ function SavedTabFavicon({ tab }: { tab: TabSession['tabs'][number] }) {
 
   useEffect(() => {
     setFailed(false);
-  }, [tab.favIconUrl, tab.url]);
+  }, [tab.url]);
 
   if (!src) {
     return (
@@ -101,7 +99,7 @@ export function StowedSessions({
             void onRunAction<SyncResult>(
               'sync-pull',
               () => sendExtensionMessage<AppResult<SyncResult>>({ type: 'sync:pull' }),
-              (result) => `Pulled ${result.sessionCount} sessions from Gist.`,
+              (result) => `Pulled ${result.sessionCount} sessions and ${result.quickLinkCount} quick links from Gist.`,
             )
           }
           disabled={busyAction !== null}
@@ -116,7 +114,7 @@ export function StowedSessions({
             void onRunAction<SyncResult>(
               'sync-push',
               () => sendExtensionMessage<AppResult<SyncResult>>({ type: 'sync:push' }),
-              (result) => `Pushed ${result.sessionCount} sessions to Gist.`,
+              (result) => `Pushed ${result.sessionCount} sessions and ${result.quickLinkCount} quick links to Gist.`,
             )
           }
           disabled={busyAction !== null}

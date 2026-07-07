@@ -1192,7 +1192,7 @@ describe('App', () => {
             id: 'saved-tab-1',
             title: 'Example Docs',
             url: 'https://docs.example.com/path',
-            favIconUrl: 'https://docs.example.com/favicon.ico',
+            favIconUrl: 'https://tracker.evil.example/favicon.ico',
             createdAt: '2026-07-07T00:00:00.000Z',
           },
           {
@@ -1219,7 +1219,7 @@ describe('App', () => {
     expect(screen().getByText('https://blog.example.com/post')).not.toBeNull();
     expect(container.querySelectorAll('.saved-tab-row')).toHaveLength(2);
     expect(container.querySelector<HTMLImageElement>('img.saved-tab-favicon')?.getAttribute('src')).toBe(
-      'https://docs.example.com/favicon.ico',
+      'chrome-extension://tabstow-test/_favicon/?pageUrl=https%3A%2F%2Fdocs.example.com%2Fpath&size=32',
     );
     expect(screen().getByRole('button', { name: 'Restore all' })).not.toBeNull();
     const savedTabLink = container.querySelector<HTMLAnchorElement>('a.saved-tab-row');
@@ -1322,6 +1322,88 @@ describe('App', () => {
     expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
       chromeTabGroups: syncedChromeGroups,
     });
+  });
+
+  it('keeps native Chrome group membership when syncing after manual group changes', async () => {
+    const manualTab: ActiveBrowserTab = {
+      active: true,
+      groupId: -1,
+      id: 12,
+      index: 0,
+      pinned: false,
+      title: 'Spec draft',
+      url: 'https://docs.example.com/spec',
+      windowId: 4,
+    };
+    const chromeGroupedTab: ActiveBrowserTab = {
+      active: false,
+      groupId: 31,
+      id: 21,
+      index: 1,
+      pinned: false,
+      title: 'Issue tracker',
+      url: 'https://github.com/openai/tabstow/issues/10',
+      windowId: 4,
+    };
+    let storedWorkspace: ActiveWorkspaceState = {
+      ...defaultWorkspace(),
+      manualGroups: {
+        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
+        assignments: { '12': 'manual-1', '21': 'manual-1' },
+      },
+    };
+    getActiveWorkspaceState.mockImplementation(async () => storedWorkspace);
+    updateActiveWorkspaceState.mockImplementation(async (partial: Partial<ReturnType<typeof defaultWorkspace>>) => {
+      storedWorkspace = {
+        ...storedWorkspace,
+        ...partial,
+        manualGroups: partial.manualGroups ?? storedWorkspace.manualGroups,
+        order: partial.order ?? storedWorkspace.order,
+        chromeTabGroups: partial.chromeTabGroups ?? storedWorkspace.chromeTabGroups,
+      };
+      return storedWorkspace;
+    });
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return {
+          ok: true,
+          data: {
+            tabs: [manualTab, chromeGroupedTab],
+            chromeGroups: [{ id: 31, windowId: 4, title: 'Reading', color: 'blue', collapsed: false }],
+          },
+        };
+      }
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'chrome-tab-groups:sync') return { ok: true, data: message.state };
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    await click(screen().getByLabelText('Move to domain group'));
+
+    const syncCall = sendExtensionMessage.mock.calls
+      .map(([message]) => message as ExtensionMessage)
+      .find((message) => message.type === 'chrome-tab-groups:sync') as Extract<
+      ExtensionMessage,
+      { type: 'chrome-tab-groups:sync' }
+    >;
+
+    expect(syncCall).toMatchObject({
+      type: 'chrome-tab-groups:sync',
+      groups: expect.arrayContaining([
+        expect.objectContaining({
+          kind: 'domain',
+          tabs: [expect.objectContaining({ id: 12 })],
+        }),
+        expect.objectContaining({
+          key: 'chrome:4:31',
+          kind: 'chrome',
+          title: 'Reading',
+          tabs: [expect.objectContaining({ id: 21 })],
+        }),
+      ]),
+    });
+    expect(syncCall.groups).not.toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'manual' })]));
   });
 
   it('clears a manual group assignment when moving a tab back to its domain group', async () => {
@@ -1596,6 +1678,62 @@ describe('App', () => {
 
     expect(screen().getByText('0 open')).not.toBeNull();
     expect(container.textContent).not.toContain('1 open');
+  });
+
+  it('preserves pulled quick links when adding a new link from stale new-tab state', async () => {
+    let storedQuickLinks = [] as Awaited<ReturnType<typeof getQuickLinks>>;
+    getQuickLinks.mockImplementation(async () => storedQuickLinks);
+    saveQuickLinks.mockImplementation(async (links: typeof storedQuickLinks) => {
+      storedQuickLinks = links;
+      return links;
+    });
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot };
+      }
+
+      if (message.type === 'active-tabs:list') {
+        return { ok: true, data: [UNIQUE_TAB] };
+      }
+
+      if (message.type === 'sessions:list') {
+        return { ok: true, data: SESSIONS };
+      }
+
+      if (message.type === 'sync:pull') {
+        storedQuickLinks = [
+          {
+            id: 'remote-1',
+            url: 'https://remote.example/',
+            label: 'Remote',
+            icon: null,
+            createdAt: '2026-07-07T00:00:00.000Z',
+          },
+        ];
+        return {
+          ok: true,
+          data: { sessionCount: 0, quickLinkCount: 1, importedAt: '2026-07-08T00:00:00.000Z' },
+        };
+      }
+
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Pull' }));
+    expect(screen().getByRole('status').textContent).toBe('Pulled 0 sessions and 1 quick links from Gist.');
+
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+    await click(screen().getByLabelText('Add quick link'));
+    await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
+    await click(screen().getByRole('button', { name: 'Fetch' }));
+    await change(screen().getByLabelText('Quick link label'), 'Example');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(saveQuickLinks).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: 'remote-1', label: 'Remote' }),
+      expect.objectContaining({ url: 'https://example.com/', label: 'Example' }),
+    ]);
   });
 });
 

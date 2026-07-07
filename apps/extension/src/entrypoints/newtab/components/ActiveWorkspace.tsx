@@ -191,7 +191,7 @@ export function ActiveWorkspace({
         ? nextWorkspace
         : await updateActiveWorkspaceState({ chromeTabGroups: syncedInputWorkspace.chromeTabGroups });
     if (workspaceForSync !== nextWorkspace) setWorkspace(workspaceForSync);
-    const nextGroups = buildActiveTabGroups(tabs, nextWorkspace.manualGroups, nextWorkspace.order);
+    const nextGroups = buildActiveTabGroups(tabs, nextWorkspace.manualGroups, nextWorkspace.order, chromeGroups);
     const response = await sendExtensionMessage<AppResult<ActiveWorkspaceState['chromeTabGroups']>>({
       type: 'chrome-tab-groups:sync',
       groups: nextGroups,
