@@ -26,6 +26,12 @@ describe('i18n', () => {
 
     expect(t('en', 'stowCurrentWindow')).toBe('Stow current window');
     expect(t('zh-CN', 'stowCurrentWindow')).toBe('收起当前窗口');
+    expect(t('en', 'switchLanguage')).toBe('Switch language');
+    expect(t('en', 'switchTheme')).toBe('Switch theme');
+    expect(t('en', 'editQuickLinksMode')).toBe('Edit quick links');
+    expect(t('en', 'showQuickLinksMode')).toBe('Show quick links');
+    expect(t('en', 'lightMode')).toBe('Light mode');
+    expect(t('en', 'darkMode')).toBe('Dark mode');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -53,6 +59,12 @@ describe('i18n', () => {
     expect(t('zh-CN', 'cancel')).toBe('取消');
     expect(t('zh-CN', 'save')).toBe('保存');
     expect(t('zh-CN', 'add')).toBe('添加');
+    expect(t('zh-CN', 'switchLanguage')).toBe('切换语言');
+    expect(t('zh-CN', 'switchTheme')).toBe('切换主题');
+    expect(t('zh-CN', 'editQuickLinksMode')).toBe('编辑快捷链接');
+    expect(t('zh-CN', 'showQuickLinksMode')).toBe('显示快捷链接');
+    expect(t('zh-CN', 'lightMode')).toBe('浅色模式');
+    expect(t('zh-CN', 'darkMode')).toBe('深色模式');
   });
 
   it('interpolates variables in message templates', async () => {

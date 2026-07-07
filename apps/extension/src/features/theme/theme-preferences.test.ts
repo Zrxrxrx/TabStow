@@ -51,11 +51,17 @@ describe('theme preferences', () => {
     const { getThemePreferences } = await import('./theme-preferences');
 
     await expect(getThemePreferences()).resolves.toEqual({
-      mode: 'system',
+      mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 35,
       customBackground: null,
     });
+  });
+
+  it('normalizes legacy system theme mode to light', async () => {
+    const { normalizeThemePreferences } = await import('./theme-preferences');
+
+    expect(normalizeThemePreferences({ mode: 'system' as never }).mode).toBe('light');
   });
 
   it('normalizes before saving and returns normalized theme preferences', async () => {
@@ -90,7 +96,7 @@ describe('theme preferences', () => {
         customBackground: 'data:image/png;base64,abc',
       }),
     ).toEqual({
-      mode: 'system',
+      mode: 'light',
       paletteId: 'paper',
       surfaceOpacity: 92,
       customBackground: null,

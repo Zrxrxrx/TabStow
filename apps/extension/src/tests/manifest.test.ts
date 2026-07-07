@@ -8,6 +8,7 @@ const manifest = config.manifest as
         default_popup?: unknown;
       };
       permissions?: string[];
+      host_permissions?: string[];
     }
   | undefined;
 
@@ -21,8 +22,15 @@ describe('extension manifest', () => {
 
   it('uses the approved permissions for this migration', () => {
     expect(manifest?.permissions).toEqual(
-      expect.arrayContaining(['tabs', 'storage', 'contextMenus', 'tabGroups', 'search']),
+      expect.arrayContaining(['tabs', 'storage', 'contextMenus', 'tabGroups', 'search', 'favicon']),
     );
     expect(manifest?.permissions).not.toContain('clipboardRead');
+  });
+
+  it('keeps host permissions narrow while enabling Chrome favicon resolution', () => {
+    expect(manifest?.host_permissions).toEqual([
+      'https://api.github.com/*',
+      'https://gist.githubusercontent.com/*',
+    ]);
   });
 });

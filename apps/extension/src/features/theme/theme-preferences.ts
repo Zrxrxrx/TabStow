@@ -2,13 +2,13 @@ import { storage } from '#imports';
 import { isThemeBackgroundToken } from './theme-background-cache';
 
 const THEME_KEY = 'local:tabstow-theme-preferences';
-const VALID_MODES = new Set(['system', 'light', 'dark']);
+const VALID_MODES = new Set(['light', 'dark']);
 const VALID_PALETTES = new Set(['paper', 'sage', 'mist', 'blush']);
 const MIN_SURFACE_OPACITY = 35;
 const MAX_SURFACE_OPACITY = 100;
 const DEFAULT_SURFACE_OPACITY = 92;
 
-export type ThemeMode = 'system' | 'light' | 'dark';
+export type ThemeMode = 'light' | 'dark';
 export type ThemePaletteId = 'paper' | 'sage' | 'mist' | 'blush';
 
 export type ThemePreferences = {
@@ -19,7 +19,7 @@ export type ThemePreferences = {
 };
 
 function normalizeMode(value: unknown): ThemeMode {
-  return typeof value === 'string' && VALID_MODES.has(value) ? (value as ThemeMode) : 'system';
+  return typeof value === 'string' && VALID_MODES.has(value) ? (value as ThemeMode) : 'light';
 }
 
 function normalizePaletteId(value: unknown): ThemePaletteId {
