@@ -1237,6 +1237,47 @@ describe('App', () => {
     expect(screen().getByText('E')).not.toBeNull();
   });
 
+  it('renders imported non-http saved tabs as inert rows without hrefs', async () => {
+    const sessions: TabSession[] = [
+      {
+        id: 'session-1',
+        title: '2 tabs stowed',
+        tabs: [
+          {
+            id: 'saved-tab-1',
+            title: 'Unsafe Import',
+            url: 'javascript:alert(1)',
+            createdAt: '2026-07-07T00:00:00.000Z',
+          },
+          {
+            id: 'saved-tab-2',
+            title: 'Safe Docs',
+            url: 'https://docs.example.com/path',
+            createdAt: '2026-07-07T00:00:00.000Z',
+          },
+        ],
+        sourceWindowId: 4,
+        createdAt: '2026-07-07T00:00:00.000Z',
+        updatedAt: '2026-07-07T00:00:00.000Z',
+        deviceId: 'device-1',
+      },
+    ];
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions });
+
+    await renderApp();
+
+    expect(screen().getByText('Unsafe Import')).not.toBeNull();
+    expect(screen().getByText('javascript:alert(1)')).not.toBeNull();
+    expect(container.querySelectorAll('.saved-tab-row')).toHaveLength(2);
+    expect(container.querySelectorAll('a.saved-tab-row')).toHaveLength(1);
+    const unsafeRow = screen().getByText('Unsafe Import').closest('.saved-tab-row');
+    const safeRow = screen().getByText('Safe Docs').closest('.saved-tab-row');
+    expect(unsafeRow?.tagName).toBe('DIV');
+    expect(unsafeRow?.getAttribute('href')).toBeNull();
+    expect(safeRow?.tagName).toBe('A');
+    expect(safeRow?.getAttribute('href')).toBe('https://docs.example.com/path');
+  });
+
   it('migrates a stored disabled Chrome group sync state on load', async () => {
     const legacyChromeTabGroups: ActiveWorkspaceState['chromeTabGroups'] = {
       enabled: false,

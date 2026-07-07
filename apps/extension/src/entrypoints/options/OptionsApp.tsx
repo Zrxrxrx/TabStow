@@ -180,7 +180,11 @@ export function OptionsApp() {
           type="button"
           className="secondary-button"
           onClick={() =>
-            void runSync('pull', 'sync:pull', (result) => `Pulled ${result.sessionCount} sessions.`)
+            void runSync(
+              'pull',
+              'sync:pull',
+              (result) => `Pulled ${result.sessionCount} sessions and ${result.quickLinkCount} quick links.`,
+            )
           }
           disabled={busyAction !== null}
         >
@@ -191,7 +195,11 @@ export function OptionsApp() {
           type="button"
           className="secondary-button"
           onClick={() =>
-            void runSync('push', 'sync:push', (result) => `Pushed ${result.sessionCount} sessions.`)
+            void runSync(
+              'push',
+              'sync:push',
+              (result) => `Pushed ${result.sessionCount} sessions and ${result.quickLinkCount} quick links.`,
+            )
           }
           disabled={busyAction !== null}
         >

@@ -33,11 +33,20 @@ function formatDate(value: string): string {
 function faviconUrlForSavedTab(tab: TabSession['tabs'][number]): string | null {
   try {
     const url = new URL(tab.url);
-    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (!isSafeSavedTabUrl(tab.url)) return null;
     if (typeof chrome === 'undefined' || typeof chrome.runtime?.getURL !== 'function') return null;
     return chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url.toString())}&size=32`);
   } catch {
     return null;
+  }
+}
+
+function isSafeSavedTabUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
   }
 }
 
@@ -62,6 +71,39 @@ function SavedTabFavicon({ tab }: { tab: TabSession['tabs'][number] }) {
   }
 
   return <img alt="" aria-hidden="true" className="saved-tab-favicon" onError={() => setFailed(true)} src={src} />;
+}
+
+function SavedTabRow({ locale, tab }: { locale: Locale; tab: TabSession['tabs'][number] }) {
+  const content = (
+    <>
+      <SavedTabFavicon tab={tab} />
+      <span className="tab-copy">
+        <span className="tab-title">{tab.title || tab.url}</span>
+        <span className="tab-url">{tab.url}</span>
+      </span>
+    </>
+  );
+
+  if (!isSafeSavedTabUrl(tab.url)) {
+    return (
+      <div className="saved-tab-row" key={tab.id}>
+        {content}
+      </div>
+    );
+  }
+
+  return (
+    <a
+      className="saved-tab-row"
+      href={tab.url}
+      key={tab.id}
+      target="_blank"
+      rel="noreferrer"
+      aria-label={t(locale, 'openSavedTab', { label: tab.title || tab.url })}
+    >
+      {content}
+    </a>
+  );
 }
 
 export function StowedSessions({
@@ -183,20 +225,7 @@ export function StowedSessions({
               </header>
               <div className="saved-tab-list">
                 {session.tabs.map((tab) => (
-                  <a
-                    className="saved-tab-row"
-                    href={tab.url}
-                    key={tab.id}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={t(locale, 'openSavedTab', { label: tab.title || tab.url })}
-                  >
-                    <SavedTabFavicon tab={tab} />
-                    <span className="tab-copy">
-                      <span className="tab-title">{tab.title || tab.url}</span>
-                      <span className="tab-url">{tab.url}</span>
-                    </span>
-                  </a>
+                  <SavedTabRow key={tab.id} locale={locale} tab={tab} />
                 ))}
               </div>
             </article>

@@ -77,7 +77,7 @@ describe('OptionsApp', () => {
     sendExtensionMessage
       .mockResolvedValueOnce({ ok: true, data: SETTINGS })
       .mockResolvedValueOnce({ ok: true, data: SETTINGS })
-      .mockResolvedValueOnce({ ok: true, data: { sessionCount: 3 } });
+      .mockResolvedValueOnce({ ok: true, data: { sessionCount: 3, quickLinkCount: 2 } });
 
     await act(async () => {
       root.render(<OptionsApp />);
@@ -97,7 +97,7 @@ describe('OptionsApp', () => {
       ],
       [{ type: 'sync:pull' }],
     ]);
-    expect(screen().getByRole('status').textContent).toBe('Pulled 3 sessions.');
+    expect(screen().getByRole('status').textContent).toBe('Pulled 3 sessions and 2 quick links.');
   });
 });
 
