@@ -26,6 +26,7 @@ export type SyncResult = {
 export type ExtensionMessage =
   | { type: 'sessions:list' }
   | { type: 'sessions:stow-current-window' }
+  | { type: 'sessions:stow-tab'; tabId: number }
   | { type: 'sessions:restore'; sessionId: string; mode: RestoreMode }
   | { type: 'sessions:delete'; sessionId: string }
   | { type: 'active-tabs:list' }

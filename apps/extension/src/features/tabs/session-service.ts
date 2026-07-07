@@ -4,7 +4,12 @@ import { getSettings } from '../settings/settings-storage';
 import { browser } from '../../lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '../../lib/errors';
 import type { RestoreMode, StowResult } from '../../lib/messages';
-import { isStowableTab, shouldCloseSavedTab, type StowableBrowserTab } from './tab-filter';
+import {
+  isBlockedTabUrl,
+  isStowableTab,
+  shouldCloseSavedTab,
+  type StowableBrowserTab,
+} from './tab-filter';
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -97,6 +102,54 @@ export async function saveCurrentWindowAsSession(windowId?: number): Promise<App
     } catch {
       // Best effort only; the session is already persisted.
     }
+
+    if (tabIdsToClose.length > 0) {
+      try {
+        await browser.tabs.remove(tabIdsToClose);
+        closedTabCount = tabIdsToClose.length;
+      } catch {
+        closedTabCount = 0;
+      }
+    }
+
+    return ok({
+      session,
+      savedTabCount: savedTabs.length,
+      closedTabCount,
+    });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
+export async function saveTabsAsSession(tabIds: number[]): Promise<AppResult<StowResult>> {
+  try {
+    const settings = await getSettings();
+    const tabs = await Promise.all(tabIds.map((tabId) => browser.tabs.get(tabId)));
+    const eligibleTabs = tabs.filter((tab) => tab.id != null && !isBlockedTabUrl(tab.url));
+
+    if (eligibleTabs.length === 0) {
+      return err('no-eligible-tabs', 'No eligible tabs were found in the selected tab.');
+    }
+
+    const createdAt = nowIso();
+    const savedTabs = eligibleTabs.map((tab) => toSavedTab(tab, createdAt));
+    const session: TabSession = {
+      id: crypto.randomUUID(),
+      title: titleFromTabs(savedTabs),
+      tabs: savedTabs,
+      sourceWindowId: eligibleTabs[0]?.windowId,
+      createdAt,
+      updatedAt: createdAt,
+      deviceId: settings.deviceId,
+    };
+
+    await createSession(session);
+
+    const tabIdsToClose = eligibleTabs
+      .map((tab) => tab.id)
+      .filter((id): id is number => typeof id === 'number');
+    let closedTabCount = 0;
 
     if (tabIdsToClose.length > 0) {
       try {

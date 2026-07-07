@@ -42,6 +42,7 @@ describe('i18n', () => {
     expect(t('zh-CN', 'customBackground')).toBe('自定义背景');
     expect(t('zh-CN', 'syncManualGroups')).toBe('同步手动分组到 Chrome 标签页分组');
     expect(t('zh-CN', 'moveToManualGroup')).toBe('移至手动分组');
+    expect(t('zh-CN', 'saveTabForLater', { label: '示例' })).toBe('保存 示例 到稍后查看');
   });
 
   it('interpolates variables in message templates', async () => {

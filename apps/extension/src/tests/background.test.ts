@@ -49,6 +49,7 @@ const actionFeedbackMocks = vi.hoisted(() => ({
 const sessionServiceMocks = vi.hoisted(() => ({
   restoreSession: vi.fn(),
   saveCurrentWindowAsSession: vi.fn(),
+  saveTabsAsSession: vi.fn(),
 }));
 
 const activeTabsMocks = vi.hoisted(() => ({
@@ -158,6 +159,20 @@ describe('background message routing', () => {
     await listener?.({ type: 'active-tabs:close', tabIds: [11, 12] }, {});
 
     expect(activeTabsMocks.closeActiveTabs).toHaveBeenCalledWith([11, 12]);
+  });
+
+  it('routes selected tab stow messages', async () => {
+    sessionServiceMocks.saveTabsAsSession.mockResolvedValue({
+      ok: true,
+      data: { session: null, savedTabCount: 1, closedTabCount: 1 },
+    });
+
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+    await listener?.({ type: 'sessions:stow-tab', tabId: 42 }, {});
+
+    expect(sessionServiceMocks.saveTabsAsSession).toHaveBeenCalledWith([42]);
   });
 
   it('routes chrome tab group sync messages', async () => {

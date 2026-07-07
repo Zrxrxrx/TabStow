@@ -823,69 +823,56 @@ describe('App', () => {
     });
   });
 
-  it('creates a manual group assignment from the prompt name', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    promptSpy.mockReturnValue('Launch');
-
-    await renderApp();
-    await click(screen().getByLabelText('Move to manual group'));
-
-    expect(updateActiveWorkspaceState).toHaveBeenCalledTimes(1);
-    expect(updateActiveWorkspaceState.mock.calls[0]?.[0]).toEqual({
-      manualGroups: {
-        groups: [
-          expect.objectContaining({
-            name: 'Launch',
-          }),
-        ],
-        assignments: {
-          '12': expect.any(String),
+  it('saves a single active tab for later from its row action', async () => {
+    let activeTabs = [UNIQUE_TAB];
+    let sessions: TabSession[] = [];
+    const savedSession: TabSession = {
+      id: 'session-1',
+      title: 'Spec draft',
+      tabs: [
+        {
+          id: 'saved-tab-1',
+          title: 'Spec draft',
+          url: 'https://docs.example.com/spec',
+          createdAt: '2026-07-07T00:00:00.000Z',
         },
-      },
-    });
-  });
-
-  it('syncs changed manual groups to Chrome groups when sync is enabled', async () => {
-    const syncedChromeGroups: ActiveWorkspaceState['chromeTabGroups'] = {
-      enabled: true,
-      mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
+      ],
+      sourceWindowId: 4,
+      createdAt: '2026-07-07T00:00:00.000Z',
+      updatedAt: '2026-07-07T00:00:00.000Z',
+      deviceId: 'device-1',
     };
-    let storedWorkspace: ActiveWorkspaceState = {
-      ...defaultWorkspace(),
-      chromeTabGroups: { enabled: true, mappings: [] },
-    };
-    getActiveWorkspaceState.mockImplementation(async () => storedWorkspace);
-    updateActiveWorkspaceState.mockImplementation(async (partial: Partial<ReturnType<typeof defaultWorkspace>>) => {
-      storedWorkspace = {
-        ...storedWorkspace,
-        ...partial,
-        manualGroups: partial.manualGroups ?? storedWorkspace.manualGroups,
-        order: partial.order ?? storedWorkspace.order,
-        chromeTabGroups: partial.chromeTabGroups ?? storedWorkspace.chromeTabGroups,
-      };
-      return storedWorkspace;
-    });
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
-      if (message.type === 'active-tabs:list') return { ok: true, data: [UNIQUE_TAB] };
-      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
-      if (message.type === 'chrome-tab-groups:sync') return { ok: true, data: syncedChromeGroups };
+      if (message.type === 'active-tabs:list') return { ok: true, data: activeTabs };
+      if (message.type === 'sessions:list') return { ok: true, data: sessions };
+      if (message.type === 'sessions:stow-tab') {
+        activeTabs = [];
+        sessions = [savedSession];
+        return {
+          ok: true,
+          data: {
+            session: savedSession,
+            savedTabCount: 1,
+            closedTabCount: 1,
+          },
+        };
+      }
       throw new Error(`Unexpected message: ${message.type}`);
     });
-    promptSpy.mockReturnValue('Launch');
 
     await renderApp();
-    await click(screen().getByLabelText('Move to manual group'));
+    expect(screen().getByText('1 open')).not.toBeNull();
+
+    await click(screen().getByLabelText('Save Spec draft for later'));
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
-      type: 'chrome-tab-groups:sync',
-      groups: expect.arrayContaining([
-        expect.objectContaining({ kind: 'manual', title: 'Launch' }),
-      ]),
-      state: expect.objectContaining({ enabled: true }),
+      type: 'sessions:stow-tab',
+      tabId: 12,
     });
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      chromeTabGroups: syncedChromeGroups,
-    });
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:list')).toHaveLength(2);
+    expect(sentMessageTypes().filter((type) => type === 'sessions:list')).toHaveLength(2);
+    expect(screen().getByText('0 open')).not.toBeNull();
+    expect(screen().getByText('Spec draft')).not.toBeNull();
   });
 
   it('syncs cleared manual groups to Chrome groups when sync is enabled', async () => {

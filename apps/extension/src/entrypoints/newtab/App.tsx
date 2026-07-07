@@ -178,6 +178,21 @@ export function App() {
                 (result) => `Stowed ${result.savedTabCount} tabs and closed ${result.closedTabCount}.`,
               )
             }
+            onStowTab={(tab) => {
+              const tabId = tab.id;
+              if (typeof tabId !== 'number') return Promise.resolve();
+
+              return runAction<StowResult>(
+                `stow-tab-${tabId}`,
+                () =>
+                  sendExtensionMessage<AppResult<StowResult>>({
+                    type: 'sessions:stow-tab',
+                    tabId,
+                  }),
+                (result) =>
+                  `Saved ${result.savedTabCount} tab for later and closed ${result.closedTabCount}.`,
+              );
+            }}
           />
 
           <StowedSessions

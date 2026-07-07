@@ -7,6 +7,7 @@ const browserMocks = vi.hoisted(() => ({
   },
   tabs: {
     create: vi.fn(),
+    get: vi.fn(),
     query: vi.fn(),
     remove: vi.fn(),
     update: vi.fn(),
@@ -33,7 +34,7 @@ vi.mock('../../db/db', () => dbMocks);
 
 vi.mock('../settings/settings-storage', () => settingsMocks);
 
-import { restoreSession, saveCurrentWindowAsSession } from './session-service';
+import { restoreSession, saveCurrentWindowAsSession, saveTabsAsSession } from './session-service';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -181,6 +182,92 @@ describe('session service', () => {
       windowId: 55,
       url: 'chrome-extension://tabstow/newtab.html',
       active: true,
+    });
+  });
+
+  it('saves a selected tab as a one-tab session and closes it', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 31,
+      windowId: 12,
+      url: 'https://example.com/article',
+      title: 'Example article',
+      favIconUrl: 'https://example.com/favicon.ico',
+      pinned: true,
+      active: false,
+    });
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => session);
+    browserMocks.tabs.remove.mockResolvedValue(undefined);
+
+    const result = await saveTabsAsSession([31]);
+
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        savedTabCount: 1,
+        closedTabCount: 1,
+        session: expect.objectContaining({
+          title: 'Example article',
+          tabs: [
+            expect.objectContaining({
+              title: 'Example article',
+              url: 'https://example.com/article',
+              favIconUrl: 'https://example.com/favicon.ico',
+              pinned: true,
+            }),
+          ],
+          sourceWindowId: 12,
+          deviceId: 'device-1',
+        }),
+      }),
+    });
+    expect(browserMocks.tabs.get).toHaveBeenCalledWith(31);
+    expect(dbMocks.createSession).toHaveBeenCalledBefore(browserMocks.tabs.remove);
+    expect(browserMocks.tabs.remove).toHaveBeenCalledWith([31]);
+  });
+
+  it('rejects blocked selected tabs without persisting or closing them', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 32,
+      windowId: 12,
+      url: 'chrome://settings',
+      title: 'Settings',
+      pinned: false,
+    });
+
+    const result = await saveTabsAsSession([32]);
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'no-eligible-tabs',
+        message: 'No eligible tabs were found in the selected tab.',
+      },
+    });
+    expect(dbMocks.createSession).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it('keeps a selected tab session when closing the saved tab fails', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 33,
+      windowId: 12,
+      url: 'https://example.com/later',
+      title: 'Read later',
+      pinned: false,
+    });
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => session);
+    browserMocks.tabs.remove.mockRejectedValue(new Error('tab removal failed'));
+
+    const result = await saveTabsAsSession([33]);
+
+    expect(dbMocks.createSession).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabs.remove).toHaveBeenCalledWith([33]);
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        savedTabCount: 1,
+        closedTabCount: 0,
+      }),
     });
   });
 

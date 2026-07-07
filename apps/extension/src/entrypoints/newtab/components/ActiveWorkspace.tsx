@@ -9,12 +9,7 @@ import {
   updateActiveWorkspaceState,
   type ActiveWorkspaceState,
 } from '@/features/active-tabs/active-workspace-storage';
-import {
-  addManualGroup,
-  assignTabToManualGroup,
-  clearTabManualGroup,
-  pruneManualGroups,
-} from '@/features/active-tabs/manual-groups';
+import { clearTabManualGroup, pruneManualGroups } from '@/features/active-tabs/manual-groups';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
@@ -27,10 +22,18 @@ type Props = {
   locale: Locale;
   onStatus: (tone: 'success' | 'error', message: string) => void;
   onStowCurrentWindow: () => Promise<void>;
+  onStowTab: (tab: ActiveBrowserTab) => Promise<void>;
   refreshKey: number;
 };
 
-export function ActiveWorkspace({ busy, locale, onStatus, onStowCurrentWindow, refreshKey }: Props) {
+export function ActiveWorkspace({
+  busy,
+  locale,
+  onStatus,
+  onStowCurrentWindow,
+  onStowTab,
+  refreshKey,
+}: Props) {
   const [tabs, setTabs] = useState<ActiveBrowserTab[]>([]);
   const [workspace, setWorkspace] = useState<ActiveWorkspaceState | null>(null);
   const [closePending, setClosePending] = useState(false);
@@ -114,22 +117,6 @@ export function ActiveWorkspace({ busy, locale, onStatus, onStowCurrentWindow, r
       windowId: tab.windowId,
     });
     if (!response.ok) onStatus('error', response.error.message);
-  }
-
-  async function createManualGroupForTab(tab: ActiveBrowserTab) {
-    if (!workspace || typeof tab.id !== 'number') return;
-    const name = window.prompt('Group name');
-    if (!name) return;
-
-    try {
-      const created = addManualGroup(workspace.manualGroups, name);
-      const manualGroups = assignTabToManualGroup(created.state, tab.id, created.group.id);
-      const nextWorkspace = await updateActiveWorkspaceState({ manualGroups });
-      setWorkspace(nextWorkspace);
-      await syncChromeGroupsForWorkspace(nextWorkspace);
-    } catch (error) {
-      onStatus('error', error instanceof Error ? error.message : 'Unable to create group.');
-    }
   }
 
   async function removeTabFromManualGroup(tab: ActiveBrowserTab) {
@@ -328,48 +315,53 @@ export function ActiveWorkspace({ busy, locale, onStatus, onStowCurrentWindow, r
               </button>
             </header>
             <div className="active-tab-list">
-              {group.tabs.map((tab) => (
-                <div className="tab-row" key={tab.id ?? tab.url}>
-                  <button className="tab-open-button" type="button" onClick={() => void focusTab(tab)}>
-                    <span className="favicon tone-blue" aria-hidden="true">
-                      {(getTabLabel(tab).match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
-                    </span>
-                    <span className="tab-copy">
-                      <span className="tab-title">{getTabLabel(tab)}</span>
-                      <span className="tab-url">{tab.url ?? ''}</span>
-                    </span>
-                  </button>
-                  <div className="row-actions">
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label={t(locale, 'moveToManualGroup')}
-                      onClick={() => void createManualGroupForTab(tab)}
-                    >
-                      <Archive size={14} aria-hidden="true" />
+              {group.tabs.map((tab) => {
+                const tabLabel = getTabLabel(tab);
+
+                return (
+                  <div className="tab-row" key={tab.id ?? tab.url}>
+                    <button className="tab-open-button" type="button" onClick={() => void focusTab(tab)}>
+                      <span className="favicon tone-blue" aria-hidden="true">
+                        {(tabLabel.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
+                      </span>
+                      <span className="tab-copy">
+                        <span className="tab-title">{tabLabel}</span>
+                        <span className="tab-url">{tab.url ?? ''}</span>
+                      </span>
                     </button>
-                    {group.kind === 'manual' && (
+                    <div className="row-actions">
                       <button
                         type="button"
                         className="icon-button"
-                        aria-label={t(locale, 'moveToDomainGroup')}
-                        onClick={() => void removeTabFromManualGroup(tab)}
+                        aria-label={t(locale, 'saveTabForLater', { label: tabLabel })}
+                        onClick={() => void onStowTab(tab)}
+                        disabled={closeDisabled || typeof tab.id !== 'number'}
                       >
-                        <X size={14} aria-hidden="true" />
+                        <Archive size={14} aria-hidden="true" />
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      className="icon-button"
-                      aria-label={`Close ${getTabLabel(tab)}`}
-                      onClick={() => typeof tab.id === 'number' && void closeTabs([tab.id])}
-                      disabled={closeDisabled}
-                    >
-                      <Trash2 size={14} aria-hidden="true" />
-                    </button>
+                      {group.kind === 'manual' && (
+                        <button
+                          type="button"
+                          className="icon-button"
+                          aria-label={t(locale, 'moveToDomainGroup')}
+                          onClick={() => void removeTabFromManualGroup(tab)}
+                        >
+                          <X size={14} aria-hidden="true" />
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        className="icon-button"
+                        aria-label={`Close ${tabLabel}`}
+                        onClick={() => typeof tab.id === 'number' && void closeTabs([tab.id])}
+                        disabled={closeDisabled}
+                      >
+                        <Trash2 size={14} aria-hidden="true" />
+                      </button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </article>
         ))}

@@ -17,7 +17,11 @@ import {
 import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
-import { restoreSession, saveCurrentWindowAsSession } from '@/features/tabs/session-service';
+import {
+  restoreSession,
+  saveCurrentWindowAsSession,
+  saveTabsAsSession,
+} from '@/features/tabs/session-service';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { browser } from '@/lib/browser';
 import type { ExtensionMessage } from '@/lib/messages';
@@ -32,6 +36,8 @@ async function handleMessage(
         return ok(await listSessions());
       case 'sessions:stow-current-window':
         return saveCurrentWindowAsSession(sender?.tab?.windowId);
+      case 'sessions:stow-tab':
+        return saveTabsAsSession([message.tabId]);
       case 'sessions:restore':
         return restoreSession(message.sessionId, message.mode);
       case 'sessions:delete':
