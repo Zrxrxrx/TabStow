@@ -45,6 +45,15 @@ type QuickLinkDialogState =
     }
   | null;
 
+function canCreateQuickLink(url: string): boolean {
+  try {
+    createQuickLink({ url });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function getImageIconToken(icon: QuickLinkIcon | null | undefined): string | null {
   return icon?.kind === 'image' ? icon.value : null;
 }
@@ -155,7 +164,7 @@ export function QuickLinks({ locale }: Props) {
     }
 
     const choices = response.data
-      .filter((tab) => typeof tab.url === 'string' && tab.url.length > 0)
+      .filter((tab) => typeof tab.url === 'string' && tab.url.length > 0 && canCreateQuickLink(tab.url))
       .map((tab) => ({
         key: String(tab.id ?? tab.url ?? getTabLabel(tab)),
         tab,
@@ -170,18 +179,26 @@ export function QuickLinks({ locale }: Props) {
   }
 
   async function submitOpenTabChoice(choice: OpenTabChoice) {
-    if (!dialog || dialog.kind !== 'open-tabs' || !choice.tab.url) return;
-    setDialog({ ...dialog, error: null, submittingKey: choice.key });
+    if (!choice.tab.url) return;
+    setDialog((current) =>
+      current?.kind === 'open-tabs'
+        ? { ...current, error: null, selectedKey: choice.key, submittingKey: choice.key }
+        : current,
+    );
 
     try {
       await persistLinks([...links, createQuickLink({ url: choice.tab.url, label: getTabLabel(choice.tab) })]);
       setDialog(null);
     } catch (error) {
-      setDialog({
-        ...dialog,
-        error: error instanceof Error ? error.message : 'Quick link URL is invalid.',
-        submittingKey: null,
-      });
+      setDialog((current) =>
+        current?.kind === 'open-tabs'
+          ? {
+              ...current,
+              error: error instanceof Error ? error.message : 'Quick link URL is invalid.',
+              submittingKey: null,
+            }
+          : current,
+      );
     }
   }
 
@@ -482,9 +499,6 @@ export function QuickLinks({ locale }: Props) {
                   disabled={dialog.submittingKey !== null}
                   key={choice.key}
                   onClick={() => {
-                    setDialog((current) =>
-                      current?.kind === 'open-tabs' ? { ...current, selectedKey: choice.key } : current,
-                    );
                     void submitOpenTabChoice(choice);
                   }}
                 >

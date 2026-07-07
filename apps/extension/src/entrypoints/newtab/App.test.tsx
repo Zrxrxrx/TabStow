@@ -151,6 +151,16 @@ const UNIQUE_TAB: ActiveBrowserTab = {
   url: 'https://docs.example.com/spec',
   windowId: 4,
 };
+const INVALID_QUICK_LINK_TAB: ActiveBrowserTab = {
+  active: false,
+  groupId: -1,
+  id: 13,
+  index: 0,
+  pinned: false,
+  title: 'Settings',
+  url: 'chrome://settings',
+  windowId: 4,
+};
 
 let container: HTMLDivElement;
 let root: Root;
@@ -428,12 +438,13 @@ describe('App', () => {
   });
 
   it('adds a quick link from an open-tab chooser', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    mockMessages({ activeTabs: [INVALID_QUICK_LINK_TAB, UNIQUE_TAB] });
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
 
     await renderApp();
     await click(screen().getByRole('button', { name: 'Add open tab' }));
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
+    expect(() => screen().getByRole('button', { name: 'Settings' })).toThrow();
     await click(screen().getByRole('button', { name: 'Add' }));
 
     expect(promptSpy).not.toHaveBeenCalled();
