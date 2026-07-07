@@ -650,6 +650,24 @@ h3 {
   gap: 8px;
 }
 
+.open-tab-chooser {
+  display: grid;
+  gap: 8px;
+}
+
+.open-tab-choice {
+  width: 100%;
+  min-width: 0;
+  min-height: 52px;
+  justify-content: flex-start;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 10px;
+  border: 1px solid var(--border);
+  background: var(--surface-warm);
+  text-align: left;
+}
+
 .extra-drawer-backdrop {
   position: fixed;
   inset: 0;
