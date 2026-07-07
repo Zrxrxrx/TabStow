@@ -30,19 +30,30 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function domainFromUrl(url: string): string {
+function faviconUrlForSavedTab(tab: TabSession['tabs'][number]): string | null {
+  if (tab.favIconUrl) return tab.favIconUrl;
+
   try {
-    return new URL(url).hostname.replace(/^www\./, '');
+    const url = new URL(tab.url);
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    if (typeof chrome === 'undefined' || typeof chrome.runtime?.getURL !== 'function') return null;
+    return chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url.toString())}&size=32`);
   } catch {
-    return url;
+    return null;
   }
 }
 
-function sessionPreview(session: TabSession): string {
-  return session.tabs
-    .slice(0, 4)
-    .map((tab) => tab.title || domainFromUrl(tab.url))
-    .join(' · ');
+function SavedTabFavicon({ tab }: { tab: TabSession['tabs'][number] }) {
+  const src = faviconUrlForSavedTab(tab);
+  if (!src) {
+    return (
+      <span className="favicon tone-blue saved-tab-fallback" aria-hidden="true">
+        {(tab.title.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
+      </span>
+    );
+  }
+
+  return <img alt="" aria-hidden="true" className="saved-tab-favicon" src={src} />;
 }
 
 export function StowedSessions({
@@ -115,12 +126,10 @@ export function StowedSessions({
             <article className="session-card" key={session.id}>
               <header>
                 <div className="tab-copy">
-                  <span className="session-title">{session.title}</span>
-                  <span className="session-preview">
-                    {formatDate(session.createdAt)} · {session.tabs.length}{' '}
-                    {session.tabs.length === 1 ? 'tab' : 'tabs'}
+                  <span className="session-title">
+                    {session.tabs.length} {session.tabs.length === 1 ? 'tab' : 'tabs'}
                   </span>
-                  <span className="session-preview">{sessionPreview(session)}</span>
+                  <span className="session-preview">{formatDate(session.createdAt)}</span>
                 </div>
                 <div className="row-actions">
                   <button
@@ -141,7 +150,7 @@ export function StowedSessions({
                     disabled={busyAction !== null}
                   >
                     <RotateCcw size={16} aria-hidden="true" />
-                    {t(locale, 'restore')}
+                    {t(locale, 'restoreAll')}
                   </button>
                   <button
                     type="button"
@@ -164,6 +173,24 @@ export function StowedSessions({
                   </button>
                 </div>
               </header>
+              <div className="saved-tab-list">
+                {session.tabs.map((tab) => (
+                  <a
+                    className="saved-tab-row"
+                    href={tab.url}
+                    key={tab.id}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={t(locale, 'openSavedTab', { label: tab.title || tab.url })}
+                  >
+                    <SavedTabFavicon tab={tab} />
+                    <span className="tab-copy">
+                      <span className="tab-title">{tab.title || tab.url}</span>
+                      <span className="tab-url">{tab.url}</span>
+                    </span>
+                  </a>
+                ))}
+              </div>
             </article>
           ))
         )}

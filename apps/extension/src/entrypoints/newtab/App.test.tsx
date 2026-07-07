@@ -1132,6 +1132,51 @@ describe('App', () => {
     expect(screen().getByText('Spec draft')).not.toBeNull();
   });
 
+  it('renders every saved tab with favicon title and URL detail', async () => {
+    const sessions: TabSession[] = [
+      {
+        id: 'session-1',
+        title: '2 tabs stowed',
+        tabs: [
+          {
+            id: 'saved-tab-1',
+            title: 'Example Docs',
+            url: 'https://docs.example.com/path',
+            favIconUrl: 'https://docs.example.com/favicon.ico',
+            createdAt: '2026-07-07T00:00:00.000Z',
+          },
+          {
+            id: 'saved-tab-2',
+            title: 'Example Blog',
+            url: 'https://blog.example.com/post',
+            createdAt: '2026-07-07T00:00:00.000Z',
+          },
+        ],
+        sourceWindowId: 4,
+        createdAt: '2026-07-07T00:00:00.000Z',
+        updatedAt: '2026-07-07T00:00:00.000Z',
+        deviceId: 'device-1',
+      },
+    ];
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions });
+
+    await renderApp();
+
+    expect(screen().getByText('2 tabs')).not.toBeNull();
+    expect(screen().getByText('Example Docs')).not.toBeNull();
+    expect(screen().getByText('https://docs.example.com/path')).not.toBeNull();
+    expect(screen().getByText('Example Blog')).not.toBeNull();
+    expect(screen().getByText('https://blog.example.com/post')).not.toBeNull();
+    expect(container.querySelectorAll('.saved-tab-row')).toHaveLength(2);
+    expect(container.querySelector<HTMLImageElement>('img.saved-tab-favicon')?.getAttribute('src')).toBe(
+      'https://docs.example.com/favicon.ico',
+    );
+    expect(screen().getByRole('button', { name: 'Restore all' })).not.toBeNull();
+    expect(container.querySelector<HTMLAnchorElement>('a.saved-tab-row')?.getAttribute('href')).toBe(
+      'https://docs.example.com/path',
+    );
+  });
+
   it('migrates a stored disabled Chrome group sync state on load', async () => {
     const legacyChromeTabGroups: ActiveWorkspaceState['chromeTabGroups'] = {
       enabled: false,
