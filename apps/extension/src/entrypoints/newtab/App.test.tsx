@@ -657,6 +657,29 @@ describe('App', () => {
     ]);
   });
 
+  it('adds a todo through an integrated form', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    saveTodos.mockImplementation(async (todos: unknown) => todos);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByLabelText('Add todo'));
+    await change(screen().getByLabelText('Todo title'), 'Review launch checklist');
+    await change(screen().getByLabelText('Todo details'), 'Remember the migration notes');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(promptSpy).not.toHaveBeenCalled();
+    expect(saveTodos).toHaveBeenCalledWith([
+      expect.objectContaining({
+        title: 'Review launch checklist',
+        description: 'Remember the migration notes',
+        completed: false,
+        dismissed: false,
+      }),
+    ]);
+    expect(screen().getByText('Review launch checklist')).not.toBeNull();
+  });
+
   it('saves only a lightweight custom background token in theme preferences', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     await renderApp();
