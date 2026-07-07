@@ -241,6 +241,7 @@ describe('FormDialog', () => {
       root.render(<Harness />);
     });
 
+    getByText('Open dialog').focus();
     await click(getByText('Open dialog'));
     expect(document.activeElement).toBe(getByLabelText('Name'));
 
