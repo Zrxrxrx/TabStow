@@ -227,14 +227,14 @@ describe('quick links', () => {
         id: 'remote-only',
         url: 'https://remote-only.example/',
         label: 'Remote only',
-        icon: { kind: 'site', value: null },
+        icon: { kind: 'site' as const, value: null },
         createdAt: '2026-07-06T00:00:00.000Z',
       },
       {
         id: 'shared',
         url: 'https://remote.example/',
         label: 'Remote',
-        icon: { kind: 'site', value: null },
+        icon: { kind: 'site' as const, value: null },
         createdAt: '2026-07-06T00:00:00.000Z',
       },
     ];
