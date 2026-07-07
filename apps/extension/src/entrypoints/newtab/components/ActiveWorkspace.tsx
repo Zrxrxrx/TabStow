@@ -1,4 +1,4 @@
-import { Archive, Layers, Trash2, X } from 'lucide-react';
+import { Layers, Save, Trash2, X } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   buildActiveTabGroups,
@@ -322,7 +322,7 @@ export function ActiveWorkspace({
                         onClick={() => void onStowTab(tab)}
                         disabled={closeDisabled || typeof tab.id !== 'number'}
                       >
-                        <Archive size={14} aria-hidden="true" />
+                        <Save size={14} aria-hidden="true" />
                       </button>
                       {group.kind === 'manual' && (
                         <button
