@@ -213,6 +213,21 @@ describe('background message routing', () => {
     });
   });
 
+  it('responds to unsupported messages instead of returning null', async () => {
+    await import('../entrypoints/background');
+
+    const { keepAlive, response } = await dispatchRuntimeMessage({ type: 'unknown:message' });
+
+    expect(keepAlive).toBe(true);
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'unknown-error',
+        message: 'Unsupported extension message: unknown:message.',
+      },
+    });
+  });
+
   it('routes selected tab stow messages', async () => {
     sessionServiceMocks.saveTabsAsSession.mockResolvedValue({
       ok: true,

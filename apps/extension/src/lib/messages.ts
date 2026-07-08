@@ -72,11 +72,31 @@ export type ExtensionMessageResponse =
   | AppResult<{ searched: true }>
   | AppResult<{ restored: true; tabCount: number }>;
 
+function isExtensionMessageResponse(response: unknown): response is ExtensionMessageResponse {
+  if (!response || typeof response !== 'object') return false;
+
+  const result = response as {
+    data?: unknown;
+    error?: { code?: unknown; message?: unknown };
+    ok?: unknown;
+  };
+  if (result.ok === true) return 'data' in result;
+
+  const error = result.error as { code?: unknown; message?: unknown } | undefined;
+  return result.ok === false && typeof error?.code === 'string' && typeof error.message === 'string';
+}
+
 export async function sendExtensionMessage<T extends ExtensionMessageResponse = ExtensionMessageResponse>(
   message: ExtensionMessage,
 ): Promise<T> {
   try {
-    return (await browser.runtime.sendMessage(message)) as T;
+    const response = await browser.runtime.sendMessage(message);
+    if (isExtensionMessageResponse(response)) return response as T;
+
+    return err(
+      'unknown-error',
+      'Extension background did not return a valid response. Reload Tabstow from chrome://extensions and try again.',
+    ) as T;
   } catch (error) {
     return err('unknown-error', toErrorMessage(error)) as T;
   }

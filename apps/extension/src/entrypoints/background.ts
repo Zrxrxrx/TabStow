@@ -32,6 +32,10 @@ import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { browser } from '@/lib/browser';
 import type { ExtensionMessage } from '@/lib/messages';
 
+function unsupportedMessage(message: ExtensionMessage): AppResult<never> {
+  return err('unknown-error', `Unsupported extension message: ${String(message.type)}.`);
+}
+
 async function handleMessage(
   message: ExtensionMessage,
   sender?: chrome.runtime.MessageSender,
@@ -87,6 +91,8 @@ async function handleMessage(
         return pushToGist();
       case 'sync:pull':
         return pullFromGist();
+      default:
+        return unsupportedMessage(message);
     }
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
@@ -109,7 +115,10 @@ export default defineBackground(() => {
   });
 
   browser.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
-    void handleMessage(message, sender).then(sendResponse);
+    void handleMessage(message, sender).then(
+      sendResponse,
+      (error) => sendResponse(err('unknown-error', toErrorMessage(error))),
+    );
     return true;
   });
 });
