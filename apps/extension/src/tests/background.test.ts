@@ -56,6 +56,7 @@ const activeTabsMocks = vi.hoisted(() => ({
   closeActiveTabs: vi.fn(),
   focusActiveTab: vi.fn(),
   listActiveTabs: vi.fn(),
+  listActiveTabsSnapshot: vi.fn(),
   runDefaultSearch: vi.fn(),
 }));
 
@@ -91,6 +92,21 @@ vi.mock('@/features/quick-links/quick-links-storage', () => ({
   updateQuickLinks: quickLinkMocks.updateQuickLinks,
 }));
 
+async function dispatchRuntimeMessage(
+  message: unknown,
+  sender: chrome.runtime.MessageSender = {},
+): Promise<{ keepAlive: unknown; response: unknown }> {
+  const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
+  const sendResponse = vi.fn();
+  const keepAlive = listener?.(message, sender, sendResponse);
+
+  for (let attempts = 0; attempts < 5 && sendResponse.mock.calls.length === 0; attempts += 1) {
+    await Promise.resolve();
+  }
+
+  return { keepAlive, response: sendResponse.mock.calls[0]?.[0] };
+}
+
 describe('background message routing', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -112,12 +128,12 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
-    await listener?.(
+    const { keepAlive } = await dispatchRuntimeMessage(
       { type: 'sessions:stow-current-window' },
       { tab: { windowId: 91 } } as chrome.runtime.MessageSender,
     );
 
+    expect(keepAlive).toBe(true);
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(91);
   });
 
@@ -168,10 +184,33 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
-    await listener?.({ type: 'active-tabs:close', tabIds: [11, 12] }, {});
+    await dispatchRuntimeMessage({ type: 'active-tabs:close', tabIds: [11, 12] });
 
     expect(activeTabsMocks.closeActiveTabs).toHaveBeenCalledWith([11, 12]);
+  });
+
+  it('responds to active tab snapshot messages through sendResponse', async () => {
+    activeTabsMocks.listActiveTabsSnapshot.mockResolvedValue({
+      ok: true,
+      data: {
+        tabs: [{ id: 3, windowId: 2, index: 0, url: 'https://example.com' }],
+        chromeGroups: [],
+      },
+    });
+
+    await import('../entrypoints/background');
+
+    const { keepAlive, response } = await dispatchRuntimeMessage({ type: 'active-tabs:snapshot' });
+
+    expect(keepAlive).toBe(true);
+    expect(activeTabsMocks.listActiveTabsSnapshot).toHaveBeenCalledTimes(1);
+    expect(response).toEqual({
+      ok: true,
+      data: {
+        tabs: [{ id: 3, windowId: 2, index: 0, url: 'https://example.com' }],
+        chromeGroups: [],
+      },
+    });
   });
 
   it('routes selected tab stow messages', async () => {
@@ -182,8 +221,7 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
-    await listener?.({ type: 'sessions:stow-tab', tabId: 42 }, {});
+    await dispatchRuntimeMessage({ type: 'sessions:stow-tab', tabId: 42 });
 
     expect(sessionServiceMocks.saveTabsAsSession).toHaveBeenCalledWith([42]);
   });
@@ -196,12 +234,11 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
-    await listener?.({
+    await dispatchRuntimeMessage({
       type: 'chrome-tab-groups:sync',
       groups: [],
       state: { enabled: true, mappings: [] },
-    }, {});
+    });
 
     expect(chromeTabGroupMocks.syncChromeTabGroups).toHaveBeenCalledWith([], { enabled: true, mappings: [] });
   });
@@ -217,13 +254,12 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
     const payload = {
       tabs: [],
       manualGroups: { groups: [], assignments: {} },
       state: { enabled: true, mappings: [] },
     };
-    await listener?.({ type: 'chrome-tab-groups:import', ...payload }, {});
+    await dispatchRuntimeMessage({ type: 'chrome-tab-groups:import', ...payload });
 
     expect(chromeTabGroupMocks.importChromeTabGroups).toHaveBeenCalledWith(
       payload.tabs,
@@ -240,8 +276,7 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
-    await listener?.({ type: 'chrome-tab-groups:collapse-window', windowId: 17 }, {});
+    await dispatchRuntimeMessage({ type: 'chrome-tab-groups:collapse-window', windowId: 17 });
 
     expect(chromeTabGroupMocks.collapseChromeTabGroups).toHaveBeenCalledWith(17);
   });
@@ -265,10 +300,9 @@ describe('background message routing', () => {
 
     await import('../entrypoints/background');
 
-    const listener = browserMocks.runtime.onMessage.addListener.mock.calls[0]?.[0];
-    const result = await listener?.({ type: 'quick-links:add', link: newLink }, {});
+    const { response } = await dispatchRuntimeMessage({ type: 'quick-links:add', link: newLink });
 
     expect(quickLinkMocks.updateQuickLinks).toHaveBeenCalledTimes(1);
-    expect(result).toEqual({ ok: true, data: [existingLink, newLink] });
+    expect(response).toEqual({ ok: true, data: [existingLink, newLink] });
   });
 });

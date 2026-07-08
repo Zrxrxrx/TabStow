@@ -108,7 +108,8 @@ export default defineBackground(() => {
     void saveCurrentWindowAsSession(tab.windowId).then(showActionFeedback);
   });
 
-  browser.runtime.onMessage.addListener((message: ExtensionMessage, sender) => {
-    return handleMessage(message, sender);
+  browser.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+    void handleMessage(message, sender).then(sendResponse);
+    return true;
   });
 });

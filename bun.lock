@@ -11,7 +11,7 @@
     },
     "apps/extension": {
       "name": "@tabstow/extension",
-      "version": "0.1.3",
+      "version": "0.1.4",
       "dependencies": {
         "@tabstow/core": "workspace:*",
         "@wxt-dev/module-react": "latest",
