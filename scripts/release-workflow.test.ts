@@ -238,7 +238,7 @@ describe('release workflow behavior', () => {
     );
   });
 
-  it('creates or repairs exactly the versioned ZIP and checksum release assets', () => {
+  it('creates an absent Release with exactly the fresh asset pair', () => {
     const assetRun = getRun('Verify and prepare release assets');
     const releaseRun = getRun('Create the GitHub Release');
     expect(assetRun).toContain(
@@ -266,20 +266,83 @@ describe('release workflow behavior', () => {
       'if [[ "$RELEASE_EXISTS" == "false" ]]; then',
       'gh release create "$TAG"',
       'else',
-      'ASSET_NAMES=',
-      'MISSING_ASSETS=()',
-      'gh release upload "$TAG" "${MISSING_ASSETS[@]}"',
+      'ASSET_RECORDS=',
     ]);
     expect(releaseRun).toMatch(
       /gh release create "\$TAG" \\\n\s+"\$RELEASE_ZIP" \\\n\s+"\$CHECKSUMS" \\\n\s+--verify-tag \\\n\s+--generate-notes/,
     );
+  });
+
+  it('verifies an existing published ZIP and checksum as an exact pair', () => {
+    const releaseRun = getRun('Create the GitHub Release');
+
     expect(releaseRun).toContain(
-      'if ! ASSET_NAMES="$(gh release view "$TAG" --json assets --jq \'.assets[].name\')"; then',
+      'if ! ASSET_RECORDS="$(gh release view "$TAG" --json assets --jq \'.assets[] | [.name, .apiUrl] | @tsv\')"; then',
     );
-    expect(releaseRun).toContain('if ! grep -Fxq "$RELEASE_ZIP_NAME" <<< "$ASSET_NAMES"; then');
-    expect(releaseRun).toContain('MISSING_ASSETS+=("$RELEASE_ZIP")');
-    expect(releaseRun).toContain('if ! grep -Fxq "$CHECKSUMS_NAME" <<< "$ASSET_NAMES"; then');
-    expect(releaseRun).toContain('MISSING_ASSETS+=("$CHECKSUMS")');
+    expectInOrder(releaseRun, [
+      'RELEASE_ZIP_API_URL=',
+      'CHECKSUMS_API_URL=',
+      'if [[ -n "$RELEASE_ZIP_API_URL" && -n "$CHECKSUMS_API_URL" ]]; then',
+      'if ! gh release download "$TAG"',
+      '--pattern "$RELEASE_ZIP_NAME"',
+      '--pattern "$CHECKSUMS_NAME"',
+      '--dir "$RECOVERY_DIR"',
+      'if ! (cd "$RECOVERY_DIR" && sha256sum --check "$CHECKSUMS_NAME"); then',
+      'Published release assets failed checksum verification.',
+      'Delete both published assets, then rerun the Release workflow with current.',
+      'exit 1',
+      'elif [[ -n "$RELEASE_ZIP_API_URL" ]]; then',
+    ]);
+
+    const pairBranch = releaseRun.slice(
+      releaseRun.indexOf(
+        'if [[ -n "$RELEASE_ZIP_API_URL" && -n "$CHECKSUMS_API_URL" ]]; then',
+      ),
+      releaseRun.indexOf('elif [[ -n "$RELEASE_ZIP_API_URL" ]]; then'),
+    );
+    expect(pairBranch).not.toContain('gh release upload');
+    expect(releaseRun).not.toContain('--clobber');
+  });
+
+  it('derives a missing checksum from the exact published ZIP', () => {
+    const releaseRun = getRun('Create the GitHub Release');
+    const zipOnlyBranch = releaseRun.slice(
+      releaseRun.indexOf('elif [[ -n "$RELEASE_ZIP_API_URL" ]]; then'),
+      releaseRun.indexOf('elif [[ -n "$CHECKSUMS_API_URL" ]]; then'),
+    );
+
+    expectInOrder(zipOnlyBranch, [
+      'elif [[ -n "$RELEASE_ZIP_API_URL" ]]; then',
+      'if ! gh release download "$TAG"',
+      '--pattern "$RELEASE_ZIP_NAME"',
+      '--dir "$RECOVERY_DIR"',
+      'if ! (cd "$RECOVERY_DIR" && sha256sum "$RELEASE_ZIP_NAME" > "$CHECKSUMS_NAME"); then',
+      'if ! gh release upload "$TAG" "$RECOVERY_DIR/$CHECKSUMS_NAME"; then',
+    ]);
+    expect(zipOnlyBranch.match(/gh release upload/g)).toHaveLength(1);
+    expect(zipOnlyBranch).not.toContain('gh release upload "$TAG" "$RELEASE_ZIP"');
+    expect(zipOnlyBranch).not.toContain('gh api --method DELETE');
+  });
+
+  it('removes an orphan checksum before uploading a fresh pair', () => {
+    const releaseRun = getRun('Create the GitHub Release');
+    const freshPairUpload =
+      'if ! gh release upload "$TAG" "$RELEASE_ZIP" "$CHECKSUMS"; then';
+    const checksumOnlyBranch = releaseRun.slice(
+      releaseRun.indexOf('elif [[ -n "$CHECKSUMS_API_URL" ]]; then'),
+      releaseRun.lastIndexOf(freshPairUpload),
+    );
+    const bothMissingBranch = releaseRun.slice(releaseRun.lastIndexOf(freshPairUpload));
+
+    expectInOrder(checksumOnlyBranch, [
+      'elif [[ -n "$CHECKSUMS_API_URL" ]]; then',
+      'if ! gh api --method DELETE "$CHECKSUMS_API_URL"; then',
+      freshPairUpload,
+    ]);
+    expect(checksumOnlyBranch.match(/gh release upload/g)).toHaveLength(1);
+    expect(bothMissingBranch.match(/gh release upload/g)).toHaveLength(1);
+    expect(bothMissingBranch).not.toContain('gh api --method DELETE');
+    expect(bothMissingBranch).not.toContain('gh release download');
   });
 });
 
@@ -301,7 +364,10 @@ describe('release recovery documentation', () => {
       'Recovery proceeds only when the existing tag resolves to the current default-branch commit.',
     );
     expect(readmeText).toContain(
-      'The rerun creates a missing Release or uploads only the missing `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` assets.',
+      'Recovery treats `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` as a coupled pair.',
+    );
+    expect(readmeText).toContain(
+      'If a complete published pair fails checksum verification, delete both assets and rerun with `current`.',
     );
   });
 });

@@ -228,22 +228,61 @@ jobs:
               --generate-notes \
               --title "$TAG"
           else
-            if ! ASSET_NAMES="$(gh release view "$TAG" --json assets --jq '.assets[].name')"; then
+            if ! ASSET_RECORDS="$(gh release view "$TAG" --json assets --jq '.assets[] | [.name, .apiUrl] | @tsv')"; then
               echo "Unable to inspect assets for GitHub Release $TAG." >&2
               exit 1
             fi
 
             RELEASE_ZIP_NAME="${RELEASE_ZIP##*/}"
             CHECKSUMS_NAME="${CHECKSUMS##*/}"
-            MISSING_ASSETS=()
-            if ! grep -Fxq "$RELEASE_ZIP_NAME" <<< "$ASSET_NAMES"; then
-              MISSING_ASSETS+=("$RELEASE_ZIP")
-            fi
-            if ! grep -Fxq "$CHECKSUMS_NAME" <<< "$ASSET_NAMES"; then
-              MISSING_ASSETS+=("$CHECKSUMS")
+            RELEASE_ZIP_API_URL="$(printf '%s\n' "$ASSET_RECORDS" | awk -F '\t' -v name="$RELEASE_ZIP_NAME" '$1 == name { print $2 }')"
+            CHECKSUMS_API_URL="$(printf '%s\n' "$ASSET_RECORDS" | awk -F '\t' -v name="$CHECKSUMS_NAME" '$1 == name { print $2 }')"
+            if ! RECOVERY_DIR="$(mktemp -d)"; then
+              echo "Unable to create a temporary recovery directory." >&2
+              exit 1
             fi
 
-            if (( ${#MISSING_ASSETS[@]} > 0 )); then
-              gh release upload "$TAG" "${MISSING_ASSETS[@]}"
+            if [[ -n "$RELEASE_ZIP_API_URL" && -n "$CHECKSUMS_API_URL" ]]; then
+              if ! gh release download "$TAG" \
+                --pattern "$RELEASE_ZIP_NAME" \
+                --pattern "$CHECKSUMS_NAME" \
+                --dir "$RECOVERY_DIR"; then
+                echo "Unable to download the published release asset pair." >&2
+                exit 1
+              fi
+              if ! (cd "$RECOVERY_DIR" && sha256sum --check "$CHECKSUMS_NAME"); then
+                echo "Published release assets failed checksum verification." >&2
+                echo "Delete both published assets, then rerun the Release workflow with current." >&2
+                exit 1
+              fi
+            elif [[ -n "$RELEASE_ZIP_API_URL" ]]; then
+              if ! gh release download "$TAG" \
+                --pattern "$RELEASE_ZIP_NAME" \
+                --dir "$RECOVERY_DIR"; then
+                echo "Unable to download the published ZIP." >&2
+                exit 1
+              fi
+              if ! (cd "$RECOVERY_DIR" && sha256sum "$RELEASE_ZIP_NAME" > "$CHECKSUMS_NAME"); then
+                echo "Unable to checksum the published ZIP." >&2
+                exit 1
+              fi
+              if ! gh release upload "$TAG" "$RECOVERY_DIR/$CHECKSUMS_NAME"; then
+                echo "Unable to upload the checksum for the published ZIP." >&2
+                exit 1
+              fi
+            elif [[ -n "$CHECKSUMS_API_URL" ]]; then
+              if ! gh api --method DELETE "$CHECKSUMS_API_URL"; then
+                echo "Unable to delete the orphan checksum asset." >&2
+                exit 1
+              fi
+              if ! gh release upload "$TAG" "$RELEASE_ZIP" "$CHECKSUMS"; then
+                echo "Unable to upload the fresh release asset pair." >&2
+                exit 1
+              fi
+            else
+              if ! gh release upload "$TAG" "$RELEASE_ZIP" "$CHECKSUMS"; then
+                echo "Unable to upload the fresh release asset pair." >&2
+                exit 1
+              fi
             fi
           fi
