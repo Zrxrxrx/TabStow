@@ -73,26 +73,35 @@ export function App() {
     actionId: string,
     action: () => Promise<AppResult<T>>,
     success: (data: T) => string,
+    options: { reloadOnFailure?: boolean } = {},
   ) {
     if (busyActionRef.current !== null) return;
     busyActionRef.current = actionId;
     setBusyAction(actionId);
     setStatus({ tone: 'info', message: null });
+    let reloadSessions = options.reloadOnFailure ?? false;
+    let refreshActiveWorkspace = false;
 
     try {
       const response = await action();
 
       if (response.ok) {
         setStatus({ tone: 'success', message: success(response.data) });
-        await loadSessions();
-        setActiveWorkspaceRefreshKey((value) => value + 1);
-        return;
+        reloadSessions = true;
+        refreshActiveWorkspace = true;
+      } else {
+        setStatus({ tone: 'error', message: response.error.message });
       }
-
-      setStatus({ tone: 'error', message: response.error.message });
     } finally {
-      busyActionRef.current = null;
-      setBusyAction(null);
+      try {
+        if (reloadSessions) await loadSessions();
+        if (refreshActiveWorkspace) {
+          setActiveWorkspaceRefreshKey((value) => value + 1);
+        }
+      } finally {
+        busyActionRef.current = null;
+        setBusyAction(null);
+      }
     }
   }
 

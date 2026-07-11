@@ -35,6 +35,27 @@ describe('i18n', () => {
     expect(t('en', 'searchTabs')).toBe('Search active and saved tabs');
     expect(t('en', 'clearTabSearch')).toBe('Clear tab search');
     expect(t('en', 'history')).toBe('History');
+    expect(t('en', 'savedSessionsSubtitle')).toBe(
+      'Durable stowed sessions sorted newest first. Normally opened, restored, and removed items move to History; middle-click keeps a Saved copy.',
+    );
+    expect(t('en', 'restoreAll')).toBe('Restore all and move session to History');
+    expect(t('en', 'restoreSavedSession', { label: 'Work' })).toBe(
+      'Restore Work and move to History',
+    );
+    expect(t('en', 'removeSavedTab', { label: 'Docs' })).toBe('Move Docs to History');
+    expect(t('en', 'removeSavedSession', { label: 'Work' })).toBe('Move Work to History');
+    expect(t('en', 'dragSavedTab', { label: 'Docs' })).toBe('Drag saved tab Docs');
+    expect(t('en', 'dragSavedSession', { label: 'Work' })).toBe('Drag saved session Work');
+    expect(t('en', 'dropSavedTabBefore', { label: 'Docs' })).toBe(
+      'Drop saved tab before Docs',
+    );
+    expect(t('en', 'dropSavedTabAtEnd', { label: 'Work' })).toBe(
+      'Drop saved tab at end of Work',
+    );
+    expect(t('en', 'dropSavedSessionBefore', { label: 'Work' })).toBe(
+      'Drop saved session before Work',
+    );
+    expect(t('en', 'dropSavedSessionAtEnd')).toBe('Drop saved session at end');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -72,6 +93,27 @@ describe('i18n', () => {
     expect(t('zh-CN', 'searchTabs')).toBe('搜索打开和已保存的标签页');
     expect(t('zh-CN', 'clearTabSearch')).toBe('清除标签页搜索');
     expect(t('zh-CN', 'history')).toBe('历史记录');
+    expect(t('zh-CN', 'savedSessionsSubtitle')).toBe(
+      '持久保存的会话按最新优先排序；正常打开、恢复或移除的内容会移至历史记录，中键打开会保留已保存副本。',
+    );
+    expect(t('zh-CN', 'restoreAll')).toBe('全部恢复并将会话移至历史记录');
+    expect(t('zh-CN', 'restoreSavedSession', { label: '工作' })).toBe(
+      '恢复工作并移至历史记录',
+    );
+    expect(t('zh-CN', 'removeSavedTab', { label: '文档' })).toBe('将文档移至历史记录');
+    expect(t('zh-CN', 'removeSavedSession', { label: '工作' })).toBe('将工作移至历史记录');
+    expect(t('zh-CN', 'dragSavedTab', { label: '文档' })).toBe('拖动已保存的标签页文档');
+    expect(t('zh-CN', 'dragSavedSession', { label: '工作' })).toBe('拖动已保存的会话工作');
+    expect(t('zh-CN', 'dropSavedTabBefore', { label: '文档' })).toBe(
+      '将已保存的标签页放在文档之前',
+    );
+    expect(t('zh-CN', 'dropSavedTabAtEnd', { label: '工作' })).toBe(
+      '将已保存的标签页放在工作末尾',
+    );
+    expect(t('zh-CN', 'dropSavedSessionBefore', { label: '工作' })).toBe(
+      '将已保存的会话放在工作之前',
+    );
+    expect(t('zh-CN', 'dropSavedSessionAtEnd')).toBe('将已保存的会话放在末尾');
   });
 
   it('interpolates variables in message templates', async () => {

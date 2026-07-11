@@ -99,6 +99,44 @@ vi.mock('@/features/theme/theme-background-cache', () => ({
 }));
 
 const SESSIONS: TabSession[] = [];
+const SAVED_SESSIONS: TabSession[] = [
+  {
+    id: 'session-1',
+    title: 'Session One',
+    tabs: [
+      {
+        id: 'saved-tab-1',
+        title: 'Saved One',
+        url: 'https://one.example/',
+        createdAt: '2026-07-11T00:00:00.000Z',
+      },
+      {
+        id: 'saved-tab-2',
+        title: 'Saved Two',
+        url: 'https://two.example/',
+        createdAt: '2026-07-11T00:00:00.000Z',
+      },
+    ],
+    createdAt: '2026-07-11T00:00:00.000Z',
+    updatedAt: '2026-07-11T00:00:00.000Z',
+    deviceId: 'device-1',
+  },
+  {
+    id: 'session-2',
+    title: 'Session Two',
+    tabs: [
+      {
+        id: 'saved-tab-3',
+        title: 'Saved Three',
+        url: 'https://three.example/',
+        createdAt: '2026-07-10T00:00:00.000Z',
+      },
+    ],
+    createdAt: '2026-07-10T00:00:00.000Z',
+    updatedAt: '2026-07-10T00:00:00.000Z',
+    deviceId: 'device-1',
+  },
+];
 const DUPLICATE_TABS: ActiveBrowserTab[] = [
   {
     active: true,
@@ -444,7 +482,163 @@ describe('App', () => {
     expect(
       screen().getByLabelText('Close GitHub active issue') as HTMLButtonElement,
     ).toHaveProperty('disabled', false);
+    const savedDragHandles = Array.from(
+      container.querySelectorAll<HTMLButtonElement>('.saved-sessions .drag-handle'),
+    );
+    expect(savedDragHandles).toHaveLength(2);
+    expect(savedDragHandles.every((handle) => handle.disabled && !handle.draggable)).toBe(true);
+    expect(screen().getByLabelText('Open GitHub saved issue')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Move GitHub saved issue to History')).toHaveProperty(
+      'disabled',
+      false,
+    );
     expect(sentMessageTypes()).not.toContain('active-tabs:search');
+  });
+
+  it('opens saved tabs on controlled primary and middle clicks without navigating the extension', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    const row = screen().getByLabelText('Open Saved One');
+    const initialUrl = window.location.href;
+    const primary = await dispatchMouseEvent(row, 'click', { button: 0 });
+
+    expect(primary.defaultPrevented).toBe(true);
+    expect(window.location.href).toBe(initialUrl);
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: 'saved-tab-1',
+      consume: true,
+    });
+    expect(screen().getByRole('status').textContent).toBe('Moved tab to History.');
+
+    const middle = await dispatchMouseEvent(row, 'auxclick', { button: 1 });
+
+    expect(middle.defaultPrevented).toBe(true);
+    expect(window.location.href).toBe(initialUrl);
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: 'saved-tab-1',
+      consume: false,
+    });
+  });
+
+  it('ignores modified primary and right clicks on saved tabs', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    const row = screen().getByLabelText('Open Saved One');
+    const modified = await dispatchMouseEvent(row, 'click', { button: 0, metaKey: true });
+    const right = await dispatchMouseEvent(row, 'auxclick', { button: 2 });
+
+    expect(modified.defaultPrevented).toBe(false);
+    expect(right.defaultPrevented).toBe(false);
+    expect(sentMessageTypes()).not.toContain('sessions:open-tab');
+  });
+
+  it('moves deleted saved tabs and sessions to History and explains destructive restores', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    await click(screen().getByLabelText('Move Saved One to History'));
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:delete-tab',
+      sessionId: 'session-1',
+      tabId: 'saved-tab-1',
+    });
+    expect(screen().getByRole('status').textContent).toBe('Moved tab to History.');
+
+    await click(screen().getByLabelText('Move Session One to History'));
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:delete',
+      sessionId: 'session-1',
+    });
+    expect(screen().getByRole('status').textContent).toBe('Moved saved session to History.');
+
+    await click(screen().getByLabelText('Restore Session One and move to History'));
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:restore',
+      sessionId: 'session-1',
+    });
+    expect(screen().getByRole('status').textContent).toBe(
+      'Restored 2 tabs and moved the session to History.',
+    );
+  });
+
+  it('persists cross-session saved tab drops and session reordering by ID', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    const tabTransfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), tabTransfer);
+    await drop(screen().getByLabelText('Drop saved tab before Saved Three'), tabTransfer);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:move-tab',
+      request: {
+        sourceSessionId: 'session-1',
+        tabId: 'saved-tab-2',
+        destinationSessionId: 'session-2',
+        destinationIndex: 0,
+      },
+    });
+
+    const sessionTransfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag saved session Session Two'), sessionTransfer);
+    await drop(screen().getByLabelText('Drop saved session before Session One'), sessionTransfer);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:reorder',
+      orderedIds: ['session-2', 'session-1'],
+    });
+    expect(sentMessageTypes().filter((type) => type === 'sessions:list').length).toBeGreaterThan(2);
+  });
+
+  it('rejects a malformed saved payload even after an internal drag starts', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), transfer);
+    transfer.setData('application/x-tabstow-saved-tabs', '{');
+    await drop(screen().getByLabelText('Drop saved tab before Saved Three'), transfer);
+
+    expect(sentMessageTypes()).not.toContain('sessions:move-tab');
+  });
+
+  it('reloads authoritative sessions and clears drag state after a failed saved drop', async () => {
+    let sessionListCalls = 0;
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
+      }
+      if (message.type === 'sessions:list') {
+        sessionListCalls += 1;
+        return { ok: true, data: SAVED_SESSIONS };
+      }
+      if (message.type === 'sessions:move-tab') {
+        return { ok: false, error: { code: 'storage-error', message: 'Saved move failed' } };
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    const target = screen().getByLabelText('Drop saved tab before Saved Three');
+    await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), transfer);
+    await dragOver(target, transfer);
+    expect(target.className).toContain('is-active-drop-target');
+    await dragLeave(target, transfer);
+    expect(target.className).not.toContain('is-active-drop-target');
+    await dragOver(target, transfer);
+    await drop(target, transfer);
+
+    expect(screen().getByRole('alert').textContent).toBe('Saved move failed');
+    expect(sessionListCalls).toBe(2);
+    expect(target.className).not.toContain('is-active-drop-target');
+    expect(screen().getByLabelText('Drag saved tab Saved Two')).toHaveProperty('disabled', false);
   });
 
   it('coalesces Chrome tab, group, and window events into one refresh', async () => {
@@ -1860,19 +2054,21 @@ describe('App', () => {
     expect(container.querySelector<HTMLImageElement>('img.saved-tab-favicon')?.getAttribute('src')).toBe(
       'chrome-extension://tabstow-test/_favicon/?pageUrl=https%3A%2F%2Fdocs.example.com%2Fpath&size=32',
     );
-    expect(screen().getByRole('button', { name: 'Restore all' })).not.toBeNull();
-    const savedTabLink = container.querySelector<HTMLAnchorElement>('a.saved-tab-row');
-    expect(savedTabLink?.getAttribute('href')).toBe('https://docs.example.com/path');
-    expect(savedTabLink?.getAttribute('target')).toBe('_blank');
-    expect(savedTabLink?.querySelector('img.saved-tab-favicon')).not.toBeNull();
+    expect(
+      screen().getByRole('button', { name: 'Restore 2 tabs stowed and move to History' }),
+    ).not.toBeNull();
+    const savedTabButton = screen().getByLabelText('Open Example Docs');
+    expect(savedTabButton.tagName).toBe('BUTTON');
+    expect(savedTabButton.getAttribute('href')).toBeNull();
+    expect(savedTabButton.querySelector('img.saved-tab-favicon')).not.toBeNull();
 
     await act(async () => {
-      savedTabLink?.querySelector<HTMLImageElement>('img.saved-tab-favicon')?.dispatchEvent(
+      savedTabButton.querySelector<HTMLImageElement>('img.saved-tab-favicon')?.dispatchEvent(
         new Event('error', { bubbles: true }),
       );
     });
 
-    expect(savedTabLink?.querySelector('img.saved-tab-favicon')).toBeNull();
+    expect(savedTabButton.querySelector('img.saved-tab-favicon')).toBeNull();
     expect(screen().getByText('E')).not.toBeNull();
   });
 
@@ -1908,13 +2104,15 @@ describe('App', () => {
     expect(screen().getByText('Unsafe Import')).not.toBeNull();
     expect(screen().getByText('javascript:alert(1)')).not.toBeNull();
     expect(container.querySelectorAll('.saved-tab-row')).toHaveLength(2);
-    expect(container.querySelectorAll('a.saved-tab-row')).toHaveLength(1);
+    expect(container.querySelectorAll('a.saved-tab-row')).toHaveLength(0);
     const unsafeRow = screen().getByText('Unsafe Import').closest('.saved-tab-row');
     const safeRow = screen().getByText('Safe Docs').closest('.saved-tab-row');
     expect(unsafeRow?.tagName).toBe('DIV');
     expect(unsafeRow?.getAttribute('href')).toBeNull();
-    expect(safeRow?.tagName).toBe('A');
-    expect(safeRow?.getAttribute('href')).toBe('https://docs.example.com/path');
+    expect(safeRow?.tagName).toBe('DIV');
+    expect(safeRow?.getAttribute('href')).toBeNull();
+    expect(() => screen().getByLabelText('Open Unsafe Import')).toThrow();
+    expect(screen().getByLabelText('Open Safe Docs').tagName).toBe('BUTTON');
   });
 
   it('omits manual Chrome controls while the active tab snapshot is loading', async () => {
@@ -2332,6 +2530,27 @@ function mockMessages({
       return { ok: true, data: sessions };
     }
 
+    if (message.type === 'sessions:open-tab') {
+      return { ok: true, data: { opened: true, consumed: message.consume } };
+    }
+
+    if (message.type === 'sessions:delete-tab' || message.type === 'sessions:delete') {
+      return { ok: true, data: { deleted: true } };
+    }
+
+    if (message.type === 'sessions:restore') {
+      const session = sessions.find(({ id }) => id === message.sessionId);
+      return { ok: true, data: { restored: true, tabCount: session?.tabs.length ?? 0 } };
+    }
+
+    if (message.type === 'sessions:reorder') {
+      return { ok: true, data: sessions };
+    }
+
+    if (message.type === 'sessions:move-tab') {
+      return { ok: true, data: { moved: true } };
+    }
+
     if (message.type === 'active-tabs:close') {
       return { ok: true, data: { closed: true, tabCount: message.tabIds.length } };
     }
@@ -2398,7 +2617,7 @@ function createDataTransfer(): DataTransfer {
 
 async function dispatchDrag(
   element: HTMLElement,
-  type: 'dragstart' | 'dragenter' | 'dragover' | 'drop' | 'dragend',
+  type: 'dragstart' | 'dragenter' | 'dragover' | 'dragleave' | 'drop' | 'dragend',
   dataTransfer: DataTransfer,
 ): Promise<Event> {
   const event = new Event(type, { bubbles: true, cancelable: true });
@@ -2416,6 +2635,9 @@ async function dragOver(element: HTMLElement, data: DataTransfer) {
   await dispatchDrag(element, 'dragenter', data);
   return dispatchDrag(element, 'dragover', data);
 }
+
+const dragLeave = (element: HTMLElement, data: DataTransfer) =>
+  dispatchDrag(element, 'dragleave', data);
 
 const drop = (element: HTMLElement, data: DataTransfer) =>
   dispatchDrag(element, 'drop', data);
@@ -2466,6 +2688,18 @@ async function click(element: HTMLElement) {
     }
     element.click();
   });
+}
+
+async function dispatchMouseEvent(
+  element: HTMLElement,
+  type: 'click' | 'auxclick',
+  init: MouseEventInit,
+): Promise<MouseEvent> {
+  const event = new MouseEvent(type, { bubbles: true, cancelable: true, ...init });
+  await act(async () => {
+    element.dispatchEvent(event);
+  });
+  return event;
 }
 
 async function keyDown(key: string) {
