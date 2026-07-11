@@ -35,3 +35,20 @@ export function toErrorMessage(error: unknown): string {
   if (typeof error === 'string') return error;
   return 'An unexpected error occurred.';
 }
+
+export function toKnownStorageError(error: unknown): AppResult<never> | null {
+  const message = toErrorMessage(error);
+  if (message.startsWith('Session not found:')) {
+    return err('session-not-found', 'Saved session was not found.');
+  }
+  if (message.startsWith('Saved tab not found:')) {
+    return err('saved-tab-not-found', 'Saved tab was not found.');
+  }
+  if (message.startsWith('History entry not found:')) {
+    return err('history-entry-not-found', 'History entry was not found.');
+  }
+  if (message.startsWith('Invalid destination index:')) {
+    return err('invalid-saved-move', 'Saved tab move request is invalid.');
+  }
+  return null;
+}

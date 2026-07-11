@@ -8,7 +8,13 @@ import {
 } from '../../db/db';
 import { getSettings } from '../settings/settings-storage';
 import { browser } from '../../lib/browser';
-import { err, ok, toErrorMessage, type AppResult } from '../../lib/errors';
+import {
+  err,
+  ok,
+  toErrorMessage,
+  toKnownStorageError,
+  type AppResult,
+} from '../../lib/errors';
 import type { StowResult } from '../../lib/messages';
 import {
   isBlockedTabUrl,
@@ -22,20 +28,7 @@ function nowIso(): string {
 }
 
 function storageErrorResult(error: unknown): AppResult<never> {
-  const message = toErrorMessage(error);
-  if (message.startsWith('Session not found:')) {
-    return err('session-not-found', 'Saved session was not found.');
-  }
-  if (message.startsWith('Saved tab not found:')) {
-    return err('saved-tab-not-found', 'Saved tab was not found.');
-  }
-  if (message.startsWith('History entry not found:')) {
-    return err('history-entry-not-found', 'History entry was not found.');
-  }
-  if (message.startsWith('Invalid destination index:')) {
-    return err('invalid-saved-move', 'Saved tab move request is invalid.');
-  }
-  return err('unknown-error', message);
+  return toKnownStorageError(error) ?? err('unknown-error', toErrorMessage(error));
 }
 
 function titleFromTabs(tabs: SavedTab[]): string {

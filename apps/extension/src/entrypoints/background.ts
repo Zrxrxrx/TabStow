@@ -39,7 +39,13 @@ import {
   saveCurrentWindowAsSession,
   saveTabsAsSession,
 } from '@/features/tabs/session-service';
-import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
+import {
+  err,
+  ok,
+  toErrorMessage,
+  toKnownStorageError,
+  type AppResult,
+} from '@/lib/errors';
 import { browser } from '@/lib/browser';
 import type { ExtensionMessage } from '@/lib/messages';
 import type { MoveSavedTabRequest } from '@/features/history/types';
@@ -66,23 +72,6 @@ function isValidSavedMoveRequest(request: unknown): request is MoveSavedTabReque
     && Number.isInteger(candidate.destinationIndex)
     && candidate.destinationIndex != null
     && candidate.destinationIndex >= 0;
-}
-
-function knownStorageError(error: unknown): AppResult<never> | null {
-  const message = toErrorMessage(error);
-  if (message.startsWith('Session not found:')) {
-    return err('session-not-found', 'Saved session was not found.');
-  }
-  if (message.startsWith('Saved tab not found:')) {
-    return err('saved-tab-not-found', 'Saved tab was not found.');
-  }
-  if (message.startsWith('History entry not found:')) {
-    return err('history-entry-not-found', 'History entry was not found.');
-  }
-  if (message.startsWith('Invalid destination index:')) {
-    return err('invalid-saved-move', 'Saved tab move request is invalid.');
-  }
-  return null;
 }
 
 async function handleMessage(
@@ -212,7 +201,7 @@ async function handleMessage(
         return unsupportedMessage(message);
     }
   } catch (error) {
-    return knownStorageError(error) ?? err('unknown-error', toErrorMessage(error));
+    return toKnownStorageError(error) ?? err('unknown-error', toErrorMessage(error));
   }
 }
 

@@ -449,6 +449,27 @@ describe('background message routing', () => {
     expect(response).toEqual({ ok: true, data: { moved: true } });
   });
 
+  it('maps a database-rejected saved move to its structured error', async () => {
+    const request = {
+      sourceSessionId: 'session-1',
+      tabId: 'tab-2',
+      destinationSessionId: 'session-2',
+      destinationIndex: 4,
+    };
+    dbMocks.moveSavedTab.mockRejectedValue(new Error('Invalid destination index: 4'));
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'sessions:move-tab', request });
+
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-saved-move',
+        message: 'Saved tab move request is invalid.',
+      },
+    });
+  });
+
   it('rejects malformed saved tab moves before they reach the database', async () => {
     await import('../entrypoints/background');
     const { response } = await dispatchRuntimeMessage({
