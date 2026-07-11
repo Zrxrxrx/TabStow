@@ -52,6 +52,21 @@ describe('extractWorkspaceVersion', () => {
   },
 }`,
     ],
+    [
+      'has only a nested version',
+      `{
+  "workspaces": {
+    "apps/extension": {
+      "name": "@tabstow/extension",
+      "dependencies": {
+        "@tabstow/core": {
+          "version": "1.0.0",
+        },
+      },
+    },
+  },
+}`,
+    ],
   ])('throws a precise error when the workspace %s', (_scenario, lockText) => {
     expect(() => extractWorkspaceVersion(lockText, 'apps/extension')).toThrowError(
       'Missing version for workspace "apps/extension" in bun.lock',

@@ -17,9 +17,14 @@ export function extractWorkspaceVersion(lockText: string, workspace: string): st
     const indentation = workspaceLine[1];
     const workspaceBody = lockText.slice(workspaceLine.index + workspaceLine[0].length);
     const workspaceEnd = new RegExp(`^${escapeRegExp(indentation)}\\}`, 'm').exec(workspaceBody);
-    const version = workspaceBody
-      .slice(0, workspaceEnd?.index)
-      .match(/^\s*"version"\s*:\s*"([^"]+)"\s*,?\s*$/m)?.[1];
+    const workspaceBlock = workspaceBody.slice(0, workspaceEnd?.index);
+    const directPropertyIndentation = workspaceBlock.match(/^([ \t]+)"[^"]+"\s*:/m)?.[1];
+    const version = directPropertyIndentation
+      ? new RegExp(
+          `^${escapeRegExp(directPropertyIndentation)}"version"\\s*:\\s*"([^"]+)"\\s*,?\\s*$`,
+          'm',
+        ).exec(workspaceBlock)?.[1]
+      : undefined;
 
     if (version !== undefined) {
       return version;
