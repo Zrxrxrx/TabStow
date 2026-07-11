@@ -155,6 +155,28 @@ describe('sync service', () => {
     expect(pushedDocument.settings).not.toHaveProperty('theme');
   });
 
+  it('initializes an empty-object gist file on push', async () => {
+    const localOnly = createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z');
+
+    dbMocks.exportSessions.mockResolvedValue([localOnly]);
+    gistMocks.getFileContent.mockResolvedValue('{}');
+    gistMocks.updateFile.mockResolvedValue(undefined);
+
+    const result = await pushToGist();
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sessionCount: 1,
+        quickLinkCount: 0,
+        exportedAt: expect.any(String),
+      },
+    });
+
+    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
+    expect(pushedDocument.sessions).toEqual([localOnly]);
+  });
+
   it('returns invalid-sync-document instead of overwriting invalid remote sync data on push', async () => {
     dbMocks.exportSessions.mockResolvedValue([
       createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z'),

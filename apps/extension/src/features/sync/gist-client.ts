@@ -26,7 +26,7 @@ function isTrustedRawGistUrl(value: string): boolean {
 export class GistClient {
   constructor(
     private readonly token: string,
-    private readonly fetcher: Fetcher = fetch,
+    private readonly fetcher: Fetcher = globalThis.fetch.bind(globalThis),
   ) {}
 
   private headers(): HeadersInit {

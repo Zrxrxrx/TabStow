@@ -9,6 +9,27 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 describe('GistClient', () => {
+  it('calls the default fetch with the worker global receiver', async () => {
+    const fetcher = vi.fn(function (this: typeof globalThis) {
+      if (this !== globalThis) {
+        throw new TypeError(
+          "Failed to execute 'fetch' on 'WorkerGlobalScope': Illegal invocation",
+        );
+      }
+      return Promise.resolve(jsonResponse({}));
+    });
+    vi.stubGlobal('fetch', fetcher);
+
+    try {
+      const client = new GistClient('token-1');
+      await expect(
+        client.updateFile('gist-1', 'tabstow.sync.json', '{"schemaVersion":1}'),
+      ).resolves.toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it('reads a configured gist file by name', async () => {
     const fetcher = vi.fn().mockResolvedValue(
       jsonResponse({

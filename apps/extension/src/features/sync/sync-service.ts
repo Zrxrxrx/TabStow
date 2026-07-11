@@ -39,6 +39,15 @@ function requireSyncSettings(settings: {
   });
 }
 
+function isEmptyObject(value: unknown): boolean {
+  return (
+    typeof value === 'object' &&
+    value !== null &&
+    !Array.isArray(value) &&
+    Object.keys(value).length === 0
+  );
+}
+
 export async function pushToGist(): Promise<AppResult<SyncResult>> {
   try {
     const settings = await getSettings();
@@ -57,9 +66,12 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
         required.data.gistId,
         required.data.gistFileName,
       );
-      const remoteDocument = parseSyncDocument(JSON.parse(remoteContent));
-      sessionsToPush = mergeSessionsById(remoteDocument.sessions, localSessions);
-      quickLinksToPush = mergeQuickLinksForPush(remoteDocument.quickLinks, localQuickLinks);
+      const remoteValue = JSON.parse(remoteContent);
+      if (!isEmptyObject(remoteValue)) {
+        const remoteDocument = parseSyncDocument(remoteValue);
+        sessionsToPush = mergeSessionsById(remoteDocument.sessions, localSessions);
+        quickLinksToPush = mergeQuickLinksForPush(remoteDocument.quickLinks, localQuickLinks);
+      }
     } catch (error) {
       if (!(error instanceof GistFileNotFoundError)) {
         if (error instanceof SyntaxError) {
