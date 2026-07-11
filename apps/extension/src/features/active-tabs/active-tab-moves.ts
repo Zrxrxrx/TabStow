@@ -97,14 +97,19 @@ function insertionBoundary(
   return position.kind === 'before' ? first : last + 1;
 }
 
+function movedTab(tabs: IndexedTab[], tabId: number): IndexedTab {
+  const source = tabs.find((tab) => tab.id === tabId);
+  if (!source) throw new Error('The moved tab no longer exists in the target window.');
+  return source;
+}
+
 function resolvedFinalIndex(
   tabs: IndexedTab[],
   tabId: number,
   lane: ActiveTabLane,
   position: ActiveTabsPosition,
 ): number {
-  const source = tabs.find((tab) => tab.id === tabId);
-  if (!source) throw new Error('The moved tab no longer exists in the target window.');
+  const source = movedTab(tabs, tabId);
   if (position.kind !== 'end' && position.anchor.kind === 'tab' && position.anchor.tabId === tabId) {
     throw new Error('A tab cannot use itself as a drop anchor.');
   }
@@ -123,17 +128,24 @@ export async function moveActiveTab(
   request: ActiveTabMoveRequest,
 ): Promise<AppResult<ActiveTabsMoveResult>> {
   try {
-    let source = await browser.tabs.get(request.tabId);
-    if (typeof source.id !== 'number') throw new Error('The moved tab no longer exists.');
+    const initialSource = await browser.tabs.get(request.tabId);
+    if (typeof initialSource.id !== 'number') throw new Error('The moved tab no longer exists.');
     const [sourceWindow, targetWindow] = await Promise.all([
-      requireNormalWindow(source.windowId),
+      requireNormalWindow(initialSource.windowId),
       requireNormalWindow(request.destination.windowId),
     ]);
     if (sourceWindow.incognito !== targetWindow.incognito) {
       throw new Error('Tabs cannot move between regular and incognito windows.');
     }
 
+    const sameWindow = initialSource.windowId === request.destination.windowId;
     const targetIsPinned = request.destination.lane.kind === 'pinned';
+    if (!sameWindow && Boolean(initialSource.pinned) !== targetIsPinned) {
+      throw new Error('Pinned state cannot be changed by dragging.');
+    }
+
+    let targetTabs = await queryWindowTabs(request.destination.windowId);
+    let source = sameWindow ? movedTab(targetTabs, request.tabId) : initialSource;
     if (Boolean(source.pinned) !== targetIsPinned) {
       throw new Error('Pinned state cannot be changed by dragging.');
     }
@@ -145,10 +157,9 @@ export async function moveActiveTab(
       }
     }
 
-    let targetTabs = await queryWindowTabs(request.destination.windowId);
     insertionBoundary(targetTabs, request.destination.lane, request.destination.position);
 
-    if (source.windowId === request.destination.windowId && laneMatches(source, request.destination.lane)) {
+    if (sameWindow && laneMatches(source, request.destination.lane)) {
       const index = resolvedFinalIndex(
         targetTabs,
         request.tabId,
@@ -159,24 +170,29 @@ export async function moveActiveTab(
     }
 
     let moved = false;
-    if (source.windowId !== request.destination.windowId) {
+    if (!sameWindow) {
       const index = source.pinned ? targetTabs.filter((tab) => tab.pinned).length : -1;
       await browser.tabs.move(request.tabId, { windowId: request.destination.windowId, index });
       moved = true;
-      source = await browser.tabs.get(request.tabId);
+      targetTabs = await queryWindowTabs(request.destination.windowId);
+      source = movedTab(targetTabs, request.tabId);
+      if (Boolean(source.pinned) !== targetIsPinned) {
+        throw new Error('Pinned state cannot be changed by dragging.');
+      }
     }
 
     if (request.destination.lane.kind === 'group' && groupId(source) !== request.destination.lane.groupId) {
       await browser.tabs.group({ groupId: request.destination.lane.groupId, tabIds: request.tabId });
       moved = true;
-      source = await browser.tabs.get(request.tabId);
+      targetTabs = await queryWindowTabs(request.destination.windowId);
+      source = movedTab(targetTabs, request.tabId);
     } else if (request.destination.lane.kind === 'ungrouped' && groupId(source) !== NO_GROUP) {
       await browser.tabs.ungroup(request.tabId);
       moved = true;
-      source = await browser.tabs.get(request.tabId);
+      targetTabs = await queryWindowTabs(request.destination.windowId);
+      source = movedTab(targetTabs, request.tabId);
     }
 
-    targetTabs = await queryWindowTabs(request.destination.windowId);
     const finalIndex = resolvedFinalIndex(
       targetTabs,
       request.tabId,
