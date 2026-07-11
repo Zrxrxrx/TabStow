@@ -159,6 +159,18 @@ export async function moveActiveTab(
     }
 
     insertionBoundary(targetTabs, request.destination.lane, request.destination.position);
+    const sourceGroupAnchor =
+      request.destination.lane.kind === 'ungrouped' &&
+      request.destination.position.kind !== 'end' &&
+      request.destination.position.anchor.kind === 'group' &&
+      request.destination.position.anchor.groupId === groupId(source)
+        ? request.destination.position.anchor.groupId
+        : null;
+    const anchorGroupTabs = sourceGroupAnchor === null
+      ? []
+      : targetTabs.filter((tab) => groupId(tab) === sourceGroupAnchor);
+    const sourceWasOnlyAnchorGroupTab =
+      anchorGroupTabs.length === 1 && anchorGroupTabs[0]?.id === request.tabId;
 
     if (sourceIsInTargetWindow && laneMatches(source, request.destination.lane)) {
       const index = resolvedFinalIndex(
@@ -194,12 +206,17 @@ export async function moveActiveTab(
       source = movedTab(targetTabs, request.tabId);
     }
 
-    const finalIndex = resolvedFinalIndex(
-      targetTabs,
-      request.tabId,
-      request.destination.lane,
-      request.destination.position,
-    );
+    const sourceGroupAnchorDisappeared =
+      sourceWasOnlyAnchorGroupTab &&
+      !targetTabs.some((tab) => groupId(tab) === sourceGroupAnchor);
+    const finalIndex = sourceGroupAnchorDisappeared
+      ? source.index
+      : resolvedFinalIndex(
+          targetTabs,
+          request.tabId,
+          request.destination.lane,
+          request.destination.position,
+        );
     if (source.index !== finalIndex) {
       await browser.tabs.move(request.tabId, { index: finalIndex });
       moved = true;

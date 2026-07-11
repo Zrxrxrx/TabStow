@@ -108,6 +108,46 @@ describe('active tab moves', () => {
     expect(browserMocks.tabs.move).toHaveBeenCalledWith(10, { index: 1 });
   });
 
+  it.each(['before', 'after'] as const)(
+    'preserves a sole-tab ungroup when its source group disappears from the %s anchor',
+    async (kind) => {
+      browserMocks.tabs.get.mockResolvedValue({
+        id: 10,
+        windowId: 2,
+        index: 1,
+        pinned: false,
+        groupId: 31,
+      });
+      browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+      browserMocks.tabs.query
+        .mockResolvedValueOnce([
+          { id: 20, windowId: 2, index: 0, pinned: false, groupId: -1 },
+          { id: 10, windowId: 2, index: 1, pinned: false, groupId: 31 },
+          { id: 21, windowId: 2, index: 2, pinned: false, groupId: -1 },
+        ])
+        .mockResolvedValueOnce([
+          { id: 20, windowId: 2, index: 0, pinned: false, groupId: -1 },
+          { id: 10, windowId: 2, index: 1, pinned: false, groupId: -1 },
+          { id: 21, windowId: 2, index: 2, pinned: false, groupId: -1 },
+        ]);
+
+      const { moveActiveTab } = await import('./active-tab-moves');
+      const result = await moveActiveTab({
+        tabId: 10,
+        destination: {
+          windowId: 2,
+          lane: { kind: 'ungrouped' },
+          position: { kind, anchor: { kind: 'group', groupId: 31 } },
+        },
+      });
+
+      expect(result).toEqual({ ok: true, data: { moved: true } });
+      expect(browserMocks.tabs.ungroup).toHaveBeenCalledTimes(1);
+      expect(browserMocks.tabs.ungroup).toHaveBeenCalledWith(10);
+      expect(browserMocks.tabs.move).not.toHaveBeenCalled();
+    },
+  );
+
   it('rejects the ungrouped sentinel as a group anchor before mutation', async () => {
     browserMocks.tabs.get.mockResolvedValue({
       id: 10,

@@ -468,6 +468,23 @@ describe('App', () => {
     expect(sentMessageTypes()).not.toContain('active-tabs:move-tab');
   });
 
+  it('does not accept a tab insertion target anchored to the dragged tab', async () => {
+    mockChromeWindowWithUngroupedAndGroupedTabs();
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Grouped'), transfer);
+    const target = screen().getByLabelText('Drop before Grouped in Reading');
+    const dragOverEvent = await dragOver(target, transfer);
+    const dropEvent = await drop(target, transfer);
+
+    expect(dragOverEvent.defaultPrevented).toBe(false);
+    expect(dropEvent.defaultPrevented).toBe(false);
+    expect(target.className).not.toContain('is-active-drop-target');
+    expect(sentMessageTypes()).not.toContain('active-tabs:move-tab');
+    expect(container.querySelector('[role="alert"]')).toBeNull();
+  });
+
   it('allows only one drag move while the first response is pending', async () => {
     const pending = deferred<AppResult<{ moved: boolean }>>();
     const tabs: ActiveBrowserTab[] = [

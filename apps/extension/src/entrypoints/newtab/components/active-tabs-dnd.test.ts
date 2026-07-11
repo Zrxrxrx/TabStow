@@ -136,6 +136,44 @@ it('rejects pinned-lane and incognito mismatches', () => {
   ).toBeNull();
 });
 
+it.each([
+  {
+    name: 'pinned',
+    pinned: true,
+    lane: { kind: 'pinned' } as const,
+  },
+  {
+    name: 'ungrouped',
+    pinned: false,
+    lane: { kind: 'ungrouped' } as const,
+  },
+  {
+    name: 'grouped',
+    pinned: false,
+    lane: { kind: 'group', groupId: 31 } as const,
+  },
+])('rejects a $name tab target anchored to the source tab', ({ pinned, lane }) => {
+  const source = {
+    kind: 'tab',
+    tabId: 10,
+    windowId: 2,
+    pinned,
+    incognito: false,
+  } as const;
+
+  expect(
+    resolveActiveTabsDropRequest(source, {
+      key: 'self-anchor',
+      incognito: false,
+      tabDestination: {
+        windowId: 2,
+        lane,
+        position: { kind: 'before', anchor: { kind: 'tab', tabId: 10 } },
+      },
+    }),
+  ).toBeNull();
+});
+
 it('only resolves groups against complete top-level group targets', () => {
   const group = {
     kind: 'group',

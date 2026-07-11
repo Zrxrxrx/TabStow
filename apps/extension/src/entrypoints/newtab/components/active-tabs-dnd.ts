@@ -90,6 +90,15 @@ export function resolveActiveTabsDropRequest(
 
   if (!target.tabDestination) return null;
 
+  const { position } = target.tabDestination;
+  if (
+    position.kind !== 'end' &&
+    position.anchor.kind === 'tab' &&
+    position.anchor.tabId === source.tabId
+  ) {
+    return null;
+  }
+
   const targetPinned = target.tabDestination.lane.kind === 'pinned';
   if (source.pinned !== targetPinned) return null;
 
