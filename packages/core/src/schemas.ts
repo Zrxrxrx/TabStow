@@ -14,6 +14,7 @@ export const tabSessionSchema = z.object({
   title: z.string().min(1),
   tabs: z.array(savedTabSchema),
   sourceWindowId: z.number().int().optional(),
+  sortOrder: z.number().int().nonnegative().optional(),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
   deviceId: z.string().min(1),

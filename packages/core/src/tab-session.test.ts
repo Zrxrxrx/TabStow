@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { TabSession } from './schemas';
-import { mergeSessionsById } from './tab-session';
+import type { SavedTab, TabSession } from './schemas';
+import {
+  deduplicateIncomingTabs,
+  deduplicateSessionsByUrl,
+  mergeSessionsById,
+  normalizeSavedTabUrl,
+  sortSessionsForDisplay,
+} from './tab-session';
 
 const baseSession: TabSession = {
   id: 'session-1',
@@ -10,6 +16,57 @@ const baseSession: TabSession = {
   updatedAt: '2026-07-06T00:00:00.000Z',
   deviceId: 'local-device',
 };
+
+function tab(id: string, url: string, createdAt: string): SavedTab {
+  return { id, url, title: id, createdAt };
+}
+
+function session(
+  id: string,
+  updatedAt: string,
+  tabs: SavedTab[],
+): TabSession {
+  return { ...baseSession, id, title: id, tabs, updatedAt };
+}
+
+it('normalizes URL identity without collapsing distinct queries', () => {
+  expect(normalizeSavedTabUrl('HTTPS://Example.COM:443/a?x=1#first')).toBe(
+    'https://example.com/a?x=1',
+  );
+  expect(normalizeSavedTabUrl('https://example.com/a?x=2')).toBe(
+    'https://example.com/a?x=2',
+  );
+  expect(normalizeSavedTabUrl('not a url')).toBeNull();
+});
+
+it('keeps the newest saved copy and removes emptied sessions', () => {
+  const older = session('older', '2026-07-10T00:00:00.000Z', [
+    tab('old-copy', 'https://example.com/read#old', '2026-07-10T00:00:00.000Z'),
+  ]);
+  const newer = session('newer', '2026-07-11T00:00:00.000Z', [
+    tab('new-copy', 'https://example.com/read#new', '2026-07-11T00:00:00.000Z'),
+  ]);
+
+  expect(deduplicateSessionsByUrl([older, newer])).toEqual([newer]);
+});
+
+it('keeps the last duplicate in one incoming save batch', () => {
+  expect(
+    deduplicateIncomingTabs([
+      tab('first', 'https://example.com/read#one', '2026-07-11T00:00:00.000Z'),
+      tab('last', 'https://example.com/read#two', '2026-07-11T00:00:00.000Z'),
+    ]).map(({ id }) => id),
+  ).toEqual(['last']);
+});
+
+it('sorts explicit session order before the created-at fallback', () => {
+  expect(
+    sortSessionsForDisplay([
+      { ...baseSession, id: 'second', sortOrder: 1 },
+      { ...baseSession, id: 'first', sortOrder: 0 },
+    ]).map(({ id }) => id),
+  ).toEqual(['first', 'second']);
+});
 
 describe('mergeSessionsById', () => {
   it('keeps local-only sessions, adds remote-only sessions, and lets remote win on matching IDs', () => {

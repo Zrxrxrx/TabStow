@@ -31,6 +31,25 @@ describe('core schemas', () => {
     expect(session.tabs).toHaveLength(1);
   });
 
+  it('parses sessions with legacy missing order and current explicit order', () => {
+    const legacy = tabSessionSchema.parse({
+      id: 'legacy-session',
+      title: 'Legacy session',
+      tabs: [],
+      createdAt: '2026-07-06T00:00:00.000Z',
+      updatedAt: '2026-07-06T00:00:00.000Z',
+      deviceId: 'device-1',
+    });
+    const current = tabSessionSchema.parse({
+      ...legacy,
+      id: 'current-session',
+      sortOrder: 0,
+    });
+
+    expect(legacy.sortOrder).toBeUndefined();
+    expect(current.sortOrder).toBe(0);
+  });
+
   it('keeps default settings aligned with the MVP', () => {
     expect(DEFAULT_SETTINGS).toEqual({
       gistFileName: 'tabstow.sync.json',
