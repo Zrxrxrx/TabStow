@@ -25,6 +25,7 @@ export async function listActiveTabsSnapshot(): Promise<AppResult<ActiveTabsSnap
   if (!response.ok) return response;
 
   return ok({
+    windows: [],
     tabs: response.data,
     chromeGroups: await listChromeTabGroups(),
   });

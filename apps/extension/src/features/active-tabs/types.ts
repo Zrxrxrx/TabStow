@@ -25,9 +25,46 @@ export type ChromeTabGroupInfo = Pick<
   'id' | 'windowId' | 'title' | 'color' | 'collapsed'
 >;
 
+export type ActiveChromeWindowInfo = {
+  id: number;
+  focused: boolean;
+  incognito: boolean;
+  type: 'normal';
+};
+
 export type ActiveTabsSnapshot = {
+  windows: ActiveChromeWindowInfo[];
   tabs: ActiveBrowserTab[];
   chromeGroups: ChromeTabGroupInfo[];
+};
+
+export type ActiveTabItem = {
+  kind: 'tab';
+  key: string;
+  tab: ActiveBrowserTab;
+};
+
+export type ActiveChromeGroupItem = {
+  kind: 'group';
+  key: string;
+  windowId: number;
+  groupId: number;
+  title: string | null;
+  color: ChromeTabGroupInfo['color'] | null;
+  collapsed: boolean | null;
+  tabs: ActiveBrowserTab[];
+};
+
+export type ActiveWindowItem = ActiveTabItem | ActiveChromeGroupItem;
+
+export type ActiveTabWindow = {
+  key: string;
+  windowId: number;
+  focused: boolean;
+  incognito: boolean;
+  visibleTabCount: number;
+  pinnedTabs: ActiveBrowserTab[];
+  items: ActiveWindowItem[];
 };
 
 export type ActiveTabGroupKind = 'chrome' | 'landing' | 'manual' | 'domain';

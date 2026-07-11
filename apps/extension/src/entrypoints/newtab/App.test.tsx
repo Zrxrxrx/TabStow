@@ -1716,13 +1716,16 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByText('Stow current window'));
 
-    secondRefresh.resolve({ ok: true, data: { tabs: [], chromeGroups: [] } });
+    secondRefresh.resolve({ ok: true, data: { windows: [], tabs: [], chromeGroups: [] } });
     await act(async () => {
       await secondRefresh.promise;
     });
     expect(screen().getByText('0 open')).not.toBeNull();
 
-    firstRefresh.resolve({ ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } });
+    firstRefresh.resolve({
+      ok: true,
+      data: { windows: [], tabs: [UNIQUE_TAB], chromeGroups: [] },
+    });
     await act(async () => {
       await firstRefresh.promise;
     });
@@ -1754,7 +1757,10 @@ describe('App', () => {
     ]);
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot };
+        return {
+          ok: true,
+          data: { windows: [], tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot,
+        };
       }
 
       if (message.type === 'active-tabs:list') {
@@ -1819,7 +1825,10 @@ describe('App', () => {
     });
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot };
+        return {
+          ok: true,
+          data: { windows: [], tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot,
+        };
       }
 
       if (message.type === 'active-tabs:list') {
@@ -1884,7 +1893,10 @@ function defaultWorkspace(): ActiveWorkspaceState {
 function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveBrowserTab[]; sessions?: TabSession[] }) {
   sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
     if (message.type === 'active-tabs:snapshot') {
-      return { ok: true, data: { tabs: activeTabs, chromeGroups: [] } satisfies ActiveTabsSnapshot };
+      return {
+        ok: true,
+        data: { windows: [], tabs: activeTabs, chromeGroups: [] } satisfies ActiveTabsSnapshot,
+      };
     }
 
     if (message.type === 'active-tabs:list') {

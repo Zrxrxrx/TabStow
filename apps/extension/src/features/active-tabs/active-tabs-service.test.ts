@@ -76,6 +76,7 @@ describe('active tabs service', () => {
     expect(result).toEqual({
       ok: true,
       data: {
+        windows: [],
         tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
         chromeGroups: [{ id: 31, windowId: 2, title: 'Reading', color: 'blue', collapsed: false }],
       },
@@ -94,6 +95,7 @@ describe('active tabs service', () => {
     expect(result).toEqual({
       ok: true,
       data: {
+        windows: [],
         tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
         chromeGroups: [],
       },
