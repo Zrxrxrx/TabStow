@@ -50,6 +50,32 @@ describe('core schemas', () => {
     expect(current.sortOrder).toBe(0);
   });
 
+  it('rejects sessions with duplicate saved-tab ids', () => {
+    const result = tabSessionSchema.safeParse({
+      id: 'session-1',
+      title: 'Duplicate tab IDs',
+      tabs: [
+        {
+          id: 'duplicate-tab',
+          url: 'https://example.com/one',
+          title: 'One',
+          createdAt: '2026-07-06T00:00:00.000Z',
+        },
+        {
+          id: 'duplicate-tab',
+          url: 'https://example.com/two',
+          title: 'Two',
+          createdAt: '2026-07-07T00:00:00.000Z',
+        },
+      ],
+      createdAt: '2026-07-06T00:00:00.000Z',
+      updatedAt: '2026-07-07T00:00:00.000Z',
+      deviceId: 'device-1',
+    });
+
+    expect(result.success).toBe(false);
+  });
+
   it('keeps default settings aligned with the MVP', () => {
     expect(DEFAULT_SETTINGS).toEqual({
       gistFileName: 'tabstow.sync.json',

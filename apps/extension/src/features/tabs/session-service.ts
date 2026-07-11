@@ -18,10 +18,50 @@ import {
 import type { StowResult } from '../../lib/messages';
 import {
   isBlockedTabUrl,
+  isOpenableTabUrl,
   isStowableTab,
   shouldCloseSavedTab,
   type StowableBrowserTab,
 } from './tab-filter';
+
+const restoringSessions = new Set<string>();
+const consumingTabs = new Set<string>();
+const consumingTabCountsBySession = new Map<string, number>();
+
+function acquireConsumptionLock(
+  sessionId: string,
+  tabId: string | null,
+): (() => void) | null {
+  if (tabId === null) {
+    if (restoringSessions.has(sessionId) || consumingTabCountsBySession.has(sessionId)) {
+      return null;
+    }
+    restoringSessions.add(sessionId);
+    return () => restoringSessions.delete(sessionId);
+  }
+
+  const tabKey = `${sessionId}\u0000${tabId}`;
+  if (restoringSessions.has(sessionId) || consumingTabs.has(tabKey)) return null;
+
+  consumingTabs.add(tabKey);
+  consumingTabCountsBySession.set(
+    sessionId,
+    (consumingTabCountsBySession.get(sessionId) ?? 0) + 1,
+  );
+  return () => {
+    consumingTabs.delete(tabKey);
+    const remaining = (consumingTabCountsBySession.get(sessionId) ?? 1) - 1;
+    if (remaining === 0) consumingTabCountsBySession.delete(sessionId);
+    else consumingTabCountsBySession.set(sessionId, remaining);
+  };
+}
+
+function operationInProgressResult(): AppResult<never> {
+  return err(
+    'operation-in-progress',
+    'Another saved-session operation is already in progress.',
+  );
+}
 
 function nowIso(): string {
   return new Date().toISOString();
@@ -186,7 +226,7 @@ export async function saveTabsAsSession(tabIds: number[]): Promise<AppResult<Sto
   }
 }
 
-export async function openSavedTab(
+async function openSavedTabUnlocked(
   sessionId: string,
   tabId: string,
   consume: boolean,
@@ -205,7 +245,7 @@ export async function openSavedTab(
   if (!tab) {
     return err('saved-tab-not-found', 'Saved tab was not found.');
   }
-  if (isBlockedTabUrl(tab.url)) {
+  if (!isOpenableTabUrl(tab.url)) {
     return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
   }
 
@@ -226,6 +266,22 @@ export async function openSavedTab(
   return ok({ opened: true, consumed: consume });
 }
 
+export async function openSavedTab(
+  sessionId: string,
+  tabId: string,
+  consume: boolean,
+): Promise<AppResult<{ opened: true; consumed: boolean }>> {
+  if (!consume) return openSavedTabUnlocked(sessionId, tabId, false);
+
+  const release = acquireConsumptionLock(sessionId, tabId);
+  if (!release) return operationInProgressResult();
+  try {
+    return await openSavedTabUnlocked(sessionId, tabId, true);
+  } finally {
+    release();
+  }
+}
+
 export async function openHistoryTab(
   historyId: string,
   tabId: string,
@@ -244,7 +300,7 @@ export async function openHistoryTab(
   if (!tab) {
     return err('saved-tab-not-found', 'Saved tab was not found.');
   }
-  if (isBlockedTabUrl(tab.url)) {
+  if (!isOpenableTabUrl(tab.url)) {
     return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
   }
 
@@ -257,7 +313,7 @@ export async function openHistoryTab(
   return ok({ opened: true });
 }
 
-export async function restoreSession(
+async function restoreSessionUnlocked(
   sessionId: string,
 ): Promise<AppResult<{ restored: true; tabCount: number }>> {
   let session: TabSession | undefined;
@@ -273,7 +329,7 @@ export async function restoreSession(
     return err('empty-session', 'Saved session has no tabs to restore.');
   }
 
-  if (session.tabs.some(({ url }) => isBlockedTabUrl(url))) {
+  if (session.tabs.some(({ url }) => !isOpenableTabUrl(url))) {
     return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
   }
 
@@ -299,4 +355,16 @@ export async function restoreSession(
   }
 
   return ok({ restored: true, tabCount: session.tabs.length });
+}
+
+export async function restoreSession(
+  sessionId: string,
+): Promise<AppResult<{ restored: true; tabCount: number }>> {
+  const release = acquireConsumptionLock(sessionId, null);
+  if (!release) return operationInProgressResult();
+  try {
+    return await restoreSessionUnlocked(sessionId);
+  } finally {
+    release();
+  }
 }

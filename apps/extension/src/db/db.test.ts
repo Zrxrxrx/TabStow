@@ -50,6 +50,24 @@ async function seedVersionOne(sessions: TabSession[]): Promise<void> {
   database.close();
 }
 
+async function seedVersionTwo(sessions: TabSession[]): Promise<void> {
+  class VersionTwoDatabase extends Dexie {
+    sessions!: Table<TabSession, string>;
+
+    constructor() {
+      super(DATABASE_NAME);
+      this.version(2).stores({
+        sessions: 'id, createdAt, updatedAt, deviceId, sortOrder',
+        history: 'id, movedAt, sourceSessionId, reason',
+      });
+    }
+  }
+
+  const database = new VersionTwoDatabase();
+  await database.sessions.bulkPut(sessions);
+  database.close();
+}
+
 async function importDatabase() {
   const databaseModule = await import('./db');
   openDatabase = databaseModule.db;
@@ -84,6 +102,55 @@ describe('session database', () => {
       ['newer', 0],
       ['older', 1],
     ]);
+  });
+
+  it('globally deduplicates normalized URLs and repairs duplicate tab ids during migration', async () => {
+    const older = makeSession(
+      'older',
+      'https://example.com/read#old',
+      '2026-07-01T00:00:00.000Z',
+    );
+    older.tabs.push(
+      makeTab('older-tab', 'https://example.com/distinct', '2026-07-01T00:00:00.000Z'),
+    );
+    const newer = makeSession(
+      'newer',
+      'https://example.com/read#new',
+      '2026-07-02T00:00:00.000Z',
+    );
+
+    await seedVersionOne([older, newer]);
+    const { listSessions } = await importDatabase();
+
+    const sessions = await listSessions();
+    expect(sessions.map(({ id, sortOrder }) => [id, sortOrder])).toEqual([
+      ['newer', 0],
+      ['older', 1],
+    ]);
+    expect(sessions[1]?.tabs).toEqual([
+      expect.objectContaining({ id: 'older-tab~2', url: 'https://example.com/distinct' }),
+    ]);
+  });
+
+  it('repairs duplicate tab ids already stored by version two without losing distinct URLs', async () => {
+    const legacy = makeSession(
+      'legacy',
+      'https://example.com/one',
+      '2026-07-01T00:00:00.000Z',
+    );
+    legacy.tabs.push(
+      makeTab('legacy-tab', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+    );
+
+    await seedVersionTwo([legacy]);
+    const { listSessions } = await importDatabase();
+
+    const tabs = (await listSessions())[0]?.tabs ?? [];
+    expect(tabs.map(({ url }) => url)).toEqual([
+      'https://example.com/one',
+      'https://example.com/two',
+    ]);
+    expect(new Set(tabs.map(({ id }) => id)).size).toBe(2);
   });
 
   it('deduplicates old sessions when saving a newest copy', async () => {
@@ -162,6 +229,30 @@ describe('session database', () => {
     expect((await listSessions()).map(({ id }) => id)).toEqual(['second', 'first']);
   });
 
+  it.each([
+    ['duplicate', ['second', 'second']],
+    ['unknown', ['second', 'unknown']],
+  ])('rejects a %s session reorder id list', async (_case, orderedIds) => {
+    const first = makeSession(
+      'first',
+      'https://example.com/first',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const second = makeSession(
+      'second',
+      'https://example.com/second',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const { createSession, reorderSessions, listSessions } = await importDatabase();
+    await createSession(first);
+    await createSession(second);
+
+    await expect(reorderSessions(orderedIds)).rejects.toThrow(
+      'orderedIds must contain every session ID exactly once',
+    );
+    expect((await listSessions()).map(({ id }) => id)).toEqual(['second', 'first']);
+  });
+
   it('replaces stale rows when importing a deduplicated merged set', async () => {
     const stale = makeSession(
       'stale',
@@ -201,6 +292,72 @@ describe('session database', () => {
     ]);
   });
 
+  it('rejects imported sessions with duplicate tab ids', async () => {
+    const malicious = makeSession(
+      'malicious',
+      'https://example.com/one',
+      '2026-07-01T00:00:00.000Z',
+    );
+    malicious.tabs.push(
+      makeTab('malicious-tab', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+    );
+    const { importSessions, listSessions } = await importDatabase();
+
+    await expect(importSessions([malicious])).rejects.toThrow();
+    expect(await listSessions()).toEqual([]);
+  });
+
+  it('atomically merges remote sessions with a concurrent local save', async () => {
+    const initial = makeSession(
+      'initial',
+      'https://example.com/initial',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const remote = makeSession(
+      'remote',
+      'https://example.com/remote',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const concurrent = makeSession(
+      'concurrent',
+      'https://example.com/concurrent',
+      '2026-07-03T00:00:00.000Z',
+    );
+    const { createSession, db, listSessions, mergeRemoteSessions } = await importDatabase();
+    await createSession(initial);
+
+    let releaseRead!: () => void;
+    const readRelease = new Promise<void>((resolve) => {
+      releaseRead = resolve;
+    });
+    let markReadStarted!: () => void;
+    const readStarted = new Promise<void>((resolve) => {
+      markReadStarted = resolve;
+    });
+    const originalToArray = db.sessions.toArray.bind(db.sessions);
+    vi.spyOn(db.sessions, 'toArray').mockImplementationOnce(
+      () => Dexie.waitFor(
+        originalToArray().then(async (rows) => {
+          markReadStarted();
+          await readRelease;
+          return rows;
+        }),
+      ) as ReturnType<typeof db.sessions.toArray>,
+    );
+
+    const merge = mergeRemoteSessions([remote]);
+    await readStarted;
+    const save = createSession(concurrent);
+    releaseRead();
+    await Promise.all([merge, save]);
+
+    expect((await listSessions()).map(({ id }) => id).sort()).toEqual([
+      'concurrent',
+      'initial',
+      'remote',
+    ]);
+  });
+
   it('atomically moves one saved tab into History', async () => {
     const source = makeSession(
       'source',
@@ -233,7 +390,7 @@ describe('session database', () => {
     expect((await listHistory()).map(({ id }) => id)).toEqual([moved.id]);
   });
 
-  it('moves only the located saved tab when another tab shares its ID', async () => {
+  it('rejects a newly saved session when another tab shares its ID', async () => {
     const source = makeSession(
       'source',
       'https://example.com/selected',
@@ -246,15 +403,12 @@ describe('session database', () => {
         '2026-07-02T00:00:00.000Z',
       ),
     );
-    const { createSession, getSession, moveSavedTabToHistory } = await importDatabase();
-    await createSession(source);
+    const { createSession, getSession } = await importDatabase();
 
-    const moved = await moveSavedTabToHistory('source', 'source-tab', 'opened');
-
-    expect(moved.tabs.map(({ url }) => url)).toEqual(['https://example.com/selected']);
-    expect((await getSession('source'))?.tabs.map(({ url }) => url)).toEqual([
-      'https://example.com/duplicate-id',
-    ]);
+    await expect(createSession(source)).rejects.toThrow(
+      'Saved tab IDs must be unique within a session.',
+    );
+    expect(await getSession('source')).toBeUndefined();
   });
 
   it('deletes the source session when its final tab moves into History', async () => {
@@ -395,6 +549,42 @@ describe('session database', () => {
     expect((await getSession('existing'))?.updatedAt).not.toBe(existing.updatedAt);
     expect((await listSessions()).map(({ id }) => id)).toEqual([restored.id, 'existing']);
     expect(await getHistoryEntry(historyEntry.id)).toBeUndefined();
+  });
+
+  it('only refreshes survivor timestamps when History restore changes their tabs', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/read',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const changed = makeSession(
+      'changed',
+      'https://example.com/read#saved',
+      '2026-07-02T00:00:00.000Z',
+    );
+    changed.tabs.push(
+      makeTab('changed-kept', 'https://example.com/kept', '2026-07-02T00:00:00.000Z'),
+    );
+    const unchanged = makeSession(
+      'unchanged',
+      'https://example.com/untouched',
+      '2026-07-03T00:00:00.000Z',
+    );
+    const {
+      createSession,
+      getSession,
+      moveSessionToHistory,
+      restoreHistoryEntry,
+    } = await importDatabase();
+    await createSession(source);
+    const historyEntry = await moveSessionToHistory('source', 'deleted');
+    await createSession(changed);
+    await createSession(unchanged);
+
+    await restoreHistoryEntry(historyEntry.id);
+
+    expect((await getSession('unchanged'))?.updatedAt).toBe(unchanged.updatedAt);
+    expect((await getSession('changed'))?.updatedAt).not.toBe(changed.updatedAt);
   });
 
   it('rolls back Saved changes when a History restore transaction fails', async () => {

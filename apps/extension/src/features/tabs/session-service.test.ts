@@ -166,6 +166,54 @@ describe('session service', () => {
     expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<h1>unsafe</h1>',
+    'file:///tmp/private.html',
+    'ftp://example.com/archive',
+  ])('rejects the imported saved URL %s at the Chrome open boundary', async (url) => {
+    dbMocks.getSession.mockResolvedValue({
+      ...sessionWithTwoTabs,
+      tabs: [{ ...sessionWithTwoTabs.tabs[0]!, url }],
+    });
+
+    await expect(openSavedTab('session-1', 'tab-1', true)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'invalid-tab-url' },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
+  });
+
+  it('allows only one concurrent consuming open for a saved tab', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    dbMocks.moveSavedTabToHistory.mockResolvedValue(historyEntry);
+    let releaseCreate!: () => void;
+    browserMocks.tabs.create.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        releaseCreate = () => resolve({ id: 91 });
+      }),
+    );
+
+    const first = openSavedTab('session-1', 'tab-1', true);
+    await vi.waitFor(() => expect(browserMocks.tabs.create).toHaveBeenCalledTimes(1));
+
+    await expect(openSavedTab('session-1', 'tab-1', true)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'operation-in-progress',
+        message: 'Another saved-session operation is already in progress.',
+      },
+    });
+    expect(browserMocks.tabs.create).toHaveBeenCalledTimes(1);
+
+    releaseCreate();
+    await expect(first).resolves.toEqual({
+      ok: true,
+      data: { opened: true, consumed: true },
+    });
+  });
+
   it('opens every saved tab in order before moving the session to History', async () => {
     dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
     browserMocks.tabs.create.mockResolvedValue({ id: 91 });
@@ -182,6 +230,52 @@ describe('session service', () => {
       dbMocks.moveSessionToHistory,
     );
     expect(dbMocks.moveSessionToHistory).toHaveBeenCalledWith('session-1', 'restored');
+  });
+
+  it('conflicts restore-all with a consuming open for the same session', async () => {
+    const oneTabSession = { ...sessionWithTwoTabs, tabs: [sessionWithTwoTabs.tabs[0]!] };
+    dbMocks.getSession.mockResolvedValue(oneTabSession);
+    dbMocks.moveSessionToHistory.mockResolvedValue(historyEntry);
+    let releaseCreate!: () => void;
+    browserMocks.tabs.create.mockImplementationOnce(
+      () => new Promise((resolve) => {
+        releaseCreate = () => resolve({ id: 91 });
+      }),
+    );
+
+    const restore = restoreSession('session-1');
+    await vi.waitFor(() => expect(browserMocks.tabs.create).toHaveBeenCalledTimes(1));
+
+    await expect(openSavedTab('session-1', 'tab-1', true)).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'operation-in-progress' },
+    });
+    expect(browserMocks.tabs.create).toHaveBeenCalledTimes(1);
+
+    releaseCreate();
+    await expect(restore).resolves.toEqual({
+      ok: true,
+      data: { restored: true, tabCount: 1 },
+    });
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<h1>unsafe</h1>',
+    'file:///tmp/private.html',
+    'ftp://example.com/archive',
+  ])('rejects the imported restore URL %s before opening or consuming any tabs', async (url) => {
+    dbMocks.getSession.mockResolvedValue({
+      ...sessionWithTwoTabs,
+      tabs: [sessionWithTwoTabs.tabs[0]!, { ...sessionWithTwoTabs.tabs[1]!, url }],
+    });
+
+    await expect(restoreSession('session-1')).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'invalid-tab-url' },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
   });
 
   it('keeps the session when one restore-all tab create fails', async () => {
@@ -228,6 +322,26 @@ describe('session service', () => {
       url: 'https://example.com/two',
       active: false,
     });
+    expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
+    expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<h1>unsafe</h1>',
+    'file:///tmp/private.html',
+    'ftp://example.com/archive',
+  ])('rejects the imported History URL %s at the Chrome open boundary', async (url) => {
+    dbMocks.getHistoryEntry.mockResolvedValue({
+      ...historyEntry,
+      tabs: [{ ...historyEntry.tabs[0]!, url }],
+    });
+
+    await expect(openHistoryTab('history-1', 'tab-1')).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'invalid-tab-url' },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
     expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
     expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
   });

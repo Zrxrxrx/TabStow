@@ -9,16 +9,31 @@ export const savedTabSchema = z.object({
   createdAt: z.string().datetime(),
 });
 
-export const tabSessionSchema = z.object({
-  id: z.string().min(1),
-  title: z.string().min(1),
-  tabs: z.array(savedTabSchema),
-  sourceWindowId: z.number().int().optional(),
-  sortOrder: z.number().int().nonnegative().optional(),
-  createdAt: z.string().datetime(),
-  updatedAt: z.string().datetime(),
-  deviceId: z.string().min(1),
-});
+export const tabSessionSchema = z
+  .object({
+    id: z.string().min(1),
+    title: z.string().min(1),
+    tabs: z.array(savedTabSchema),
+    sourceWindowId: z.number().int().optional(),
+    sortOrder: z.number().int().nonnegative().optional(),
+    createdAt: z.string().datetime(),
+    updatedAt: z.string().datetime(),
+    deviceId: z.string().min(1),
+  })
+  .superRefine((session, context) => {
+    const seenTabIds = new Set<string>();
+
+    for (const [index, tab] of session.tabs.entries()) {
+      if (seenTabIds.has(tab.id)) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          path: ['tabs', index, 'id'],
+          message: 'Saved tab IDs must be unique within a session.',
+        });
+      }
+      seenTabIds.add(tab.id);
+    }
+  });
 
 export const themeSchema = z.enum(['system', 'light', 'dark']);
 

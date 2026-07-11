@@ -61,6 +61,17 @@ it('uses tab creation time before stable IDs when session update times tie', () 
   expect(deduplicateSessionsByUrl([olderTab, newerTab])).toEqual([newerTab]);
 });
 
+it('uses stable IDs when duplicate ranking timestamps fully tie', () => {
+  const stableWinner = session('a-session', '2026-07-11T00:00:00.000Z', [
+    tab('a-tab', 'https://example.com/read#a', '2026-07-11T00:00:00.000Z'),
+  ]);
+  const stableLoser = session('z-session', '2026-07-11T00:00:00.000Z', [
+    tab('z-tab', 'https://example.com/read#z', '2026-07-11T00:00:00.000Z'),
+  ]);
+
+  expect(deduplicateSessionsByUrl([stableLoser, stableWinner])).toEqual([stableWinner]);
+});
+
 it('keeps the last duplicate in one incoming save batch', () => {
   expect(
     deduplicateIncomingTabs([
@@ -70,6 +81,26 @@ it('keeps the last duplicate in one incoming save batch', () => {
   ).toEqual(['last']);
 });
 
+it('deduplicates duplicate-id occurrences without retaining every matching occurrence', () => {
+  const malicious = session('session', '2026-07-11T00:00:00.000Z', [
+    tab('duplicate', 'https://example.com/read#first', '2026-07-11T00:00:00.000Z'),
+    tab('duplicate', 'https://example.com/read#second', '2026-07-11T00:00:00.000Z'),
+  ]);
+
+  expect(deduplicateSessionsByUrl([malicious])[0]?.tabs).toHaveLength(1);
+});
+
+it('keeps distinct URLs even when malicious input reuses a tab id', () => {
+  const malicious = session('session', '2026-07-11T00:00:00.000Z', [
+    tab('duplicate', 'https://example.com/one', '2026-07-11T00:00:00.000Z'),
+    tab('duplicate', 'https://example.com/two', '2026-07-11T00:00:00.000Z'),
+  ]);
+
+  expect(
+    deduplicateSessionsByUrl([malicious])[0]?.tabs.map(({ url }) => url),
+  ).toEqual(['https://example.com/one', 'https://example.com/two']);
+});
+
 it('sorts explicit session order before the created-at fallback', () => {
   expect(
     sortSessionsForDisplay([
@@ -77,6 +108,24 @@ it('sorts explicit session order before the created-at fallback', () => {
       { ...baseSession, id: 'first', sortOrder: 0 },
     ]).map(({ id }) => id),
   ).toEqual(['first', 'second']);
+});
+
+it('sorts legacy sessions newest first by createdAt', () => {
+  expect(
+    sortSessionsForDisplay([
+      { ...baseSession, id: 'older', createdAt: '2026-07-01T00:00:00.000Z' },
+      { ...baseSession, id: 'newer', createdAt: '2026-07-02T00:00:00.000Z' },
+    ]).map(({ id }) => id),
+  ).toEqual(['newer', 'older']);
+});
+
+it('uses stable session ids when display ordering fully ties', () => {
+  expect(
+    sortSessionsForDisplay([
+      { ...baseSession, id: 'z-session', sortOrder: 0 },
+      { ...baseSession, id: 'a-session', sortOrder: 0 },
+    ]).map(({ id }) => id),
+  ).toEqual(['a-session', 'z-session']);
 });
 
 describe('mergeSessionsById', () => {

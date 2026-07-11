@@ -10,6 +10,7 @@ export type AppErrorCode =
   | 'history-entry-not-found'
   | 'invalid-tab-url'
   | 'invalid-saved-move'
+  | 'operation-in-progress'
   | 'empty-session'
   | 'unknown-error';
 

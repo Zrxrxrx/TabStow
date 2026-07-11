@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 type Props = {
   className?: string;
@@ -51,7 +51,11 @@ function chromeFaviconUrl(pageUrl: string): string | null {
 }
 
 export function TabFavicon({ className, favIconUrl, pageUrl, title }: Props) {
-  const [candidateIndex, setCandidateIndex] = useState(0);
+  const candidateIdentity = `${favIconUrl ?? ''}\u0000${pageUrl}`;
+  const [candidateState, setCandidateState] = useState({
+    identity: candidateIdentity,
+    index: 0,
+  });
   const candidates = useMemo(
     () =>
       [safeLiveFaviconUrl(favIconUrl), chromeFaviconUrl(pageUrl)].filter(
@@ -59,11 +63,8 @@ export function TabFavicon({ className, favIconUrl, pageUrl, title }: Props) {
       ),
     [favIconUrl, pageUrl],
   );
-
-  useEffect(() => {
-    setCandidateIndex(0);
-  }, [favIconUrl, pageUrl]);
-
+  const candidateIndex =
+    candidateState.identity === candidateIdentity ? candidateState.index : 0;
   const src = candidates[candidateIndex];
   if (!src) {
     return (
@@ -81,7 +82,12 @@ export function TabFavicon({ className, favIconUrl, pageUrl, title }: Props) {
       alt=""
       aria-hidden="true"
       className={`tab-favicon${className ? ` ${className}` : ''}`}
-      onError={() => setCandidateIndex((index) => index + 1)}
+      onError={() =>
+        setCandidateState((state) => ({
+          identity: candidateIdentity,
+          index: state.identity === candidateIdentity ? state.index + 1 : 1,
+        }))
+      }
       src={src}
     />
   );

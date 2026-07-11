@@ -6,7 +6,7 @@ import {
   parseSyncDocument,
   toImportableSettings,
 } from '@tabstow/core';
-import { exportSessions, importSessions, listSessions } from '@/db/db';
+import { exportSessions, mergeRemoteSessions } from '@/db/db';
 import {
   mergeQuickLinksForPull,
   mergeQuickLinksForPush,
@@ -59,7 +59,7 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
     const localQuickLinks = await getQuickLinks();
     const exportedAt = new Date().toISOString();
     const client = new GistClient(required.data.githubToken);
-    let sessionsToPush = localSessions;
+    let sessionsToPush = deduplicateSessionsByUrl(localSessions);
     let quickLinksToPush = localQuickLinks;
 
     try {
@@ -126,14 +126,11 @@ export async function pullFromGist(): Promise<AppResult<SyncResult>> {
     const client = new GistClient(required.data.githubToken);
     const content = await client.getFileContent(required.data.gistId, required.data.gistFileName);
     const document = parseSyncDocument(JSON.parse(content));
-    const merged = deduplicateSessionsByUrl(
-      mergeSessionsById(await listSessions(), document.sessions),
-    );
+    const merged = await mergeRemoteSessions(document.sessions);
     const mergedQuickLinks = await updateQuickLinks((currentQuickLinks) =>
       mergeQuickLinksForPull(currentQuickLinks, document.quickLinks),
     );
 
-    await importSessions(merged);
     await updateSettings(toImportableSettings(document.settings));
 
     return ok({

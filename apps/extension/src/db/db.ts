@@ -2,7 +2,9 @@ import Dexie, { type Table } from 'dexie';
 import {
   deduplicateIncomingTabs,
   deduplicateSessionsByUrl,
+  mergeSessionsById,
   normalizeSavedTabUrl,
+  repairDuplicateTabIds,
   sortSessionsForDisplay,
   sortSessionsNewestFirst,
   tabSessionSchema,
@@ -30,10 +32,35 @@ class TabstowDatabase extends Dexie {
       })
       .upgrade(async (transaction) => {
         const table = transaction.table<TabSession, string>('sessions');
-        const sessions = sortSessionsNewestFirst(await table.toArray());
-        await table.bulkPut(sessions.map((session, sortOrder) => ({ ...session, sortOrder })));
+        await migrateSessions(table);
+      });
+    this.version(3)
+      .stores({
+        sessions: 'id, createdAt, updatedAt, deviceId, sortOrder',
+        history: 'id, movedAt, sourceSessionId, reason',
+      })
+      .upgrade(async (transaction) => {
+        const table = transaction.table<TabSession, string>('sessions');
+        await migrateSessions(table);
       });
   }
+}
+
+function prepareSessionsForStorage(sessions: TabSession[]): TabSession[] {
+  return deduplicateSessionsByUrl(
+    sessions.map((session) => ({
+      ...session,
+      tabs: repairDuplicateTabIds(session.tabs),
+    })),
+  ).map((session, sortOrder) => ({ ...session, sortOrder }));
+}
+
+async function migrateSessions(table: Table<TabSession, string>): Promise<void> {
+  const migrated = prepareSessionsForStorage(
+    sortSessionsNewestFirst(await table.toArray()),
+  );
+  await table.clear();
+  await table.bulkPut(migrated);
 }
 
 export const db = new TabstowDatabase();
@@ -50,18 +77,22 @@ async function insertNewestSessionInCurrentTransaction(
   const existingSessions = sortSessionsForDisplay(await db.sessions.toArray());
   const survivors = existingSessions
     .filter(({ id }) => id !== session.id)
-    .map((existingSession) => ({
-      ...existingSession,
-      tabs: existingSession.tabs.filter((tab) => {
+    .map((existingSession) => {
+      const tabs = existingSession.tabs.filter((tab) => {
         const normalizedUrl = normalizeSavedTabUrl(tab.url);
         return normalizedUrl === null || !incomingUrls.has(normalizedUrl);
-      }),
+      });
+      return { existingSession, tabs, tabsChanged: tabs.length !== existingSession.tabs.length };
+    })
+    .map(({ existingSession, tabs, tabsChanged }) => ({
+      ...existingSession,
+      tabs,
+      ...(survivorsUpdatedAt && tabsChanged ? { updatedAt: survivorsUpdatedAt } : {}),
     }))
     .filter(({ tabs }) => tabs.length > 0)
     .map((existingSession, index) => ({
       ...existingSession,
       sortOrder: index + 1,
-      ...(survivorsUpdatedAt ? { updatedAt: survivorsUpdatedAt } : {}),
     }));
   const newestSession = { ...session, sortOrder: 0 };
 
@@ -154,15 +185,30 @@ export async function importSessions(sessions: TabSession[]): Promise<TabSession
   const parsed = sessions.map((session) => tabSessionSchema.parse(session));
 
   return db.transaction('rw', db.sessions, async () => {
-    const deduplicated = deduplicateSessionsByUrl(parsed).map((session, sortOrder) => ({
-      ...session,
-      sortOrder,
-    }));
+    const deduplicated = prepareSessionsForStorage(parsed);
 
     await db.sessions.clear();
     await db.sessions.bulkPut(deduplicated);
 
     return deduplicated;
+  });
+}
+
+export async function mergeRemoteSessions(
+  remoteSessions: TabSession[],
+): Promise<TabSession[]> {
+  const parsedRemote = remoteSessions.map((session) => tabSessionSchema.parse(session));
+
+  return db.transaction('rw', db.sessions, async () => {
+    const currentSessions = await db.sessions.toArray();
+    const merged = prepareSessionsForStorage(
+      mergeSessionsById(currentSessions, parsedRemote),
+    );
+
+    await db.sessions.clear();
+    await db.sessions.bulkPut(merged);
+
+    return merged;
   });
 }
 

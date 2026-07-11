@@ -64,6 +64,11 @@ describe('i18n', () => {
     expect(t('en', 'movedSavedSessionToHistory')).toBe('Moved saved session to History.');
     expect(t('en', 'movedSavedTab')).toBe('Moved saved tab.');
     expect(t('en', 'reorderedSavedSessions')).toBe('Reordered saved sessions.');
+    expect(t('en', 'savedCount', { sessions: 2, tabs: 3 })).toBe(
+      '2 sessions, 3 tabs',
+    );
+    expect(t('en', 'savedSessionsCount', { count: 2 })).toBe('2 sessions');
+    expect(t('en', 'savedTabsCount', { count: 3 })).toBe('3 tabs');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -130,6 +135,11 @@ describe('i18n', () => {
     expect(t('zh-CN', 'movedSavedSessionToHistory')).toBe('已将保存的会话移至历史记录。');
     expect(t('zh-CN', 'movedSavedTab')).toBe('已移动保存的标签页。');
     expect(t('zh-CN', 'reorderedSavedSessions')).toBe('已重新排列保存的会话。');
+    expect(t('zh-CN', 'savedCount', { sessions: 2, tabs: 3 })).toBe(
+      '2 个会话，3 个标签页',
+    );
+    expect(t('zh-CN', 'savedSessionsCount', { count: 2 })).toBe('2 个会话');
+    expect(t('zh-CN', 'savedTabsCount', { count: 3 })).toBe('3 个标签页');
   });
 
   it('includes English and Simplified Chinese labels for the History page', async () => {

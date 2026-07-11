@@ -6,6 +6,7 @@ const dbMocks = vi.hoisted(() => ({
   exportSessions: vi.fn(),
   importSessions: vi.fn(),
   listSessions: vi.fn(),
+  mergeRemoteSessions: vi.fn(),
 }));
 
 const settingsMocks = vi.hoisted(() => ({
@@ -81,6 +82,7 @@ describe('sync service', () => {
     });
     settingsMocks.getSettings.mockResolvedValue(SETTINGS);
     settingsMocks.updateSettings.mockResolvedValue(SETTINGS);
+    dbMocks.mergeRemoteSessions.mockResolvedValue([]);
   });
 
   it('merges remote sessions into a push while keeping local versions for matching ids', async () => {
@@ -203,6 +205,46 @@ describe('sync service', () => {
     const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
     expect(pushedDocument.sessions).toEqual([localOnly]);
     expect(pushedDocument.settings).not.toHaveProperty('theme');
+  });
+
+  it.each([
+    ['missing', null],
+    ['empty', '{}'],
+  ])('deduplicates local sessions when the gist file is %s', async (_case, remoteContent) => {
+    const older = {
+      ...createSession('older', 'Older', '2026-07-10T00:00:00.000Z'),
+      tabs: [{
+        id: 'older-tab',
+        url: 'https://example.com/read#old',
+        title: 'Older',
+        createdAt: '2026-07-10T00:00:00.000Z',
+      }],
+    };
+    const newer = {
+      ...createSession('newer', 'Newer', '2026-07-11T00:00:00.000Z'),
+      tabs: [{
+        id: 'newer-tab',
+        url: 'https://example.com/read#new',
+        title: 'Newer',
+        createdAt: '2026-07-11T00:00:00.000Z',
+      }],
+    };
+    dbMocks.exportSessions.mockResolvedValue([older, newer]);
+    if (remoteContent === null) {
+      gistMocks.getFileContent.mockRejectedValue(
+        new gistMocks.GistFileNotFoundError('Gist file was not found.'),
+      );
+    } else {
+      gistMocks.getFileContent.mockResolvedValue(remoteContent);
+    }
+    gistMocks.updateFile.mockResolvedValue(undefined);
+
+    await pushToGist();
+
+    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
+    expect(pushedDocument.sessions).toEqual([
+      expect.objectContaining({ id: 'newer' }),
+    ]);
   });
 
   it('initializes an empty-object gist file on push', async () => {
@@ -339,18 +381,7 @@ describe('sync service', () => {
     });
   });
 
-  it('imports only the newer saved copy when pulled sessions contain the same URL', async () => {
-    const olderLocal = {
-      ...createSession('old-session', 'Old session', '2026-07-10T00:00:00.000Z'),
-      tabs: [
-        {
-          id: 'old-copy',
-          url: 'https://example.com/read#old',
-          title: 'Old copy',
-          createdAt: '2026-07-10T00:00:00.000Z',
-        },
-      ],
-    };
+  it('atomically merges pulled sessions with remote precedence', async () => {
     const newerRemote = {
       ...createSession('new-session', 'New session', '2026-07-11T00:00:00.000Z'),
       tabs: [
@@ -363,8 +394,7 @@ describe('sync service', () => {
       ],
     };
 
-    dbMocks.listSessions.mockResolvedValue([olderLocal]);
-    dbMocks.importSessions.mockResolvedValue(undefined);
+    dbMocks.mergeRemoteSessions.mockResolvedValue([newerRemote]);
     gistMocks.getFileContent.mockResolvedValue(
       JSON.stringify({
         schemaVersion: 1,
@@ -383,9 +413,41 @@ describe('sync service', () => {
 
     await pullFromGist();
 
-    expect(dbMocks.importSessions).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'new-session' }),
-    ]);
+    expect(dbMocks.mergeRemoteSessions).toHaveBeenCalledWith([newerRemote]);
+    expect(dbMocks.listSessions).not.toHaveBeenCalled();
+    expect(dbMocks.importSessions).not.toHaveBeenCalled();
+  });
+
+  it('rejects a malicious sync session with duplicate tab ids before changing local sessions', async () => {
+    const malicious = createSession('malicious', 'Malicious', '2026-07-11T00:00:00.000Z');
+    malicious.tabs.push({
+      ...malicious.tabs[0]!,
+      url: 'https://example.com/distinct',
+    });
+    gistMocks.getFileContent.mockResolvedValue(
+      JSON.stringify({
+        schemaVersion: 1,
+        deviceId: 'remote-device',
+        exportedAt: '2026-07-11T00:00:00.000Z',
+        sessions: [malicious],
+        settings: {
+          deviceId: 'remote-device',
+          gistId: 'gist-1',
+          gistFileName: 'tabstow.sync.json',
+          includePinnedTabs: false,
+          closePinnedTabs: false,
+        },
+      }),
+    );
+
+    await expect(pullFromGist()).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-sync-document',
+        message: 'The configured Gist file was not a valid Tabstow sync document.',
+      },
+    });
+    expect(dbMocks.mergeRemoteSessions).not.toHaveBeenCalled();
   });
 
   it('classifies zod validation failures during pull as invalid sync documents', async () => {

@@ -316,9 +316,20 @@ export function StowedSessions({
           </h2>
           <p className="subtle">{t(locale, 'savedSessionsSubtitle')}</p>
         </div>
-        <span className="meta-row" id="saved-count" aria-label="Saved sessions and tabs count">
-          <span className="meta-pill">{filteredSessions.length} sessions</span>
-          <span className="meta-pill">{totalTabs} tabs</span>
+        <span
+          className="meta-row"
+          id="saved-count"
+          aria-label={t(locale, 'savedCount', {
+            sessions: filteredSessions.length,
+            tabs: totalTabs,
+          })}
+        >
+          <span className="meta-pill">
+            {t(locale, 'savedSessionsCount', { count: filteredSessions.length })}
+          </span>
+          <span className="meta-pill">
+            {t(locale, 'savedTabsCount', { count: totalTabs })}
+          </span>
         </span>
       </header>
 

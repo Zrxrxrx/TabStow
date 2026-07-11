@@ -1,4 +1,5 @@
 import { act } from 'react';
+import { flushSync } from 'react-dom';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { TabFavicon } from './TabFavicon';
@@ -98,6 +99,29 @@ describe('TabFavicon', () => {
       favIconUrl: 'https://new.example/favicon.ico',
       pageUrl: 'https://new.example/page',
       title: 'New',
+    });
+
+    expect(getImage().getAttribute('src')).toBe('https://new.example/favicon.ico');
+  });
+
+  it('resets the candidate cascade in the same render as candidate identity changes', async () => {
+    await renderFavicon({
+      favIconUrl: 'https://old.example/favicon.ico',
+      pageUrl: 'https://old.example/page',
+      title: 'Old',
+    });
+    await failImage();
+
+    act(() => {
+      flushSync(() => {
+        root.render(
+          <TabFavicon
+            favIconUrl="https://new.example/favicon.ico"
+            pageUrl="https://new.example/page"
+            title="New"
+          />,
+        );
+      });
     });
 
     expect(getImage().getAttribute('src')).toBe('https://new.example/favicon.ico');

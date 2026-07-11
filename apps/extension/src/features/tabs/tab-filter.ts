@@ -12,6 +12,17 @@ export function isBlockedTabUrl(url: string | undefined): boolean {
   return BLOCKED_URL_PREFIXES.some((prefix) => url.startsWith(prefix));
 }
 
+export function isOpenableTabUrl(url: string | undefined): boolean {
+  if (!url) return false;
+
+  try {
+    const parsed = new URL(url);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
 export function isStowableTab(
   tab: StowableBrowserTab,
   settings: Pick<ExtensionSettings, 'includePinnedTabs'>,
