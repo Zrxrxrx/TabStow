@@ -1,0 +1,164 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      bump:
+        description: Version to publish or increment
+        required: true
+        default: current
+        type: choice
+        options:
+          - current
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Publish Chrome extension
+    runs-on: ubuntu-latest
+    env:
+      BUMP: ${{ inputs.bump }}
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+    steps:
+      - name: Check out the default branch
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
+        with:
+          ref: ${{ github.event.repository.default_branch }}
+          fetch-depth: 0
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
+        with:
+          bun-version: '1.3.6'
+
+      - name: Install frozen dependencies
+        run: |
+          set -euo pipefail
+          bun install --frozen-lockfile
+
+      - name: Prepare the release version
+        id: release
+        run: |
+          set -euo pipefail
+
+          case "$BUMP" in
+            current)
+              if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+                echo "Publishing the current version requires a clean tracked worktree." >&2
+                exit 1
+              fi
+              ;;
+            patch|minor|major)
+              (
+                cd apps/extension
+                bun pm version "$BUMP" --no-git-tag-version
+              )
+              bun install --lockfile-only
+              bun install --frozen-lockfile
+              ;;
+            *)
+              echo "Unsupported release input: $BUMP" >&2
+              exit 1
+              ;;
+          esac
+
+          VERSION="$(bun -e 'const pkg = await Bun.file("apps/extension/package.json").json(); console.log(pkg.version)')"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid extension version: $VERSION" >&2
+            exit 1
+          fi
+
+          TAG="v$VERSION"
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            echo "Tag $TAG already exists." >&2
+            exit 1
+          fi
+
+          printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
+          printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+
+      - name: Typecheck, test, and build the Chrome ZIP
+        run: |
+          set -euo pipefail
+          bun run typecheck
+          bun run test
+          bun run zip
+
+      - name: Verify and prepare release assets
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          bun run release:verify -- "$TAG" apps/extension/.output/chrome-mv3/manifest.json
+
+          SOURCE_ZIP="apps/extension/.output/tabstow-$VERSION-chrome.zip"
+          RELEASE_ZIP="apps/extension/.output/tabstow-v$VERSION-chrome.zip"
+          CHECKSUMS="apps/extension/.output/SHA256SUMS"
+          test -f "$SOURCE_ZIP"
+          mv -- "$SOURCE_ZIP" "$RELEASE_ZIP"
+          (
+            cd apps/extension/.output
+            sha256sum "tabstow-v$VERSION-chrome.zip" > SHA256SUMS
+          )
+          test -s "$CHECKSUMS"
+
+      - name: Commit, tag, and push
+        env:
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          if [[ "$BUMP" == "current" ]]; then
+            if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+              echo "Publishing the current version requires a clean tracked worktree." >&2
+              exit 1
+            fi
+          else
+            if ! git diff --quiet -- . ':(exclude)apps/extension/package.json' ':(exclude)bun.lock'; then
+              echo "The version bump changed tracked files other than the package and lockfile." >&2
+              exit 1
+            fi
+
+            git add -- apps/extension/package.json bun.lock
+            if [[ "$(git diff --cached --name-only)" != $'apps/extension/package.json\nbun.lock' ]]; then
+              echo "The version bump must change exactly the extension package and lockfile." >&2
+              exit 1
+            fi
+            git commit -m "chore(release): bump version to $VERSION"
+          fi
+
+          git tag -a "$TAG" -m "Release $TAG"
+          if [[ "$BUMP" == "current" ]]; then
+            git push origin "refs/tags/$TAG"
+          else
+            git push --atomic origin "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$TAG"
+          fi
+
+      - name: Create the GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          TAG: ${{ steps.release.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" \
+            "apps/extension/.output/tabstow-v$VERSION-chrome.zip" \
+            apps/extension/.output/SHA256SUMS \
+            --verify-tag \
+            --generate-notes \
+            --title "$TAG"
