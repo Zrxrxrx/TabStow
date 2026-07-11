@@ -108,6 +108,22 @@ describe('session service', () => {
     );
   });
 
+  it('returns a structured saved-tab error when consuming the open loses a storage race', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    browserMocks.tabs.create.mockResolvedValue({ id: 91 });
+    dbMocks.moveSavedTabToHistory.mockRejectedValue(
+      new Error('Saved tab not found: tab-1'),
+    );
+
+    await expect(openSavedTab('session-1', 'tab-1', true)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'saved-tab-not-found',
+        message: 'Saved tab was not found.',
+      },
+    });
+  });
+
   it('does not consume a middle-click open', async () => {
     dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
     browserMocks.tabs.create.mockResolvedValue({ id: 91 });
@@ -181,6 +197,20 @@ describe('session service', () => {
       error: { code: 'chrome-tabs-error', message: 'create failed' },
     });
     expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
+  });
+
+  it('returns an unknown error when restored tabs open but the History move fails unexpectedly', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    browserMocks.tabs.create.mockResolvedValue({ id: 91 });
+    dbMocks.moveSessionToHistory.mockRejectedValue(new Error('storage unavailable'));
+
+    await expect(restoreSession('session-1')).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'unknown-error',
+        message: 'storage unavailable',
+      },
+    });
   });
 
   it('opens a History tab without mutating the History entry', async () => {

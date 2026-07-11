@@ -21,6 +21,23 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+function storageErrorResult(error: unknown): AppResult<never> {
+  const message = toErrorMessage(error);
+  if (message.startsWith('Session not found:')) {
+    return err('session-not-found', 'Saved session was not found.');
+  }
+  if (message.startsWith('Saved tab not found:')) {
+    return err('saved-tab-not-found', 'Saved tab was not found.');
+  }
+  if (message.startsWith('History entry not found:')) {
+    return err('history-entry-not-found', 'History entry was not found.');
+  }
+  if (message.startsWith('Invalid destination index:')) {
+    return err('invalid-saved-move', 'Saved tab move request is invalid.');
+  }
+  return err('unknown-error', message);
+}
+
 function titleFromTabs(tabs: SavedTab[]): string {
   if (tabs.length === 1) return tabs[0]?.title || '1 tab';
   return `${tabs.length} tabs stowed`;
@@ -181,72 +198,93 @@ export async function openSavedTab(
   tabId: string,
   consume: boolean,
 ): Promise<AppResult<{ opened: true; consumed: boolean }>> {
+  let session: TabSession | undefined;
   try {
-    const session = await getSession(sessionId);
-    if (!session) {
-      return err('session-not-found', 'Saved session was not found.');
-    }
+    session = await getSession(sessionId);
+  } catch (error) {
+    return storageErrorResult(error);
+  }
+  if (!session) {
+    return err('session-not-found', 'Saved session was not found.');
+  }
 
-    const tab = session.tabs.find(({ id }) => id === tabId);
-    if (!tab) {
-      return err('saved-tab-not-found', 'Saved tab was not found.');
-    }
-    if (isBlockedTabUrl(tab.url)) {
-      return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
-    }
+  const tab = session.tabs.find(({ id }) => id === tabId);
+  if (!tab) {
+    return err('saved-tab-not-found', 'Saved tab was not found.');
+  }
+  if (isBlockedTabUrl(tab.url)) {
+    return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
+  }
 
+  try {
     await browser.tabs.create({ url: tab.url, active: false });
-    if (consume) {
-      await moveSavedTabToHistory(sessionId, tabId, 'opened');
-    }
-
-    return ok({ opened: true, consumed: consume });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }
+
+  if (consume) {
+    try {
+      await moveSavedTabToHistory(sessionId, tabId, 'opened');
+    } catch (error) {
+      return storageErrorResult(error);
+    }
+  }
+
+  return ok({ opened: true, consumed: consume });
 }
 
 export async function openHistoryTab(
   historyId: string,
   tabId: string,
 ): Promise<AppResult<{ opened: true }>> {
+  let entry: Awaited<ReturnType<typeof getHistoryEntry>>;
   try {
-    const entry = await getHistoryEntry(historyId);
-    if (!entry) {
-      return err('history-entry-not-found', 'History entry was not found.');
-    }
+    entry = await getHistoryEntry(historyId);
+  } catch (error) {
+    return storageErrorResult(error);
+  }
+  if (!entry) {
+    return err('history-entry-not-found', 'History entry was not found.');
+  }
 
-    const tab = entry.tabs.find(({ id }) => id === tabId);
-    if (!tab) {
-      return err('saved-tab-not-found', 'Saved tab was not found.');
-    }
-    if (isBlockedTabUrl(tab.url)) {
-      return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
-    }
+  const tab = entry.tabs.find(({ id }) => id === tabId);
+  if (!tab) {
+    return err('saved-tab-not-found', 'Saved tab was not found.');
+  }
+  if (isBlockedTabUrl(tab.url)) {
+    return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
+  }
 
+  try {
     await browser.tabs.create({ url: tab.url, active: false });
-    return ok({ opened: true });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }
+
+  return ok({ opened: true });
 }
 
 export async function restoreSession(
   sessionId: string,
 ): Promise<AppResult<{ restored: true; tabCount: number }>> {
+  let session: TabSession | undefined;
   try {
-    const session = await getSession(sessionId);
-    if (!session) {
-      return err('session-not-found', 'Saved session was not found.');
-    }
-    if (session.tabs.length === 0) {
-      return err('empty-session', 'Saved session has no tabs to restore.');
-    }
+    session = await getSession(sessionId);
+  } catch (error) {
+    return storageErrorResult(error);
+  }
+  if (!session) {
+    return err('session-not-found', 'Saved session was not found.');
+  }
+  if (session.tabs.length === 0) {
+    return err('empty-session', 'Saved session has no tabs to restore.');
+  }
 
-    if (session.tabs.some(({ url }) => isBlockedTabUrl(url))) {
-      return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
-    }
+  if (session.tabs.some(({ url }) => isBlockedTabUrl(url))) {
+    return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
+  }
 
+  try {
     for (const tab of session.tabs) {
       await browser.tabs.create({
         url: tab.url,
@@ -254,10 +292,15 @@ export async function restoreSession(
         pinned: tab.pinned || undefined,
       });
     }
-
-    await moveSessionToHistory(sessionId, 'restored');
-    return ok({ restored: true, tabCount: session.tabs.length });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }
+
+  try {
+    await moveSessionToHistory(sessionId, 'restored');
+  } catch (error) {
+    return storageErrorResult(error);
+  }
+
+  return ok({ restored: true, tabCount: session.tabs.length });
 }

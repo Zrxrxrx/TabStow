@@ -308,6 +308,75 @@ describe('background message routing', () => {
     expect(response).toBe(result);
   });
 
+  it('rejects string saved tab consume flags before calling the service', async () => {
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: 'tab-2',
+      consume: 'false',
+    });
+
+    expect(sessionServiceMocks.openSavedTab).not.toHaveBeenCalled();
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'unknown-error',
+        message: 'Invalid sessions:open-tab message.',
+      },
+    });
+  });
+
+  it('rejects missing saved tab open IDs before calling the service', async () => {
+    await import('../entrypoints/background');
+
+    const missingSession = await dispatchRuntimeMessage({
+      type: 'sessions:open-tab',
+      sessionId: '',
+      tabId: 'tab-2',
+      consume: true,
+    });
+    const missingTab = await dispatchRuntimeMessage({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: '',
+      consume: true,
+    });
+
+    expect(sessionServiceMocks.openSavedTab).not.toHaveBeenCalled();
+    expect(missingSession.response).toEqual({
+      ok: false,
+      error: {
+        code: 'session-not-found',
+        message: 'Saved session was not found.',
+      },
+    });
+    expect(missingTab.response).toEqual({
+      ok: false,
+      error: {
+        code: 'saved-tab-not-found',
+        message: 'Saved tab was not found.',
+      },
+    });
+  });
+
+  it('rejects malformed saved session restore IDs before calling the service', async () => {
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:restore',
+      sessionId: 7,
+    });
+
+    expect(sessionServiceMocks.restoreSession).not.toHaveBeenCalled();
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'session-not-found',
+        message: 'Saved session was not found.',
+      },
+    });
+  });
+
   it('routes saved tab delete messages into History', async () => {
     dbMocks.moveSavedTabToHistory.mockResolvedValue({ id: 'history-1' });
 
@@ -338,6 +407,30 @@ describe('background message routing', () => {
 
     expect(dbMocks.reorderSessions).toHaveBeenCalledWith(['session-2', 'session-1']);
     expect(response).toEqual({ ok: true, data: sessions });
+  });
+
+  it('rejects malformed saved session reorder lists before calling the database', async () => {
+    await import('../entrypoints/background');
+
+    const nonArray = await dispatchRuntimeMessage({
+      type: 'sessions:reorder',
+      orderedIds: 'session-1',
+    });
+    const nonStringId = await dispatchRuntimeMessage({
+      type: 'sessions:reorder',
+      orderedIds: ['session-1', 2],
+    });
+
+    expect(dbMocks.reorderSessions).not.toHaveBeenCalled();
+    for (const { response } of [nonArray, nonStringId]) {
+      expect(response).toEqual({
+        ok: false,
+        error: {
+          code: 'unknown-error',
+          message: 'Invalid sessions:reorder message.',
+        },
+      });
+    }
   });
 
   it('routes valid saved tab move requests unchanged', async () => {
@@ -429,6 +522,37 @@ describe('background message routing', () => {
 
     expect(sessionServiceMocks.openHistoryTab).toHaveBeenCalledWith('history-1', 'tab-2');
     expect(response).toBe(result);
+  });
+
+  it('rejects malformed History tab open IDs before calling the service', async () => {
+    await import('../entrypoints/background');
+
+    const missingHistory = await dispatchRuntimeMessage({
+      type: 'history:open-tab',
+      historyId: '',
+      tabId: 'tab-2',
+    });
+    const missingTab = await dispatchRuntimeMessage({
+      type: 'history:open-tab',
+      historyId: 'history-1',
+      tabId: null,
+    });
+
+    expect(sessionServiceMocks.openHistoryTab).not.toHaveBeenCalled();
+    expect(missingHistory.response).toEqual({
+      ok: false,
+      error: {
+        code: 'history-entry-not-found',
+        message: 'History entry was not found.',
+      },
+    });
+    expect(missingTab.response).toEqual({
+      ok: false,
+      error: {
+        code: 'saved-tab-not-found',
+        message: 'Saved tab was not found.',
+      },
+    });
   });
 
   it('routes History restore messages with exact IDs', async () => {

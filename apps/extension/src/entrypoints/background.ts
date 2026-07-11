@@ -44,8 +44,12 @@ import { browser } from '@/lib/browser';
 import type { ExtensionMessage } from '@/lib/messages';
 import type { MoveSavedTabRequest } from '@/features/history/types';
 
-function unsupportedMessage(message: ExtensionMessage): AppResult<never> {
+function unsupportedMessage(message: { type: unknown }): AppResult<never> {
   return err('unknown-error', `Unsupported extension message: ${String(message.type)}.`);
+}
+
+function invalidMessage(type: string): AppResult<never> {
+  return err('unknown-error', `Invalid ${type} message.`);
 }
 
 function hasId(value: unknown): value is string {
@@ -82,9 +86,19 @@ function knownStorageError(error: unknown): AppResult<never> | null {
 }
 
 async function handleMessage(
-  message: ExtensionMessage,
+  rawMessage: unknown,
   sender?: chrome.runtime.MessageSender,
 ): Promise<AppResult<unknown>> {
+  if (
+    !rawMessage
+    || typeof rawMessage !== 'object'
+    || !('type' in rawMessage)
+    || typeof rawMessage.type !== 'string'
+  ) {
+    return invalidMessage('extension');
+  }
+
+  const message = rawMessage as ExtensionMessage;
   try {
     switch (message.type) {
       case 'sessions:list':
@@ -94,8 +108,20 @@ async function handleMessage(
       case 'sessions:stow-tab':
         return saveTabsAsSession([message.tabId]);
       case 'sessions:open-tab':
+        if (!hasId(message.sessionId)) {
+          return err('session-not-found', 'Saved session was not found.');
+        }
+        if (!hasId(message.tabId)) {
+          return err('saved-tab-not-found', 'Saved tab was not found.');
+        }
+        if (typeof message.consume !== 'boolean') {
+          return invalidMessage(message.type);
+        }
         return openSavedTab(message.sessionId, message.tabId, message.consume);
       case 'sessions:restore':
+        if (!hasId(message.sessionId)) {
+          return err('session-not-found', 'Saved session was not found.');
+        }
         return restoreSession(message.sessionId);
       case 'sessions:delete-tab':
         if (!hasId(message.sessionId)) {
@@ -113,6 +139,9 @@ async function handleMessage(
         await moveSessionToHistory(message.sessionId, 'deleted');
         return ok({ deleted: true });
       case 'sessions:reorder':
+        if (!Array.isArray(message.orderedIds) || !message.orderedIds.every(hasId)) {
+          return invalidMessage(message.type);
+        }
         return ok(await reorderSessions(message.orderedIds));
       case 'sessions:move-tab':
         if (!isValidSavedMoveRequest(message.request)) {
@@ -123,6 +152,12 @@ async function handleMessage(
       case 'history:list':
         return ok(await listHistory());
       case 'history:open-tab':
+        if (!hasId(message.historyId)) {
+          return err('history-entry-not-found', 'History entry was not found.');
+        }
+        if (!hasId(message.tabId)) {
+          return err('saved-tab-not-found', 'Saved tab was not found.');
+        }
         return openHistoryTab(message.historyId, message.tabId);
       case 'history:restore':
         if (!hasId(message.historyId)) {
@@ -196,7 +231,7 @@ export default defineBackground(() => {
     void saveCurrentWindowAsSession(tab.windowId).then(showActionFeedback);
   });
 
-  browser.runtime.onMessage.addListener((message: ExtensionMessage, sender, sendResponse) => {
+  browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
     void handleMessage(message, sender).then(
       sendResponse,
       (error) => sendResponse(err('unknown-error', toErrorMessage(error))),
