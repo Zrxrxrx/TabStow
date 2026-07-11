@@ -57,7 +57,17 @@ const packageJson = JSON.parse(
 ) as {
   scripts: Record<string, string>;
 };
+const extensionPackageJson = JSON.parse(
+  readFileSync(new URL('../apps/extension/package.json', import.meta.url), 'utf8'),
+) as {
+  devDependencies: Record<string, string>;
+  scripts: Record<string, string>;
+};
 const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
+const manualQaText = readFileSync(
+  new URL('../docs/manual-qa.md', import.meta.url),
+  'utf8',
+);
 
 function getStep(name: string): WorkflowStep {
   const matchingStep = steps.find((step) => step.name === name);
@@ -222,6 +232,9 @@ describe('release workflow behavior', () => {
     expect(getRun('Verify and prepare release assets')).toContain(
       'bun run release:verify -- "$TAG" apps/extension/.output/chrome-mv3/manifest.json',
     );
+    expect(extensionPackageJson.scripts.zip).toBe(
+      'wxt zip -b chrome && bun run verify:build',
+    );
   });
 
   it('separates current tag pushes from atomic bump pushes', () => {
@@ -353,6 +366,16 @@ describe('release workflow behavior', () => {
 });
 
 describe('release test integration', () => {
+  it('keeps extension test dependencies exactly pinned', () => {
+    expect(extensionPackageJson.devDependencies).toEqual({
+      '@types/chrome': '0.2.2',
+      '@types/react': '19.2.17',
+      '@types/react-dom': '19.2.3',
+      'fake-indexeddb': '6.2.5',
+      jsdom: '29.1.1',
+    });
+  });
+
   it('makes the canonical test command gate release contracts without recursion', () => {
     expect(packageJson.scripts.test).toMatch(/&& bun run test:release$/);
     expect(packageJson.scripts['test:release']).toBe(
@@ -393,5 +416,26 @@ describe('release recovery documentation', () => {
     expect(readmeText).toContain(
       'If a complete published pair fails checksum verification, delete both assets and rerun with `current`.',
     );
+  });
+});
+
+describe('manual QA documentation', () => {
+  it('covers the current Saved and History behavior', () => {
+    expect(manualQaText).not.toContain('Collapse Chrome tab groups from the dashboard.');
+
+    for (const expectedStep of [
+      'confirm the dashboard refreshes without manual Refresh or Collapse controls.',
+      'Confirm Active and Saved rows show favicons and fall back to title initials when an icon fails.',
+      'confirm only the newest normalized copy remains and query strings remain distinct.',
+      'Use quick tab search and confirm Active tabs and Saved for later filter',
+      'Reorder saved sessions and tabs, move a tab between sessions',
+      'Left-click a saved tab and confirm it opens in the background, moves to History',
+      'middle-click another and confirm it remains saved.',
+      'confirm both move to History and can be restored to Saved for later.',
+      'Open a History tab without consuming it and permanently delete a History entry.',
+      'confirm Saved URLs deduplicate while local History remains unchanged.',
+    ]) {
+      expect(manualQaText).toContain(expectedStep);
+    }
   });
 });

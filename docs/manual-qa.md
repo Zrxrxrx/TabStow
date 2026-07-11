@@ -9,16 +9,20 @@
 - Drag an ungrouped tab, reorder a tab inside a group, move a tab into and out of a group, and move a tab between windows.
 - Reorder a complete Chrome group and move it to the other normal window.
 - Confirm pinned tabs only accept pinned destinations and retain their pinned state across windows.
-- Change tab order, group membership, group title/color/collapsed state, and window focus directly in Chrome; confirm the open dashboard refreshes.
+- Change tab order, group membership, group title/color/collapsed state, and window focus directly in Chrome; confirm the dashboard refreshes without manual Refresh or Collapse controls.
 - Reload Tabstow and confirm no local URL/manual grouping or stale local order returns.
-- Collapse Chrome tab groups from the dashboard.
+- Confirm Active and Saved rows show favicons and fall back to title initials when an icon fails.
 - Close one tab, close a group, and close duplicates.
 - Add and open a quick link.
 - Create, complete, search, and clear todos.
 - Change theme mode, palette, transparency, and language preference.
 - Run dashboard search with the default search provider.
 - Confirm the saved session appears and eligible tabs close.
-- Restore the saved session.
-- Delete the saved session.
+- Save duplicate URLs with different fragments/default ports and distinct query strings; confirm only the newest normalized copy remains and query strings remain distinct.
+- Use quick tab search and confirm Active tabs and Saved for later filter without running a web search or flattening their groups; confirm Saved drag-and-drop is disabled until the query is cleared.
+- Reorder saved sessions and tabs, move a tab between sessions, reload the extension, and confirm the order persists.
+- Left-click a saved tab and confirm it opens in the background, moves to History, and keeps Tabstow focused; middle-click another and confirm it remains saved.
+- Restore a saved session and delete another, then confirm both move to History and can be restored to Saved for later.
+- Open a History tab without consuming it and permanently delete a History entry.
 - Open the options page and save Gist settings.
-- Push and pull Gist sync and confirm only stowed sessions sync.
+- Push and pull Gist sync and confirm Saved URLs deduplicate while local History remains unchanged.
