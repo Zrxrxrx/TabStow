@@ -139,14 +139,13 @@ export async function moveActiveTab(
       throw new Error('Tabs cannot move between regular and incognito windows.');
     }
 
-    const sameWindow = initialSource.windowId === request.destination.windowId;
     const targetIsPinned = request.destination.lane.kind === 'pinned';
-    if (!sameWindow && Boolean(initialSource.pinned) !== targetIsPinned) {
-      throw new Error('Pinned state cannot be changed by dragging.');
-    }
-
     let targetTabs = await queryWindowTabs(request.destination.windowId);
-    let source = sameWindow ? movedTab(targetTabs, request.tabId) : initialSource;
+    const queriedSource = initialSource.windowId === request.destination.windowId
+      ? movedTab(targetTabs, request.tabId)
+      : targetTabs.find((tab) => tab.id === request.tabId);
+    const sourceIsInTargetWindow = queriedSource !== undefined;
+    let source = queriedSource ?? initialSource;
     if (Boolean(source.pinned) !== targetIsPinned) {
       throw new Error('Pinned state cannot be changed by dragging.');
     }
@@ -160,7 +159,7 @@ export async function moveActiveTab(
 
     insertionBoundary(targetTabs, request.destination.lane, request.destination.position);
 
-    if (sameWindow && laneMatches(source, request.destination.lane)) {
+    if (sourceIsInTargetWindow && laneMatches(source, request.destination.lane)) {
       const index = resolvedFinalIndex(
         targetTabs,
         request.tabId,
@@ -171,7 +170,7 @@ export async function moveActiveTab(
     }
 
     let moved = false;
-    if (!sameWindow) {
+    if (!sourceIsInTargetWindow) {
       const index = source.pinned ? targetTabs.filter((tab) => tab.pinned).length : -1;
       await browser.tabs.move(request.tabId, { windowId: request.destination.windowId, index });
       moved = true;

@@ -216,6 +216,38 @@ describe('active tab moves', () => {
     expect(browserMocks.tabs.ungroup).not.toHaveBeenCalled();
   });
 
+  it('treats a tab in the destination query as already moved despite a stale source window', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 10,
+      windowId: 2,
+      index: 0,
+      pinned: false,
+      groupId: -1,
+    });
+    browserMocks.windows.get
+      .mockResolvedValueOnce({ id: 2, type: 'normal', incognito: false })
+      .mockResolvedValueOnce({ id: 3, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 10, windowId: 3, index: 0, pinned: false, groupId: -1 },
+      { id: 11, windowId: 3, index: 1, pinned: false, groupId: -1 },
+    ]);
+
+    const { moveActiveTab } = await import('./active-tab-moves');
+    const result = await moveActiveTab({
+      tabId: 10,
+      destination: {
+        windowId: 3,
+        lane: { kind: 'ungrouped' },
+        position: { kind: 'before', anchor: { kind: 'tab', tabId: 11 } },
+      },
+    });
+
+    expect(result).toEqual({ ok: true, data: { moved: false } });
+    expect(browserMocks.tabs.move).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.group).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.ungroup).not.toHaveBeenCalled();
+  });
+
   it('uses fresh same-window group membership instead of regrouping', async () => {
     browserMocks.tabs.get.mockResolvedValue({
       id: 10,
