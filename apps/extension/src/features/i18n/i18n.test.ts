@@ -132,6 +132,40 @@ describe('i18n', () => {
     expect(t('zh-CN', 'reorderedSavedSessions')).toBe('已重新排列保存的会话。');
   });
 
+  it('includes English and Simplified Chinese labels for the History page', async () => {
+    const { t } = await import('./i18n');
+
+    expect(t('en', 'history')).toBe('History');
+    expect(t('en', 'historyEmpty')).toBe('History is empty.');
+    expect(t('en', 'historyOpenedFrom', { sourceTitle: 'Reading' })).toBe(
+      'Opened from Reading',
+    );
+    expect(t('en', 'historyRestoredFrom', { sourceTitle: 'Reading' })).toBe(
+      'Restored from Reading',
+    );
+    expect(t('en', 'historyRemovedFrom', { sourceTitle: 'Reading' })).toBe(
+      'Removed from Reading',
+    );
+    expect(t('en', 'historyOpen')).toBe('Open');
+    expect(t('en', 'historyRestore')).toBe('Restore to Saved for later');
+    expect(t('en', 'historyDeletePermanently')).toBe('Delete permanently');
+    expect(t('en', 'historyConfirmDelete')).toBe(
+      'Delete this History entry permanently?',
+    );
+    expect(t('en', 'historyBackToTabstow')).toBe('Back to Tabstow');
+
+    expect(t('zh-CN', 'history')).toBe('历史记录');
+    expect(t('zh-CN', 'historyEmpty')).toBe('历史记录为空。');
+    expect(t('zh-CN', 'historyOpenedFrom', { sourceTitle: '阅读' })).toBe('从阅读打开');
+    expect(t('zh-CN', 'historyRestoredFrom', { sourceTitle: '阅读' })).toBe('从阅读恢复');
+    expect(t('zh-CN', 'historyRemovedFrom', { sourceTitle: '阅读' })).toBe('从阅读移除');
+    expect(t('zh-CN', 'historyOpen')).toBe('打开');
+    expect(t('zh-CN', 'historyRestore')).toBe('恢复到稍后查看');
+    expect(t('zh-CN', 'historyDeletePermanently')).toBe('永久删除');
+    expect(t('zh-CN', 'historyConfirmDelete')).toBe('要永久删除这条历史记录吗？');
+    expect(t('zh-CN', 'historyBackToTabstow')).toBe('返回 Tabstow');
+  });
+
   it('interpolates variables in message templates', async () => {
     const { t } = await import('./i18n');
 

@@ -9,6 +9,7 @@ const manifest = config.manifest as
       };
       permissions?: string[];
       host_permissions?: string[];
+      content_scripts?: unknown[];
     }
   | undefined;
 
@@ -21,10 +22,18 @@ describe('extension manifest', () => {
   });
 
   it('uses the approved permissions for this migration', () => {
-    expect(manifest?.permissions).toEqual(
-      expect.arrayContaining(['tabs', 'storage', 'contextMenus', 'tabGroups', 'search', 'favicon']),
-    );
-    expect(manifest?.permissions).not.toContain('clipboardRead');
+    expect(manifest?.permissions).toEqual([
+      'tabs',
+      'storage',
+      'contextMenus',
+      'tabGroups',
+      'search',
+      'favicon',
+    ]);
+  });
+
+  it('does not register content scripts', () => {
+    expect(manifest).not.toHaveProperty('content_scripts');
   });
 
   it('keeps host permissions narrow while enabling Chrome favicon resolution', () => {
