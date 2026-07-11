@@ -467,8 +467,9 @@ describe('App', () => {
     expect(container.textContent).not.toContain('Saved mail');
     expect(container.textContent).not.toContain('Saved article');
     expect(screen().getByText('1 open')).not.toBeNull();
-    expect(screen().getByText('1 sessions')).not.toBeNull();
-    expect(screen().getByText('1 tabs')).not.toBeNull();
+    expect(screen().getByText('1 session')).not.toBeNull();
+    expect(screen().getByText('1 tab')).not.toBeNull();
+    expect(screen().getByLabelText('1 session, 1 tab')).not.toBeNull();
 
     const dragHandle = screen().getByLabelText('Drag GitHub active issue') as HTMLButtonElement;
     expect(dragHandle.disabled).toBe(true);
@@ -1256,7 +1257,7 @@ describe('App', () => {
   });
 
   it('renders migrated dashboard labels in Simplified Chinese when selected', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: [SAVED_SESSIONS[1]!] });
     getLanguagePreference.mockResolvedValue('zh-CN');
 
     await renderApp();
@@ -1264,6 +1265,9 @@ describe('App', () => {
     expect(screen().getByRole('heading', { name: '打开的标签页' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '稍后查看' })).not.toBeNull();
+    expect(screen().getByText('1 个会话')).not.toBeNull();
+    expect(screen().getByText('1 个标签页')).not.toBeNull();
+    expect(screen().getByLabelText('1 个会话，1 个标签页')).not.toBeNull();
     expect(screen().getByLabelText('搜索网页')).not.toBeNull();
     expect(screen().getByLabelText('编辑快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();

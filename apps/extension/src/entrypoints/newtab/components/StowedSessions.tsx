@@ -183,6 +183,16 @@ export function StowedSessions({
     () => filteredSessions.reduce((count, session) => count + session.tabs.length, 0),
     [filteredSessions],
   );
+  const sessionCount = t(
+    locale,
+    filteredSessions.length === 1 ? 'savedSessionCount' : 'savedSessionsCount',
+    { count: filteredSessions.length },
+  );
+  const tabCount = t(
+    locale,
+    totalTabs === 1 ? 'savedTabCount' : 'savedTabsCount',
+    { count: totalTabs },
+  );
   const sessionIds = filteredSessions.map(({ id }) => id);
   const searchActive = query.trim() !== '';
   const dragDisabled = searchActive || busyAction !== null;
@@ -320,16 +330,12 @@ export function StowedSessions({
           className="meta-row"
           id="saved-count"
           aria-label={t(locale, 'savedCount', {
-            sessions: filteredSessions.length,
-            tabs: totalTabs,
+            sessions: sessionCount,
+            tabs: tabCount,
           })}
         >
-          <span className="meta-pill">
-            {t(locale, 'savedSessionsCount', { count: filteredSessions.length })}
-          </span>
-          <span className="meta-pill">
-            {t(locale, 'savedTabsCount', { count: totalTabs })}
-          </span>
+          <span className="meta-pill">{sessionCount}</span>
+          <span className="meta-pill">{tabCount}</span>
         </span>
       </header>
 

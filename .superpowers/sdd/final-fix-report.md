@@ -236,3 +236,110 @@ Exit: `0`, no output.
 - No correctness blockers remain.
 - Keyboard Saved DnD remains the explicitly deferred accessibility enhancement.
 - Implementer model selection was unavailable in this API; work used the platform model with the requested integration rigor.
+
+## Compatibility follow-up
+
+A subsequent integration review identified three compatibility gaps. Commit following this report update addresses all three without changing the approved interaction scope.
+
+### Stow safety
+
+- `isStowableTab` now uses the same positive `http:`/`https:` validator as Chrome open boundaries.
+- Selected-tab stow also requires `isOpenableTabUrl`; the former negative browser-URL check is no longer used there.
+- Current-window and selected-tab regressions cover `javascript:`, `data:`, `file:`, and `ftp:` URLs.
+- Each fixture returns the existing `no-eligible-tabs` result and proves there is no persistence or Chrome removal; current-window tests also prove no survivor tab is created.
+
+### Legacy v2 History duplicate IDs
+
+- The v3 migration now repairs History tab IDs as well as Saved tab IDs while retaining tab order and every distinct URL.
+- `prepareHistoryTabs` deterministically repairs IDs and parses every saved tab.
+- Both new History writes and History restore use the helper, so current writes remain valid and post-migration malformed rows are repaired defensively.
+- A real seeded v2 database verifies migrated History IDs, order, distinct URL preservation, and successful restore into Saved.
+- A defensive v3-row fixture separately proves restore repairs duplicate IDs without URL loss.
+
+### Localized singular/plural counts
+
+- Added singular/plural Saved session and tab keys for English and Simplified Chinese.
+- Visible counts select keys by count; the combined accessible name composes the same localized strings.
+- i18n tests cover all keys. App tests verify English `1 session` / `1 tab` and Simplified Chinese visible/accessible count copy.
+
+### Follow-up TDD evidence
+
+RED command:
+
+```text
+(cd apps/extension && bun run test src/features/tabs/session-service.test.ts src/db/db.test.ts src/features/i18n/i18n.test.ts src/entrypoints/newtab/App.test.tsx)
+```
+
+Exit: `1`
+
+```text
+Test Files  4 failed (4)
+Tests  13 failed | 127 passed (140)
+```
+
+Expected failures:
+
+```text
+8 stow fixtures saved/closed non-http URLs instead of returning no-eligible-tabs
+2 History fixtures retained duplicate IDs through migration/restore
+2 i18n suites lacked singular keys
+1 App test rendered "1 sessions" / "1 tabs"
+```
+
+GREEN command:
+
+```text
+(cd apps/extension && bun run test src/features/tabs/session-service.test.ts src/db/db.test.ts src/features/i18n/i18n.test.ts src/entrypoints/newtab/App.test.tsx)
+```
+
+Exit: `0`
+
+```text
+Test Files  4 passed (4)
+Tests  140 passed (140)
+```
+
+### Follow-up final verification
+
+Command: `bun run test`
+
+Exit: `0`
+
+```text
+Core:      Test Files 6 passed (6); Tests 52 passed (52)
+Extension: Test Files 30 passed (30); Tests 339 passed (339)
+```
+
+Command: `bun run typecheck`
+
+Exit: `0`
+
+```text
+packages/core: tsc --noEmit -p tsconfig.json
+apps/extension: wxt prepare && tsc --noEmit -p tsconfig.json
+WXT: Finished in 71 ms
+```
+
+Command: `bun run build`
+
+Exit: `0`
+
+```text
+packages/core: tsc -p tsconfig.json
+apps/extension: Built chrome-mv3; total size 510.42 kB
+Verified built Chrome manifest and saved-history entrypoint.
+```
+
+Command: `git diff --check`
+
+Exit: `0`, no output.
+
+### Follow-up self-review
+
+- Non-HTTP live tabs cannot enter Saved or the closure list in either stow path.
+- Existing pinned-tab inclusion/closure behavior is unchanged for HTTP(S) tabs.
+- History repair changes IDs only when they collide; URL data and ordering are preserved.
+- History remains local-only and absent from Gist sync.
+- New History entries parse their tab payload before persistence.
+- Singular/plural selection changes count copy only; filtering, Saved drag disabling during search, and all topbar behavior are unchanged.
+- Manifest permissions and build safeguards remain unchanged and passed verification.

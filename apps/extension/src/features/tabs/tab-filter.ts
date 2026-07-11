@@ -28,7 +28,7 @@ export function isStowableTab(
   settings: Pick<ExtensionSettings, 'includePinnedTabs'>,
 ): boolean {
   if (tab.id == null) return false;
-  if (isBlockedTabUrl(tab.url)) return false;
+  if (!isOpenableTabUrl(tab.url)) return false;
   if (tab.pinned && !settings.includePinnedTabs) return false;
   return true;
 }

@@ -564,6 +564,60 @@ describe('session service', () => {
     expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
   });
 
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<h1>unsafe</h1>',
+    'file:///tmp/private.html',
+    'ftp://example.com/archive',
+  ])('does not stow or close the non-http current-window tab %s', async (url) => {
+    browserMocks.tabs.query.mockResolvedValue([
+      {
+        id: 35,
+        windowId: 12,
+        url,
+        title: 'Unsafe',
+        pinned: false,
+        active: true,
+      },
+    ]);
+
+    await expect(saveCurrentWindowAsSession(12)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'no-eligible-tabs',
+        message: 'No eligible tabs were found in the current window.',
+      },
+    });
+    expect(dbMocks.createSession).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'data:text/html,<h1>unsafe</h1>',
+    'file:///tmp/private.html',
+    'ftp://example.com/archive',
+  ])('does not stow or close the selected non-http tab %s', async (url) => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 36,
+      windowId: 12,
+      url,
+      title: 'Unsafe',
+      pinned: false,
+    });
+
+    await expect(saveTabsAsSession([36])).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'no-eligible-tabs',
+        message: 'No eligible tabs were found in the selected tab.',
+      },
+    });
+    expect(dbMocks.createSession).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
   it('keeps a selected tab session when closing the saved tab fails', async () => {
     browserMocks.tabs.get.mockResolvedValue({
       id: 33,

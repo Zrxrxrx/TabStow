@@ -5,6 +5,7 @@ import {
   mergeSessionsById,
   normalizeSavedTabUrl,
   repairDuplicateTabIds,
+  savedTabSchema,
   sortSessionsForDisplay,
   sortSessionsNewestFirst,
   tabSessionSchema,
@@ -31,8 +32,10 @@ class TabstowDatabase extends Dexie {
         history: 'id, movedAt, sourceSessionId, reason',
       })
       .upgrade(async (transaction) => {
-        const table = transaction.table<TabSession, string>('sessions');
-        await migrateSessions(table);
+        const sessions = transaction.table<TabSession, string>('sessions');
+        const history = transaction.table<HistoryEntry, string>('history');
+        await migrateSessions(sessions);
+        await migrateHistory(history);
       });
     this.version(3)
       .stores({
@@ -40,8 +43,10 @@ class TabstowDatabase extends Dexie {
         history: 'id, movedAt, sourceSessionId, reason',
       })
       .upgrade(async (transaction) => {
-        const table = transaction.table<TabSession, string>('sessions');
-        await migrateSessions(table);
+        const sessions = transaction.table<TabSession, string>('sessions');
+        const history = transaction.table<HistoryEntry, string>('history');
+        await migrateSessions(sessions);
+        await migrateHistory(history);
       });
   }
 }
@@ -61,6 +66,17 @@ async function migrateSessions(table: Table<TabSession, string>): Promise<void> 
   );
   await table.clear();
   await table.bulkPut(migrated);
+}
+
+function prepareHistoryTabs(tabs: HistoryEntry['tabs']): HistoryEntry['tabs'] {
+  return repairDuplicateTabIds(tabs).map((tab) => savedTabSchema.parse(tab));
+}
+
+async function migrateHistory(table: Table<HistoryEntry, string>): Promise<void> {
+  const entries = await table.toArray();
+  await table.bulkPut(
+    entries.map((entry) => ({ ...entry, tabs: prepareHistoryTabs(entry.tabs) })),
+  );
 }
 
 export const db = new TabstowDatabase();
@@ -118,7 +134,7 @@ function createHistoryEntry(
     id: crypto.randomUUID(),
     sourceSessionId: session.id,
     sourceTitle: session.title,
-    tabs,
+    tabs: prepareHistoryTabs(tabs),
     originalCreatedAt: session.createdAt,
     movedAt,
     reason,
@@ -279,7 +295,7 @@ export async function restoreHistoryEntry(id: string): Promise<TabSession> {
       {
         id: crypto.randomUUID(),
         title: entry.sourceTitle,
-        tabs: deduplicateIncomingTabs(entry.tabs),
+        tabs: deduplicateIncomingTabs(prepareHistoryTabs(entry.tabs)),
         createdAt: restoredAt,
         updatedAt: restoredAt,
         sortOrder: 0,

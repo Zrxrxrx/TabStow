@@ -3,6 +3,7 @@ import 'fake-indexeddb/auto';
 import Dexie, { type Table } from 'dexie';
 import type { SavedTab, TabSession } from '@tabstow/core';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { HistoryEntry } from '@/features/history/types';
 
 const DATABASE_NAME = 'tabstow';
 
@@ -50,9 +51,13 @@ async function seedVersionOne(sessions: TabSession[]): Promise<void> {
   database.close();
 }
 
-async function seedVersionTwo(sessions: TabSession[]): Promise<void> {
+async function seedVersionTwo(
+  sessions: TabSession[],
+  history: HistoryEntry[] = [],
+): Promise<void> {
   class VersionTwoDatabase extends Dexie {
     sessions!: Table<TabSession, string>;
+    history!: Table<HistoryEntry, string>;
 
     constructor() {
       super(DATABASE_NAME);
@@ -65,6 +70,7 @@ async function seedVersionTwo(sessions: TabSession[]): Promise<void> {
 
   const database = new VersionTwoDatabase();
   await database.sessions.bulkPut(sessions);
+  await database.history.bulkPut(history);
   database.close();
 }
 
@@ -151,6 +157,65 @@ describe('session database', () => {
       'https://example.com/two',
     ]);
     expect(new Set(tabs.map(({ id }) => id)).size).toBe(2);
+  });
+
+  it('repairs duplicate tab ids in version-two History and restores every distinct URL', async () => {
+    const legacyHistory: HistoryEntry = {
+      id: 'legacy-history',
+      sourceSessionId: 'legacy-source',
+      sourceTitle: 'Legacy History',
+      tabs: [
+        makeTab('duplicate-tab', 'https://example.com/one', '2026-07-01T00:00:00.000Z'),
+        makeTab('duplicate-tab', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+      ],
+      originalCreatedAt: '2026-07-01T00:00:00.000Z',
+      movedAt: '2026-07-03T00:00:00.000Z',
+      reason: 'deleted',
+      deviceId: 'device',
+    };
+    await seedVersionTwo([], [legacyHistory]);
+    const { getHistoryEntry, getSession, restoreHistoryEntry } = await importDatabase();
+
+    const migrated = await getHistoryEntry(legacyHistory.id);
+    expect(migrated?.tabs.map(({ url }) => url)).toEqual([
+      'https://example.com/one',
+      'https://example.com/two',
+    ]);
+    expect(new Set(migrated?.tabs.map(({ id }) => id)).size).toBe(2);
+
+    const restored = await restoreHistoryEntry(legacyHistory.id);
+    expect((await getSession(restored.id))?.tabs.map(({ url }) => url)).toEqual([
+      'https://example.com/one',
+      'https://example.com/two',
+    ]);
+    expect(new Set(restored.tabs.map(({ id }) => id)).size).toBe(2);
+    expect(await getHistoryEntry(legacyHistory.id)).toBeUndefined();
+  });
+
+  it('defensively repairs duplicate History tab ids during restore', async () => {
+    const { db, getSession, restoreHistoryEntry } = await importDatabase();
+    const malformed: HistoryEntry = {
+      id: 'malformed-history',
+      sourceSessionId: 'source',
+      sourceTitle: 'Malformed History',
+      tabs: [
+        makeTab('duplicate-tab', 'https://example.com/one', '2026-07-01T00:00:00.000Z'),
+        makeTab('duplicate-tab', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+      ],
+      originalCreatedAt: '2026-07-01T00:00:00.000Z',
+      movedAt: '2026-07-03T00:00:00.000Z',
+      reason: 'deleted',
+      deviceId: 'device',
+    };
+    await db.history.put(malformed);
+
+    const restored = await restoreHistoryEntry(malformed.id);
+
+    expect((await getSession(restored.id))?.tabs.map(({ url }) => url)).toEqual([
+      'https://example.com/one',
+      'https://example.com/two',
+    ]);
+    expect(new Set(restored.tabs.map(({ id }) => id)).size).toBe(2);
   });
 
   it('deduplicates old sessions when saving a newest copy', async () => {

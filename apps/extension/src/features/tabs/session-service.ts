@@ -17,7 +17,6 @@ import {
 } from '../../lib/errors';
 import type { StowResult } from '../../lib/messages';
 import {
-  isBlockedTabUrl,
   isOpenableTabUrl,
   isStowableTab,
   shouldCloseSavedTab,
@@ -182,7 +181,9 @@ export async function saveTabsAsSession(tabIds: number[]): Promise<AppResult<Sto
   try {
     const settings = await getSettings();
     const tabs = await Promise.all(tabIds.map((tabId) => browser.tabs.get(tabId)));
-    const eligibleTabs = tabs.filter((tab) => tab.id != null && !isBlockedTabUrl(tab.url));
+    const eligibleTabs = tabs.filter(
+      (tab) => tab.id != null && isOpenableTabUrl(tab.url),
+    );
 
     if (eligibleTabs.length === 0) {
       return err('no-eligible-tabs', 'No eligible tabs were found in the selected tab.');
