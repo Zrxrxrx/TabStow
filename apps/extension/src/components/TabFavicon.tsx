@@ -18,6 +18,23 @@ function safeHttpUrl(value: string | undefined): string | null {
   }
 }
 
+function safeLiveFaviconUrl(value: string | undefined): string | null {
+  if (!value) return null;
+
+  try {
+    const url = new URL(value);
+    if (url.protocol === 'http:' || url.protocol === 'https:') return url.toString();
+    if (url.protocol !== 'data:') return null;
+    return /^data:image\/[a-z0-9][a-z0-9!#$&^_.+-]*(?:;[a-z0-9!#$&^_.+-]+(?:=[^;,]*)?)*,/i.test(
+      value,
+    )
+      ? value
+      : null;
+  } catch {
+    return null;
+  }
+}
+
 function chromeFaviconUrl(pageUrl: string): string | null {
   const safePageUrl = safeHttpUrl(pageUrl);
   if (
@@ -37,7 +54,7 @@ export function TabFavicon({ className, favIconUrl, pageUrl, title }: Props) {
   const [candidateIndex, setCandidateIndex] = useState(0);
   const candidates = useMemo(
     () =>
-      [safeHttpUrl(favIconUrl), chromeFaviconUrl(pageUrl)].filter(
+      [safeLiveFaviconUrl(favIconUrl), chromeFaviconUrl(pageUrl)].filter(
         (url): url is string => Boolean(url),
       ),
     [favIconUrl, pageUrl],

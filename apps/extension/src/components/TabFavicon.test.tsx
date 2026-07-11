@@ -30,6 +30,40 @@ afterEach(async () => {
 });
 
 describe('TabFavicon', () => {
+  it.each([
+    'http://example.com/favicon.ico',
+    'https://example.com/favicon.ico',
+    'data:image/png;base64,iVBORw0KGgo=',
+    'DATA:IMAGE/PNG;BASE64,iVBORw0KGgo=',
+  ])('accepts the safe live favicon source %s', async (favIconUrl) => {
+    await renderFavicon({
+      favIconUrl,
+      pageUrl: '',
+      title: 'Allowed',
+    });
+
+    expect(getImage().getAttribute('src')).toBe(favIconUrl);
+  });
+
+  it.each([
+    'javascript:alert(1)',
+    'blob:https://example.com/favicon-id',
+    'data:text/html,<script>alert(1)</script>',
+    'data:application/javascript,alert(1)',
+    'data:image/png',
+    'file:///tmp/favicon.ico',
+    'chrome-extension://other-extension/favicon.ico',
+  ])('rejects the unsafe live favicon source %s', async (favIconUrl) => {
+    await renderFavicon({
+      favIconUrl,
+      pageUrl: '',
+      title: 'Rejected',
+    });
+
+    expect(container.querySelector('img')).toBeNull();
+    expect(container.textContent).toBe('R');
+  });
+
   it('falls back from the supplied favicon to Chrome and then the title initial', async () => {
     await renderFavicon({
       favIconUrl: 'https://example.com/favicon.ico',
