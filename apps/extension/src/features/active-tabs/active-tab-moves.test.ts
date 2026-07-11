@@ -10,6 +10,7 @@ const browserMocks = vi.hoisted(() => ({
   },
   tabGroups: {
     get: vi.fn(),
+    move: vi.fn(),
   },
   windows: {
     get: vi.fn(),
@@ -563,5 +564,289 @@ describe('active tab moves', () => {
     expect(browserMocks.tabs.group).not.toHaveBeenCalled();
     expect(browserMocks.tabs.ungroup).not.toHaveBeenCalled();
     expect(result).toEqual({ ok: true, data: { moved: true } });
+  });
+
+  it('moves a complete group after another complete group without splitting it', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: 31 },
+      { id: 2, windowId: 2, index: 1, pinned: false, groupId: 31 },
+      { id: 3, windowId: 2, index: 2, pinned: false, groupId: 32 },
+      { id: 4, windowId: 2, index: 3, pinned: false, groupId: 32 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 2,
+        position: { kind: 'after', anchor: { kind: 'group', groupId: 32 } },
+      },
+    });
+
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledWith(31, { windowId: 2, index: 2 });
+    expect(browserMocks.tabs.move).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, data: { moved: true } });
+  });
+
+  it('returns a no-op when a group is already after its complete group anchor', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: 32 },
+      { id: 2, windowId: 2, index: 1, pinned: false, groupId: 32 },
+      { id: 3, windowId: 2, index: 2, pinned: false, groupId: 31 },
+      { id: 4, windowId: 2, index: 3, pinned: false, groupId: 31 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 2,
+        position: { kind: 'after', anchor: { kind: 'group', groupId: 32 } },
+      },
+    });
+
+    expect(result).toEqual({ ok: true, data: { moved: false } });
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it('moves a group before an ungrouped tab in another normal window', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get
+      .mockResolvedValueOnce({ id: 2, type: 'normal', incognito: false })
+      .mockResolvedValueOnce({ id: 3, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 90, windowId: 3, index: 0, pinned: false, groupId: -1, url: 'chrome://settings' },
+      { id: 11, windowId: 3, index: 1, pinned: false, groupId: -1 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 3,
+        position: { kind: 'before', anchor: { kind: 'tab', tabId: 11 } },
+      },
+    });
+
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowId: 3 });
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledWith(31, { windowId: 3, index: 1 });
+    expect(browserMocks.tabs.move).not.toHaveBeenCalled();
+    expect(result).toEqual({ ok: true, data: { moved: true } });
+  });
+
+  it('moves a group to the end of another normal window', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get
+      .mockResolvedValueOnce({ id: 2, type: 'normal', incognito: false })
+      .mockResolvedValueOnce({ id: 3, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 11, windowId: 3, index: 0, pinned: false, groupId: -1 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: { windowId: 3, position: { kind: 'end' } },
+    });
+
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledWith(31, { windowId: 3, index: -1 });
+    expect(result).toEqual({ ok: true, data: { moved: true } });
+  });
+
+  it('returns a no-op when the source group is already at the window end', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: -1 },
+      { id: 2, windowId: 2, index: 1, pinned: false, groupId: 31 },
+      { id: 3, windowId: 2, index: 2, pinned: false, groupId: 31 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: { windowId: 2, position: { kind: 'end' } },
+    });
+
+    expect(result).toEqual({ ok: true, data: { moved: false } });
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it('treats the source group as a no-op anchor', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: 31 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 2,
+        position: { kind: 'before', anchor: { kind: 'group', groupId: 31 } },
+      },
+    });
+
+    expect(result).toEqual({ ok: true, data: { moved: false } });
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it('rejects a source-group anchor that is absent from another destination window', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get
+      .mockResolvedValueOnce({ id: 2, type: 'normal', incognito: false })
+      .mockResolvedValueOnce({ id: 3, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 3, index: 0, pinned: false, groupId: -1 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 3,
+        position: { kind: 'before', anchor: { kind: 'group', groupId: 31 } },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'The drop group no longer exists.' },
+    });
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'a grouped tab anchor',
+      anchor: { id: 2, windowId: 2, index: 1, pinned: false, groupId: 32 },
+    },
+    {
+      name: 'a pinned tab anchor',
+      anchor: { id: 2, windowId: 2, index: 1, pinned: true, groupId: -1 },
+    },
+  ])('rejects $name because it would split a top-level item', async ({ anchor }) => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: 31 },
+      anchor,
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 2,
+        position: { kind: 'before', anchor: { kind: 'tab', tabId: 2 } },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'Group moves cannot split another Chrome group.' },
+    });
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it('rejects the ungrouped sentinel as a native group anchor', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: 31 },
+      { id: 2, windowId: 2, index: 1, pinned: false, groupId: -1 },
+    ]);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: {
+        windowId: 2,
+        position: { kind: 'before', anchor: { kind: 'group', groupId: -1 } },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'The drop group is invalid.' },
+    });
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    {
+      name: 'source window changed',
+      request: {
+        groupId: 31,
+        sourceWindowId: 9,
+        destination: { windowId: 2, position: { kind: 'end' as const } },
+      },
+      sourceWindow: { id: 2, type: 'normal', incognito: false },
+      targetWindow: { id: 2, type: 'normal', incognito: false },
+      message: 'The dragged Chrome group moved to another window.',
+    },
+    {
+      name: 'target is incognito-incompatible',
+      request: {
+        groupId: 31,
+        sourceWindowId: 2,
+        destination: { windowId: 3, position: { kind: 'end' as const } },
+      },
+      sourceWindow: { id: 2, type: 'normal', incognito: false },
+      targetWindow: { id: 3, type: 'normal', incognito: true },
+      message: 'Groups cannot move between regular and incognito windows.',
+    },
+  ])('rejects $name before mutation', async ({ request, sourceWindow, targetWindow, message }) => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get
+      .mockResolvedValueOnce(sourceWindow)
+      .mockResolvedValueOnce(targetWindow);
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup(request);
+
+    expect(result).toEqual({ ok: false, error: { code: 'chrome-tabs-error', message } });
+    expect(browserMocks.tabs.query).not.toHaveBeenCalled();
+    expect(browserMocks.tabGroups.move).not.toHaveBeenCalled();
+  });
+
+  it('returns the Chrome group move failure without retrying', async () => {
+    browserMocks.tabGroups.get.mockResolvedValue({ id: 31, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, pinned: false, groupId: 31 },
+      { id: 2, windowId: 2, index: 1, pinned: false, groupId: -1 },
+    ]);
+    browserMocks.tabGroups.move.mockRejectedValue(new Error('Group move failed'));
+
+    const { moveActiveTabGroup } = await import('./active-tab-moves');
+    const result = await moveActiveTabGroup({
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: { windowId: 2, position: { kind: 'end' } },
+    });
+
+    expect(browserMocks.tabGroups.move).toHaveBeenCalledTimes(1);
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'Group move failed' },
+    });
   });
 });

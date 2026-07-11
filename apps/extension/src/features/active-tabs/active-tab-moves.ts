@@ -1,6 +1,7 @@
 import { browser } from '@/lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import type {
+  ActiveGroupMoveRequest,
   ActiveTabLane,
   ActiveTabMoveRequest,
   ActiveTabsMoveResult,
@@ -205,6 +206,78 @@ export async function moveActiveTab(
     }
 
     return ok({ moved });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
+function groupMoveBoundary(
+  tabs: IndexedTab[],
+  sourceGroupId: number,
+  position: ActiveTabsPosition,
+): number {
+  if (position.kind === 'end') return tabs.length;
+  const { anchor } = position;
+  if (anchor.kind === 'group') {
+    if (anchor.groupId === NO_GROUP) throw new Error('The drop group is invalid.');
+    const groupTabs = tabs.filter((tab) => groupId(tab) === anchor.groupId);
+    if (groupTabs.length === 0) throw new Error('The drop group no longer exists.');
+    if (anchor.groupId === sourceGroupId) return -1;
+    const first = Math.min(...groupTabs.map((tab) => tab.index));
+    const last = Math.max(...groupTabs.map((tab) => tab.index));
+    return position.kind === 'before' ? first : last + 1;
+  }
+
+  const anchorTab = tabs.find((tab) => tab.id === anchor.tabId);
+  if (!anchorTab) throw new Error('The drop anchor no longer exists.');
+  if (anchorTab.pinned || groupId(anchorTab) !== NO_GROUP) {
+    throw new Error('Group moves cannot split another Chrome group.');
+  }
+  return position.kind === 'before' ? anchorTab.index : anchorTab.index + 1;
+}
+
+export async function moveActiveTabGroup(
+  request: ActiveGroupMoveRequest,
+): Promise<AppResult<ActiveTabsMoveResult>> {
+  try {
+    const sourceGroup = await browser.tabGroups.get(request.groupId);
+    if (sourceGroup.windowId !== request.sourceWindowId) {
+      throw new Error('The dragged Chrome group moved to another window.');
+    }
+    const [sourceWindow, targetWindow] = await Promise.all([
+      requireNormalWindow(sourceGroup.windowId),
+      requireNormalWindow(request.destination.windowId),
+    ]);
+    if (sourceWindow.incognito !== targetWindow.incognito) {
+      throw new Error('Groups cannot move between regular and incognito windows.');
+    }
+
+    const targetTabs = await queryWindowTabs(request.destination.windowId);
+    const sourceTabs = sourceGroup.windowId === request.destination.windowId
+      ? targetTabs.filter((tab) => groupId(tab) === request.groupId)
+      : [];
+    if (sourceGroup.windowId === request.destination.windowId && sourceTabs.length === 0) {
+      throw new Error('The dragged Chrome group has no tabs.');
+    }
+
+    const boundary = groupMoveBoundary(targetTabs, request.groupId, request.destination.position);
+    if (boundary === -1) return ok({ moved: false });
+    const removedBeforeBoundary = sourceTabs.filter((tab) => tab.index < boundary).length;
+    const resolvedIndex = Math.max(0, boundary - removedBeforeBoundary);
+    const currentIndex = sourceTabs.length === 0
+      ? -1
+      : Math.min(...sourceTabs.map((tab) => tab.index));
+    const alreadyAtEnd = request.destination.position.kind === 'end'
+      && sourceTabs.length > 0
+      && Math.max(...sourceTabs.map((tab) => tab.index)) === targetTabs.length - 1;
+
+    if (currentIndex === resolvedIndex || alreadyAtEnd) return ok({ moved: false });
+
+    await browser.tabGroups.move(request.groupId, {
+      windowId: request.destination.windowId,
+      index: request.destination.position.kind === 'end' ? -1 : resolvedIndex,
+    });
+    return ok({ moved: true });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }
