@@ -15,6 +15,7 @@ import { filterSavedSessions } from '@/features/tab-search/tab-search';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type SyncResult } from '@/lib/messages';
 import {
+  SAVED_TABS_DRAG_MIME,
   readSavedTabsDragSource,
   resolveSavedDrop,
   writeSavedTabsDragSource,
@@ -138,7 +139,7 @@ function SavedTabRow({
             onOpen(true);
           }}
           onAuxClick={(event) => {
-            if (event.button !== 1 || isModifiedClick(event)) return;
+            if (event.button !== 1) return;
             event.preventDefault();
             event.stopPropagation();
             onOpen(false);
@@ -218,13 +219,26 @@ export function StowedSessions({
     return resolveSavedDrop(serializedSource, target, { searchActive });
   }
 
+  function resolveProtectedDrag(target: SavedTabsDropTarget) {
+    if (dragDisabled || dropPendingRef.current) return null;
+    const internalSource = dragSourceRef.current;
+    return internalSource
+      ? resolveSavedDrop(internalSource, target, { searchActive })
+      : null;
+  }
+
   function activateDropTarget(
     event: DragEvent,
     key: string,
     target: SavedTabsDropTarget,
   ) {
     event.stopPropagation();
-    if (!resolveEventDrop(event, target)) return;
+    if (
+      !Array.from(event.dataTransfer.types).includes(SAVED_TABS_DRAG_MIME) ||
+      !resolveProtectedDrag(target)
+    ) {
+      return;
+    }
 
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
@@ -251,7 +265,7 @@ export function StowedSessions({
               type: 'sessions:move-tab',
               request: dropRequest.request,
             }),
-          () => 'Moved saved tab.',
+          () => t(locale, 'movedSavedTab'),
           { reloadOnFailure: true },
         );
       } else {
@@ -262,7 +276,7 @@ export function StowedSessions({
               type: 'sessions:reorder',
               orderedIds: dropRequest.orderedIds,
             }),
-          () => 'Reordered saved sessions.',
+          () => t(locale, 'reorderedSavedSessions'),
           { reloadOnFailure: true },
         );
       }
@@ -396,7 +410,7 @@ export function StowedSessions({
                                 sessionId: session.id,
                               }),
                             (result) =>
-                              `Restored ${result.tabCount} tabs and moved the session to History.`,
+                              t(locale, 'restoredSavedSession', { count: result.tabCount }),
                           )
                         }
                         disabled={busyAction !== null}
@@ -416,7 +430,7 @@ export function StowedSessions({
                                 type: 'sessions:delete',
                                 sessionId: session.id,
                               }),
-                            () => 'Moved saved session to History.',
+                            () => t(locale, 'movedSavedSessionToHistory'),
                           )
                         }
                         disabled={busyAction !== null}
@@ -454,7 +468,7 @@ export function StowedSessions({
                                   sessionId: session.id,
                                   tabId: tab.id,
                                 }),
-                              () => 'Moved tab to History.',
+                              () => t(locale, 'movedSavedTabToHistory'),
                             )
                           }
                           onDragEnd={endDrag}
@@ -469,7 +483,11 @@ export function StowedSessions({
                                   tabId: tab.id,
                                   consume,
                                 }),
-                              () => (consume ? 'Moved tab to History.' : 'Opened saved tab.'),
+                              () =>
+                                t(
+                                  locale,
+                                  consume ? 'movedSavedTabToHistory' : 'openedSavedTab',
+                                ),
                             )
                           }
                         />

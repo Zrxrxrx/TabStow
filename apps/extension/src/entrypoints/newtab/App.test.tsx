@@ -525,17 +525,30 @@ describe('App', () => {
     });
   });
 
-  it('ignores modified primary and right clicks on saved tabs', async () => {
+  it('ignores modified primary and right clicks but handles every middle click', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
     await renderApp();
 
     const row = screen().getByLabelText('Open Saved One');
     const modified = await dispatchMouseEvent(row, 'click', { button: 0, metaKey: true });
     const right = await dispatchMouseEvent(row, 'auxclick', { button: 2 });
+    const modifiedMiddle = await dispatchMouseEvent(row, 'auxclick', {
+      button: 1,
+      altKey: true,
+      ctrlKey: true,
+      metaKey: true,
+      shiftKey: true,
+    });
 
     expect(modified.defaultPrevented).toBe(false);
     expect(right.defaultPrevented).toBe(false);
-    expect(sentMessageTypes()).not.toContain('sessions:open-tab');
+    expect(modifiedMiddle.defaultPrevented).toBe(true);
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: 'saved-tab-1',
+      consume: false,
+    });
   });
 
   it('moves deleted saved tabs and sessions to History and explains destructive restores', async () => {
@@ -573,7 +586,12 @@ describe('App', () => {
 
     const tabTransfer = createDataTransfer();
     await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), tabTransfer);
-    await drop(screen().getByLabelText('Drop saved tab before Saved Three'), tabTransfer);
+    const tabTarget = screen().getByLabelText('Drop saved tab before Saved Three');
+    const tabDragOver = await dragOver(tabTarget, tabTransfer);
+
+    expect(tabDragOver.defaultPrevented).toBe(true);
+    expect(tabTarget.className).toContain('is-active-drop-target');
+    await drop(tabTarget, tabTransfer);
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'sessions:move-tab',
@@ -584,6 +602,7 @@ describe('App', () => {
         destinationIndex: 0,
       },
     });
+    expect(screen().getByRole('status').textContent).toBe('Moved saved tab.');
 
     const sessionTransfer = createDataTransfer();
     await dragStart(screen().getByLabelText('Drag saved session Session Two'), sessionTransfer);
@@ -593,19 +612,48 @@ describe('App', () => {
       type: 'sessions:reorder',
       orderedIds: ['session-2', 'session-1'],
     });
+    expect(screen().getByRole('status').textContent).toBe('Reordered saved sessions.');
     expect(sentMessageTypes().filter((type) => type === 'sessions:list').length).toBeGreaterThan(2);
   });
 
-  it('rejects a malformed saved payload even after an internal drag starts', async () => {
+  it('rejects malformed, external, and stale saved drag payloads', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
     await renderApp();
 
-    const transfer = createDataTransfer();
-    await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), transfer);
-    transfer.setData('application/x-tabstow-saved-tabs', '{');
-    await drop(screen().getByLabelText('Drop saved tab before Saved Three'), transfer);
+    const target = screen().getByLabelText('Drop saved tab before Saved Three');
+    const externalTransfer = createDataTransfer();
+    externalTransfer.setData(
+      'application/x-tabstow-saved-tabs',
+      JSON.stringify({ kind: 'tab', sessionId: 'session-1', tabId: 'saved-tab-2' }),
+    );
+    const externalDragOver = await dragOver(target, externalTransfer);
+    expect(externalDragOver.defaultPrevented).toBe(false);
+    await drop(target, externalTransfer);
+
+    const malformedTransfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), malformedTransfer);
+    malformedTransfer.setData('application/x-tabstow-saved-tabs', '{');
+    await drop(target, malformedTransfer);
+
+    const staleTransfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag saved tab Saved Two'), staleTransfer);
+    staleTransfer.setData(
+      'application/x-tabstow-saved-tabs',
+      JSON.stringify({ kind: 'tab', sessionId: 'session-1', tabId: 'saved-tab-1' }),
+    );
+    await drop(target, staleTransfer);
 
     expect(sentMessageTypes()).not.toContain('sessions:move-tab');
+  });
+
+  it('localizes Saved action success messages', async () => {
+    getLanguagePreference.mockResolvedValue('zh-CN');
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    await click(screen().getByLabelText('将Saved One移至历史记录'));
+
+    expect(screen().getByRole('status').textContent).toBe('已将标签页移至历史记录。');
   });
 
   it('reloads authoritative sessions and clears drag state after a failed saved drop', async () => {
@@ -2602,17 +2650,27 @@ function mockMessages({
   });
 }
 
-function createDataTransfer(): DataTransfer {
+type TestDataTransfer = DataTransfer & {
+  setProtectedMode: (protectedMode: boolean) => void;
+};
+
+function createDataTransfer(): TestDataTransfer {
   const values = new Map<string, string>();
+  let protectedMode = false;
   return {
     effectAllowed: 'none',
     dropEffect: 'none',
-    types: [],
-    getData: (type: string) => values.get(type) ?? '',
+    get types() {
+      return [...values.keys()];
+    },
+    getData: (type: string) => (protectedMode ? '' : values.get(type) ?? ''),
     setData: (type: string, value: string) => {
       values.set(type, value);
     },
-  } as unknown as DataTransfer;
+    setProtectedMode: (nextProtectedMode: boolean) => {
+      protectedMode = nextProtectedMode;
+    },
+  } as unknown as TestDataTransfer;
 }
 
 async function dispatchDrag(
@@ -2620,6 +2678,9 @@ async function dispatchDrag(
   type: 'dragstart' | 'dragenter' | 'dragover' | 'dragleave' | 'drop' | 'dragend',
   dataTransfer: DataTransfer,
 ): Promise<Event> {
+  (dataTransfer as Partial<TestDataTransfer>).setProtectedMode?.(
+    type === 'dragenter' || type === 'dragover',
+  );
   const event = new Event(type, { bubbles: true, cancelable: true });
   Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
   await act(async () => {

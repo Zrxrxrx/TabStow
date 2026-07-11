@@ -56,6 +56,14 @@ describe('i18n', () => {
       'Drop saved session before Work',
     );
     expect(t('en', 'dropSavedSessionAtEnd')).toBe('Drop saved session at end');
+    expect(t('en', 'openedSavedTab')).toBe('Opened saved tab.');
+    expect(t('en', 'movedSavedTabToHistory')).toBe('Moved tab to History.');
+    expect(t('en', 'restoredSavedSession', { count: 2 })).toBe(
+      'Restored 2 tabs and moved the session to History.',
+    );
+    expect(t('en', 'movedSavedSessionToHistory')).toBe('Moved saved session to History.');
+    expect(t('en', 'movedSavedTab')).toBe('Moved saved tab.');
+    expect(t('en', 'reorderedSavedSessions')).toBe('Reordered saved sessions.');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -114,6 +122,14 @@ describe('i18n', () => {
       '将已保存的会话放在工作之前',
     );
     expect(t('zh-CN', 'dropSavedSessionAtEnd')).toBe('将已保存的会话放在末尾');
+    expect(t('zh-CN', 'openedSavedTab')).toBe('已打开保存的标签页。');
+    expect(t('zh-CN', 'movedSavedTabToHistory')).toBe('已将标签页移至历史记录。');
+    expect(t('zh-CN', 'restoredSavedSession', { count: 2 })).toBe(
+      '已恢复 2 个标签页，并将会话移至历史记录。',
+    );
+    expect(t('zh-CN', 'movedSavedSessionToHistory')).toBe('已将保存的会话移至历史记录。');
+    expect(t('zh-CN', 'movedSavedTab')).toBe('已移动保存的标签页。');
+    expect(t('zh-CN', 'reorderedSavedSessions')).toBe('已重新排列保存的会话。');
   });
 
   it('interpolates variables in message templates', async () => {
