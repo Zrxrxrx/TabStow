@@ -454,7 +454,7 @@ describe('App', () => {
     expect(tabSearch.getAttribute('type')).toBe('search');
     expect(
       container.querySelector<HTMLAnchorElement>('.workspace-history-link')?.getAttribute('href'),
-    ).toBe('chrome-extension://tabstow-test/history.html');
+    ).toBe('chrome-extension://tabstow-test/saved-history.html');
 
     await change(tabSearch, 'GITHUB');
 

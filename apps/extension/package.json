@@ -5,10 +5,11 @@
   "type": "module",
   "scripts": {
     "dev": "wxt",
-    "build": "wxt build -b chrome",
+    "build": "wxt build -b chrome && bun run verify:build",
     "zip": "wxt zip -b chrome",
     "typecheck": "wxt prepare && tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
+    "verify:build": "bun scripts/verify-built-extension.ts",
     "postinstall": "wxt prepare"
   },
   "dependencies": {

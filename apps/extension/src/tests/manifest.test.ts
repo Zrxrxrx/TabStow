@@ -1,3 +1,5 @@
+import { readdirSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import config from '../../wxt.config';
 
@@ -34,6 +36,18 @@ describe('extension manifest', () => {
 
   it('does not register content scripts', () => {
     expect(manifest).not.toHaveProperty('content_scripts');
+  });
+
+  it('keeps the recycle bin on a non-reserved extension entrypoint', () => {
+    const entrypointDirectories = readdirSync(resolve(process.cwd(), 'src/entrypoints'), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+
+    expect(entrypointDirectories).toContain('saved-history');
+    expect(entrypointDirectories).not.toContain('history');
+    expect(manifest).not.toHaveProperty('chrome_url_overrides.history');
   });
 
   it('keeps host permissions narrow while enabling Chrome favicon resolution', () => {

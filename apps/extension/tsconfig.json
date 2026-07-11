@@ -4,5 +4,5 @@
     "types": ["chrome"],
     "jsx": "react-jsx"
   },
-  "include": ["src", ".wxt/wxt.d.ts", "wxt.config.ts", "vitest.config.ts"]
+  "include": ["src", "scripts", ".wxt/wxt.d.ts", "wxt.config.ts", "vitest.config.ts"]
 }

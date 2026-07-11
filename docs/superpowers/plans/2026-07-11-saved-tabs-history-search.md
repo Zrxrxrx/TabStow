@@ -58,10 +58,12 @@
 
 ### History entrypoint
 
-- Create `apps/extension/src/entrypoints/history/index.html`.
-- Create `apps/extension/src/entrypoints/history/main.tsx`.
-- Create `apps/extension/src/entrypoints/history/HistoryApp.tsx` and `.test.tsx`.
-- Create `apps/extension/src/entrypoints/history/styles.css`.
+- Create `apps/extension/src/entrypoints/saved-history/index.html`.
+- Create `apps/extension/src/entrypoints/saved-history/main.tsx`.
+- Create `apps/extension/src/entrypoints/saved-history/HistoryApp.tsx` and `.test.tsx`.
+- Create `apps/extension/src/entrypoints/saved-history/styles.css`.
+- Create `apps/extension/scripts/verify-built-extension.ts` — reject generated native History overrides, content scripts, permission drift, and reserved output names.
+- Modify `apps/extension/package.json` and `tsconfig.json` — run and typecheck built-output verification.
 - Modify `apps/extension/src/tests/manifest.test.ts` — verify the packaged History page is extension-local and permissions remain unchanged.
 
 ---
@@ -671,7 +673,7 @@ Expected: FAIL because filters/container/input do not exist.
 </section>
 ```
 
-`WorkspaceSearch` uses a controlled `type="search"` input and an extension URL link from `chrome.runtime.getURL('/history.html')`. Active computes windows from the filtered snapshot; Saved maps the filtered sessions. Counts should describe the visible filtered items when query is nonblank.
+`WorkspaceSearch` uses a controlled `type="search"` input and an extension URL link from `chrome.runtime.getURL('/saved-history.html')`. Active computes windows from the filtered snapshot; Saved maps the filtered sessions. Counts should describe the visible filtered items when query is nonblank.
 
 Pass `dragDisabled={controlsDisabled || query.trim() !== ''}` from `ActiveWorkspace` to `ActiveWindowSection`. Use it only for active drag handles/drop targets; keep tab focus, close, and stow controlled by the existing `disabled` prop. Add English and Simplified Chinese strings for the local-search placeholder, clear action, and History link without changing the topbar web-search copy.
 
@@ -786,11 +788,14 @@ git commit -m "feat(saved-tabs): add restore and drag interactions"
 ### Task 9: Simple History Recycle Bin Page
 
 **Files:**
-- Create: `apps/extension/src/entrypoints/history/index.html`
-- Create: `apps/extension/src/entrypoints/history/main.tsx`
-- Create: `apps/extension/src/entrypoints/history/HistoryApp.tsx`
-- Create: `apps/extension/src/entrypoints/history/HistoryApp.test.tsx`
-- Create: `apps/extension/src/entrypoints/history/styles.css`
+- Create: `apps/extension/src/entrypoints/saved-history/index.html`
+- Create: `apps/extension/src/entrypoints/saved-history/main.tsx`
+- Create: `apps/extension/src/entrypoints/saved-history/HistoryApp.tsx`
+- Create: `apps/extension/src/entrypoints/saved-history/HistoryApp.test.tsx`
+- Create: `apps/extension/src/entrypoints/saved-history/styles.css`
+- Create: `apps/extension/scripts/verify-built-extension.ts`
+- Modify: `apps/extension/package.json`
+- Modify: `apps/extension/tsconfig.json`
 - Modify: `apps/extension/src/tests/manifest.test.ts`
 - Modify: `apps/extension/src/features/i18n/i18n.ts`
 - Modify: `apps/extension/src/features/i18n/i18n.test.ts`
@@ -830,7 +835,7 @@ expect(sendExtensionMessage).toHaveBeenCalledWith({
 
 - [ ] **Step 2: Run and verify RED**
 
-Run: `bun run test --cwd apps/extension -- src/entrypoints/history/HistoryApp.test.tsx`
+Run: `bun run --cwd apps/extension test -- src/entrypoints/saved-history/HistoryApp.test.tsx`
 
 Expected: FAIL because the History entrypoint does not exist.
 
@@ -844,18 +849,18 @@ Add English and Simplified Chinese strings for History title, empty state, reaso
 
 - [ ] **Step 4: Add WXT/manifest coverage**
 
-Extend `manifest.test.ts` to build/inspect the WXT manifest and assert the permissions remain exactly `tabs`, `storage`, `contextMenus`, `tabGroups`, `search`, and `favicon`. Assert no content scripts appear. The history HTML entrypoint is discovered by WXT; verify `bun run build` emits `history.html` in Task 10.
+Extend `manifest.test.ts` to assert the permissions remain exactly `tabs`, `storage`, `contextMenus`, `tabGroups`, `search`, and `favicon`, assert no content scripts appear, and reject the reserved `history` entrypoint name. Keep generated-manifest verification in the build so it asserts the new-tab override remains, no native History override or content scripts appear, and WXT emits `saved-history.html` but not `history.html`.
 
 - [ ] **Step 5: Run tests**
 
-Run: `bun run test --cwd apps/extension -- src/entrypoints/history/HistoryApp.test.tsx src/tests/manifest.test.ts`
+Run: `bun run --cwd apps/extension test -- src/entrypoints/saved-history/HistoryApp.test.tsx src/tests/manifest.test.ts`
 
 Expected: PASS.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add apps/extension/src/entrypoints/history apps/extension/src/tests/manifest.test.ts apps/extension/src/features/i18n/i18n.ts apps/extension/src/features/i18n/i18n.test.ts
+git add apps/extension/src/entrypoints/saved-history apps/extension/src/tests/manifest.test.ts apps/extension/src/features/i18n/i18n.ts apps/extension/src/features/i18n/i18n.test.ts
 git commit -m "feat(history): add recycle bin page"
 ```
 
@@ -890,7 +895,7 @@ Expected: exit 0 for core and extension.
 
 Run: `bun run build`
 
-Expected: exit 0 and `apps/extension/.output/chrome-mv3/history.html` exists alongside `newtab.html`.
+Expected: exit 0; `apps/extension/.output/chrome-mv3/saved-history.html` exists alongside `newtab.html`; `history.html`, `chrome_url_overrides.history`, and content scripts are absent.
 
 - [ ] **Step 5: Inspect the final diff against the approved design**
 

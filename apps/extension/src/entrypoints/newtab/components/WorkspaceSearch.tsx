@@ -32,7 +32,7 @@ export function WorkspaceSearch({ locale, onChange, value }: Props) {
       </div>
       <a
         className="secondary-button workspace-history-link"
-        href={chrome.runtime.getURL('/history.html')}
+        href={chrome.runtime.getURL('/saved-history.html')}
       >
         <History size={16} aria-hidden="true" />
         {t(locale, 'history')}
