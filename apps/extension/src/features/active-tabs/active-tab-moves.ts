@@ -38,6 +38,7 @@ function anchorTabs(tabs: IndexedTab[], position: ActiveTabsPosition): IndexedTa
     if (!anchorTab) throw new Error('The drop anchor no longer exists.');
     return [anchorTab];
   }
+  if (anchor.groupId === NO_GROUP) throw new Error('The drop group is invalid.');
   const matches = tabs.filter((tab) => groupId(tab) === anchor.groupId);
   if (matches.length === 0) throw new Error('The drop group no longer exists.');
   return matches;

@@ -107,6 +107,39 @@ describe('active tab moves', () => {
     expect(browserMocks.tabs.move).toHaveBeenCalledWith(10, { index: 1 });
   });
 
+  it('rejects the ungrouped sentinel as a group anchor before mutation', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 10,
+      windowId: 2,
+      index: 0,
+      pinned: false,
+      groupId: -1,
+    });
+    browserMocks.windows.get.mockResolvedValue({ id: 2, type: 'normal', incognito: false });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 10, windowId: 2, index: 0, pinned: false, groupId: -1 },
+      { id: 11, windowId: 2, index: 1, pinned: false, groupId: -1 },
+    ]);
+
+    const { moveActiveTab } = await import('./active-tab-moves');
+    const result = await moveActiveTab({
+      tabId: 10,
+      destination: {
+        windowId: 2,
+        lane: { kind: 'ungrouped' },
+        position: { kind: 'after', anchor: { kind: 'group', groupId: -1 } },
+      },
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'The drop group is invalid.' },
+    });
+    expect(browserMocks.tabs.move).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.group).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.ungroup).not.toHaveBeenCalled();
+  });
+
   it('rejects pinned and incognito lane mismatches without mutation', async () => {
     browserMocks.tabs.get.mockResolvedValue({ id: 10, windowId: 2, index: 0, pinned: true, groupId: -1 });
     browserMocks.windows.get
