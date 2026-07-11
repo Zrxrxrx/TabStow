@@ -3,6 +3,9 @@ import { defineConfig } from 'wxt';
 export default defineConfig({
   srcDir: 'src',
   modules: ['@wxt-dev/module-react'],
+  zip: {
+    name: 'tabstow',
+  },
   manifest: {
     name: 'Tabstow',
     description: 'Stow, organize, and restore your browser tabs.',
