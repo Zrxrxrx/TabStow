@@ -1,11 +1,22 @@
 import { Layers } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { findDuplicateTabGroups } from '@/features/active-tabs/active-tab-groups';
 import { buildActiveTabWindows } from '@/features/active-tabs/active-tab-windows';
-import type { ActiveBrowserTab, ActiveTabsSnapshot } from '@/features/active-tabs/types';
+import type {
+  ActiveBrowserTab,
+  ActiveTabsDragSource,
+  ActiveTabsMoveResult,
+  ActiveTabsSnapshot,
+} from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import {
+  readActiveTabsDragSource,
+  writeActiveTabsDragSource,
+  resolveActiveTabsDropRequest,
+  type ActiveTabsDropTarget,
+} from './active-tabs-dnd';
 import { ActiveWindowSection } from './ActiveWindowSection';
 import { GroupNav } from './GroupNav';
 
@@ -29,8 +40,13 @@ export function ActiveWorkspace({
   const [snapshot, setSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_SNAPSHOT);
   const [snapshotReady, setSnapshotReady] = useState(false);
   const [closePending, setClosePending] = useState(false);
+  const [dragSource, setDragSource] = useState<ActiveTabsDragSource | null>(null);
+  const [activeDropTargetKey, setActiveDropTargetKey] = useState<string | null>(null);
+  const [movePending, setMovePending] = useState(false);
   const targetRefs = useRef(new Map<string, HTMLElement>());
   const closePendingRef = useRef(false);
+  const dragSourceRef = useRef<ActiveTabsDragSource | null>(null);
+  const movePendingRef = useRef(false);
   const refreshTokenRef = useRef(0);
 
   async function refresh() {
@@ -92,10 +108,10 @@ export function ActiveWorkspace({
     [snapshot.tabs],
   );
   const currentWindowId = snapshot.windows.find((window) => window.focused)?.id;
-  const controlsDisabled = busy || closePending || !snapshotReady;
+  const controlsDisabled = busy || closePending || movePending || !snapshotReady;
 
   async function closeTabs(tabIds: number[]) {
-    if (busy || closePendingRef.current || tabIds.length === 0) return;
+    if (busy || closePendingRef.current || movePendingRef.current || tabIds.length === 0) return;
 
     closePendingRef.current = true;
     setClosePending(true);
@@ -118,7 +134,15 @@ export function ActiveWorkspace({
   }
 
   async function focusTab(tab: ActiveBrowserTab) {
-    if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') return;
+    if (
+      busy ||
+      closePendingRef.current ||
+      movePendingRef.current ||
+      typeof tab.id !== 'number' ||
+      typeof tab.windowId !== 'number'
+    ) {
+      return;
+    }
     const response = await sendExtensionMessage<AppResult<{ focused: true }>>({
       type: 'active-tabs:focus',
       tabId: tab.id,
@@ -128,7 +152,14 @@ export function ActiveWorkspace({
   }
 
   async function collapseCurrentWindowGroups() {
-    if (busy || closePendingRef.current || typeof currentWindowId !== 'number') return;
+    if (
+      busy ||
+      closePendingRef.current ||
+      movePendingRef.current ||
+      typeof currentWindowId !== 'number'
+    ) {
+      return;
+    }
 
     const response = await sendExtensionMessage<AppResult<{ collapsed: true; groupCount: number }>>({
       type: 'chrome-tab-groups:collapse-window',
@@ -139,6 +170,56 @@ export function ActiveWorkspace({
       return;
     }
     onStatus('error', response.error.message);
+  }
+
+  function startDrag(event: DragEvent, source: ActiveTabsDragSource) {
+    event.stopPropagation();
+    if (controlsDisabled || movePendingRef.current) {
+      event.preventDefault();
+      return;
+    }
+
+    dragSourceRef.current = source;
+    setDragSource(source);
+    writeActiveTabsDragSource(event.dataTransfer, source);
+  }
+
+  function endDrag(event?: DragEvent) {
+    event?.stopPropagation();
+    dragSourceRef.current = null;
+    setDragSource(null);
+    setActiveDropTargetKey(null);
+  }
+
+  async function dropOnTarget(event: DragEvent, target: ActiveTabsDropTarget) {
+    event.stopPropagation();
+    const source = readActiveTabsDragSource(event.dataTransfer) ?? dragSourceRef.current;
+    const dropRequest = source ? resolveActiveTabsDropRequest(source, target) : null;
+    if (!dropRequest || movePendingRef.current) return;
+
+    event.preventDefault();
+    movePendingRef.current = true;
+    setMovePending(true);
+    setActiveDropTargetKey(null);
+
+    try {
+      const response =
+        dropRequest.kind === 'tab'
+          ? await sendExtensionMessage<AppResult<ActiveTabsMoveResult>>({
+              type: 'active-tabs:move-tab',
+              request: dropRequest.request,
+            })
+          : await sendExtensionMessage<AppResult<ActiveTabsMoveResult>>({
+              type: 'active-tabs:move-group',
+              request: dropRequest.request,
+            });
+      if (!response.ok) onStatus('error', response.error.message);
+    } finally {
+      await refresh();
+      movePendingRef.current = false;
+      setMovePending(false);
+      endDrag();
+    }
   }
 
   function registerTarget(key: string, node: HTMLElement | null) {
@@ -214,12 +295,18 @@ export function ActiveWorkspace({
       <div className="active-window-list">
         {windows.map((window, displayIndex) => (
           <ActiveWindowSection
+            activeDropTargetKey={activeDropTargetKey}
             disabled={controlsDisabled}
             displayIndex={displayIndex}
+            dragSource={dragSource}
             key={window.key}
             locale={locale}
             window={window}
+            onActivateDropTarget={setActiveDropTargetKey}
             onCloseTabs={(tabIds) => void closeTabs(tabIds)}
+            onDragEnd={endDrag}
+            onDragStart={startDrag}
+            onDrop={(event, target) => void dropOnTarget(event, target)}
             onFocusTab={(tab) => void focusTab(tab)}
             onRegisterTarget={registerTarget}
             onStowTab={(tab) => void onStowTab(tab)}

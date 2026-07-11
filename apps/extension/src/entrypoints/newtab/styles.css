@@ -419,6 +419,31 @@ h3 {
   gap: 10px;
 }
 
+.active-window-list,
+.active-window-items,
+.pinned-lane {
+  display: grid;
+  gap: 10px;
+}
+
+.active-window {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--surface), transparent 8%);
+}
+
+.active-window-header,
+.pinned-lane-header,
+.chrome-group-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  justify-content: space-between;
+}
+
 .tab-group,
 .session-card {
   display: grid;
@@ -440,13 +465,90 @@ h3 {
 .tab-row {
   min-height: 50px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 8px;
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   background: color-mix(in oklab, var(--surface-warm), var(--surface) 46%);
+}
+
+.drag-handle {
+  width: 28px;
+  min-width: 28px;
+  min-height: 34px;
+  padding: 0;
+  cursor: grab;
+  color: var(--muted);
+  background: transparent;
+}
+
+.drag-handle:active {
+  cursor: grabbing;
+}
+
+.drag-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.drop-insertion {
+  min-height: 8px;
+  border-radius: var(--radius-pill);
+}
+
+.drop-insertion.is-active-drop-target {
+  min-height: 4px;
+  background: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in oklab, var(--accent), transparent 70%);
+}
+
+.drop-target.is-active-drop-target {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.chrome-group-color {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+.chrome-group-color--grey {
+  background: #8b95a7;
+}
+
+.chrome-group-color--blue {
+  background: #4f8cff;
+}
+
+.chrome-group-color--red {
+  background: #e65b65;
+}
+
+.chrome-group-color--yellow {
+  background: #dcae3f;
+}
+
+.chrome-group-color--green {
+  background: #45a66f;
+}
+
+.chrome-group-color--pink {
+  background: #d56fa7;
+}
+
+.chrome-group-color--purple {
+  background: #8d72d9;
+}
+
+.chrome-group-color--cyan {
+  background: #3ca9ba;
+}
+
+.chrome-group-color--orange {
+  background: #dc8545;
 }
 
 .tab-open-button {

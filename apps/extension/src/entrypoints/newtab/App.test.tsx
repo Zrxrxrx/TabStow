@@ -273,6 +273,270 @@ describe('App', () => {
     expect(() => screen().getByText('Import Chrome groups')).toThrow();
   });
 
+  it('drops an unpinned tab onto a Chrome group header', async () => {
+    mockChromeWindowWithUngroupedAndGroupedTabs();
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    const target = screen().getByLabelText('Drop into Reading');
+    const dragOverEvent = await dragOver(target, transfer);
+
+    expect(dragOverEvent.defaultPrevented).toBe(true);
+    expect(target.className).toContain('is-active-drop-target');
+    await drop(target, transfer);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:move-tab',
+      request: {
+        tabId: 21,
+        destination: {
+          windowId: 8,
+          lane: { kind: 'group', groupId: 31 },
+          position: { kind: 'end' },
+        },
+      },
+    });
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
+  });
+
+  it('drops a complete group at another window end', async () => {
+    mockTwoChromeWindowsWithGroup();
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Reading group'), transfer);
+    await drop(screen().getByLabelText('Drop at end of Window 2'), transfer);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:move-group',
+      request: {
+        groupId: 31,
+        sourceWindowId: 8,
+        destination: { windowId: 3, position: { kind: 'end' } },
+      },
+    });
+  });
+
+  it('uses a complete group as a semantic top-level anchor', async () => {
+    mockChromeWindowWithUngroupedAndGroupedTabs();
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    await drop(screen().getByLabelText('Drop after Reading'), transfer);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:move-tab',
+      request: {
+        tabId: 21,
+        destination: {
+          windowId: 8,
+          lane: { kind: 'ungrouped' },
+          position: { kind: 'after', anchor: { kind: 'group', groupId: 31 } },
+        },
+      },
+    });
+  });
+
+  it('offers an empty pinned lane when dragging a pinned tab', async () => {
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 20, windowId: 8, index: 0, pinned: true, title: 'Pinned' },
+      { ...UNIQUE_TAB, id: 30, windowId: 3, index: 0, title: 'Target' },
+    ];
+    mockMessages({ activeTabs: tabs, focusedWindowId: 8 });
+    await renderApp();
+
+    expect(() => screen().getByLabelText('Drop at end of pinned tabs in Window 2')).toThrow();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Pinned'), transfer);
+    await drop(screen().getByLabelText('Drop at end of pinned tabs in Window 2'), transfer);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:move-tab',
+      request: {
+        tabId: 20,
+        destination: {
+          windowId: 3,
+          lane: { kind: 'pinned' },
+          position: { kind: 'end' },
+        },
+      },
+    });
+  });
+
+  it('does not accept a pinned tab on a Chrome group target', async () => {
+    const tabs: ActiveBrowserTab[] = [
+      {
+        ...UNIQUE_TAB,
+        id: 20,
+        windowId: 8,
+        index: 0,
+        pinned: true,
+        groupId: -1,
+        title: 'Pinned',
+      },
+      {
+        ...UNIQUE_TAB,
+        id: 22,
+        windowId: 8,
+        index: 1,
+        pinned: false,
+        groupId: 31,
+        title: 'Grouped',
+      },
+    ];
+    mockMessages({
+      activeTabs: tabs,
+      focusedWindowId: 8,
+      chromeGroups: [
+        { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+      ],
+    });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Pinned'), transfer);
+    const target = screen().getByLabelText('Drop into Reading');
+    const dragOverEvent = await dragOver(target, transfer);
+    await drop(target, transfer);
+
+    expect(dragOverEvent.defaultPrevented).toBe(false);
+    expect(sentMessageTypes()).not.toContain('active-tabs:move-tab');
+  });
+
+  it('allows only one drag move while the first response is pending', async () => {
+    const pending = deferred<AppResult<{ moved: boolean }>>();
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },
+      { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
+    ];
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return {
+          ok: true,
+          data: activeTabsSnapshot(tabs, {
+            focusedWindowId: 8,
+            chromeGroups: [
+              { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+            ],
+          }),
+        };
+      }
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'active-tabs:move-tab') return pending.promise;
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    const target = screen().getByLabelText('Drop into Reading');
+    await act(async () => {
+      const first = new Event('drop', { bubbles: true, cancelable: true });
+      const second = new Event('drop', { bubbles: true, cancelable: true });
+      Object.defineProperty(first, 'dataTransfer', { value: transfer });
+      Object.defineProperty(second, 'dataTransfer', { value: transfer });
+      target.dispatchEvent(first);
+      target.dispatchEvent(second);
+    });
+
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:move-tab')).toHaveLength(1);
+    pending.resolve({ ok: true, data: { moved: true } });
+    await act(async () => {
+      await pending.promise;
+    });
+  });
+
+  it('keeps move controls disabled through the authoritative refresh after a no-op', async () => {
+    const pendingMove = deferred<AppResult<{ moved: boolean }>>();
+    const pendingRefresh = deferred<AppResult<ActiveTabsSnapshot>>();
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },
+      { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
+    ];
+    const snapshot = activeTabsSnapshot(tabs, {
+      focusedWindowId: 8,
+      chromeGroups: [
+        { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+      ],
+    });
+    let snapshotCalls = 0;
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        snapshotCalls += 1;
+        return snapshotCalls === 1 ? { ok: true, data: snapshot } : pendingRefresh.promise;
+      }
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'active-tabs:move-tab') return pendingMove.promise;
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    await drop(screen().getByLabelText('Drop into Reading'), transfer);
+
+    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
+
+    pendingMove.resolve({ ok: true, data: { moved: false } });
+    await act(async () => {
+      await pendingMove.promise;
+      await Promise.resolve();
+    });
+
+    expect(snapshotCalls).toBe(2);
+    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
+
+    pendingRefresh.resolve({ ok: true, data: snapshot });
+    await act(async () => {
+      await pendingRefresh.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', false);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', false);
+  });
+
+  it('reports a failed move and refreshes Chrome state', async () => {
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },
+      { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
+    ];
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return {
+          ok: true,
+          data: activeTabsSnapshot(tabs, {
+            focusedWindowId: 8,
+            chromeGroups: [
+              { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+            ],
+          }),
+        };
+      }
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'active-tabs:move-tab') {
+        return {
+          ok: false,
+          error: { code: 'chrome-tabs-error', message: 'Target disappeared' },
+        };
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    await drop(screen().getByLabelText('Drop into Reading'), transfer);
+
+    expect(screen().getByRole('alert').textContent).toContain('Target disappeared');
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
+  });
+
   it('renders utility panels from stored quick links, todos, and theme preferences', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([
@@ -1711,6 +1975,10 @@ function mockMessages({
       return { ok: true, data: { focused: true } };
     }
 
+    if (message.type === 'active-tabs:move-tab' || message.type === 'active-tabs:move-group') {
+      return { ok: true, data: { moved: true } };
+    }
+
     if (message.type === 'quick-links:add') {
       const saved = await saveQuickLinks([...((await getQuickLinks()) as QuickLink[]), message.link]);
       return { ok: true, data: saved };
@@ -1747,6 +2015,71 @@ function mockMessages({
     }
 
     throw new Error(`Unexpected message: ${message.type}`);
+  });
+}
+
+function createDataTransfer(): DataTransfer {
+  const values = new Map<string, string>();
+  return {
+    effectAllowed: 'none',
+    dropEffect: 'none',
+    types: [],
+    getData: (type: string) => values.get(type) ?? '',
+    setData: (type: string, value: string) => {
+      values.set(type, value);
+    },
+  } as unknown as DataTransfer;
+}
+
+async function dispatchDrag(
+  element: HTMLElement,
+  type: 'dragstart' | 'dragenter' | 'dragover' | 'drop' | 'dragend',
+  dataTransfer: DataTransfer,
+): Promise<Event> {
+  const event = new Event(type, { bubbles: true, cancelable: true });
+  Object.defineProperty(event, 'dataTransfer', { value: dataTransfer });
+  await act(async () => {
+    element.dispatchEvent(event);
+  });
+  return event;
+}
+
+const dragStart = (element: HTMLElement, data: DataTransfer) =>
+  dispatchDrag(element, 'dragstart', data);
+
+async function dragOver(element: HTMLElement, data: DataTransfer) {
+  await dispatchDrag(element, 'dragenter', data);
+  return dispatchDrag(element, 'dragover', data);
+}
+
+const drop = (element: HTMLElement, data: DataTransfer) =>
+  dispatchDrag(element, 'drop', data);
+
+function mockChromeWindowWithUngroupedAndGroupedTabs() {
+  const tabs: ActiveBrowserTab[] = [
+    { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },
+    { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
+  ];
+  mockMessages({
+    activeTabs: tabs,
+    focusedWindowId: 8,
+    chromeGroups: [
+      { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+    ],
+  });
+}
+
+function mockTwoChromeWindowsWithGroup() {
+  const tabs: ActiveBrowserTab[] = [
+    { ...UNIQUE_TAB, id: 22, windowId: 8, index: 0, groupId: 31, title: 'Grouped' },
+    { ...UNIQUE_TAB, id: 30, windowId: 3, index: 0, groupId: -1, title: 'Target' },
+  ];
+  mockMessages({
+    activeTabs: tabs,
+    focusedWindowId: 8,
+    chromeGroups: [
+      { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+    ],
   });
 }
 
