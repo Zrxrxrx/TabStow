@@ -1,7 +1,7 @@
 # Chrome-Native Active Tabs Drag Design
 
 Date: 2026-07-11
-Status: Approved for specification review
+Status: Approved for planning
 
 ## Context
 
