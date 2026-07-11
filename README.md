@@ -50,9 +50,13 @@ Create a GitHub Gist manually, add a file named `tabstow.sync.json`, and paste t
 - Open a new tab and confirm the Tabstow dashboard appears.
 - Click the extension toolbar icon and confirm the current window's eligible tabs are stowed and no popup opens.
 - Open several ordinary web tabs and use **Stow current window**.
-- Confirm active tabs group by domain and homepage-style tabs appear in the Homepages group.
-- Create a manual group from an active tab and move the tab back to its domain group.
-- Enable Chrome tab-group sync and confirm manual groups become native Chrome tab groups.
+- Open two normal Chrome windows with pinned, ungrouped, and natively grouped web tabs.
+- Confirm Active Tabs shows the focused window first and preserves each window's eligible tab-strip order.
+- Drag an ungrouped tab, reorder a tab inside a group, move a tab into and out of a group, and move a tab between windows.
+- Reorder a complete Chrome group and move it to the other normal window.
+- Confirm pinned tabs only accept pinned destinations and retain their pinned state across windows.
+- Change tab order, group membership, group title/color/collapsed state, and window focus directly in Chrome; confirm the open dashboard refreshes.
+- Reload Tabstow and confirm no local URL/manual grouping or stale local order returns.
 - Collapse Chrome tab groups from the dashboard.
 - Close one tab, close a group, and close duplicates.
 - Add and open a quick link.
