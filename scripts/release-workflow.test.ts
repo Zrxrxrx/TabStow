@@ -8,6 +8,7 @@ interface WorkflowStep {
   uses?: string;
   with?: Record<string, boolean | number | string>;
   env?: Record<string, string>;
+  if?: string;
   run?: string;
 }
 
@@ -56,6 +57,7 @@ const packageJson = JSON.parse(
 ) as {
   scripts: Record<string, string>;
 };
+const readmeText = readFileSync(new URL('../README.md', import.meta.url), 'utf8');
 
 function getStep(name: string): WorkflowStep {
   const matchingStep = steps.find((step) => step.name === name);
@@ -73,6 +75,17 @@ function expectFailClosedTrackedStatus(run: string): void {
   expect(run).toMatch(
     /if ! TRACKED_STATUS="\$\(git status --porcelain --untracked-files=no\)"; then\s+echo [^\n]+ >&2\s+exit 1\s+fi\s+if \[\[ -n "\$TRACKED_STATUS" \]\]; then/,
   );
+}
+
+function expectInOrder(text: string, fragments: string[]): void {
+  let previousIndex = -1;
+  for (const fragment of fragments) {
+    const index = text.indexOf(fragment, previousIndex + 1);
+    expect(index, `Missing or out-of-order fragment: ${fragment}`).toBeGreaterThan(
+      previousIndex,
+    );
+    previousIndex = index;
+  }
 }
 
 describe('release workflow structure', () => {
@@ -168,9 +181,32 @@ describe('release workflow behavior', () => {
     expectFailClosedTrackedStatus(prepareRun);
     expect(prepareRun).toContain('bun pm version "$BUMP" --no-git-tag-version');
     expect(prepareRun).toContain('bun install --lockfile-only');
+  });
+
+  it('fails closed when probing tags and resumes only a same-HEAD current tag', () => {
+    const prepareRun = getRun('Prepare the release version');
+
+    expectInOrder(prepareRun, [
+      'set +e',
+      'TAG_PROBE_OUTPUT="$(git ls-remote --exit-code --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" 2>&1)"',
+      'TAG_PROBE_STATUS=$?',
+      'set -e\ncase "$TAG_PROBE_STATUS" in',
+      '0)',
+      'if [[ "$BUMP" != "current" ]]; then',
+      'TAG_COMMIT=',
+      'HEAD_COMMIT="$(git rev-parse HEAD)"',
+      'if [[ -z "$TAG_COMMIT" || "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then',
+      'RESUME=true',
+      '2)',
+      'RESUME=false',
+      '*)',
+      'printf \'%s\\n\' "$TAG_PROBE_OUTPUT" >&2',
+      'exit 1',
+    ]);
     expect(prepareRun).toContain(
-      'git ls-remote --exit-code --tags origin "refs/tags/$TAG"',
+      'awk -v tag_ref="refs/tags/$TAG^{}" \'$2 == tag_ref { print $1 }\'',
     );
+    expect(prepareRun).toContain('printf \'resume=%s\\n\' "$RESUME" >> "$GITHUB_OUTPUT"');
   });
 
   it('runs every check and verifier before mutation', () => {
@@ -189,8 +225,10 @@ describe('release workflow behavior', () => {
   });
 
   it('separates current tag pushes from atomic bump pushes', () => {
+    const pushStep = getStep('Commit, tag, and push');
     const pushRun = getRun('Commit, tag, and push');
 
+    expect(pushStep.if).toBe("${{ steps.release.outputs.resume != 'true' }}");
     expectFailClosedTrackedStatus(pushRun);
     expect(pushRun).toContain('git add -- apps/extension/package.json bun.lock');
     expect(pushRun).toContain('git commit -m "chore(release): bump version to $VERSION"');
@@ -200,8 +238,9 @@ describe('release workflow behavior', () => {
     );
   });
 
-  it('creates exactly the versioned ZIP and checksum release assets', () => {
+  it('creates or repairs exactly the versioned ZIP and checksum release assets', () => {
     const assetRun = getRun('Verify and prepare release assets');
+    const releaseRun = getRun('Create the GitHub Release');
     expect(assetRun).toContain(
       'RELEASE_ZIP="apps/extension/.output/tabstow-v$VERSION-chrome.zip"',
     );
@@ -210,17 +249,37 @@ describe('release workflow behavior', () => {
       'sha256sum "tabstow-v$VERSION-chrome.zip" > SHA256SUMS',
     );
 
-    expect(getRun('Create the GitHub Release').trim()).toBe(
-      [
-        'set -euo pipefail',
-        'gh release create "$TAG" \\',
-        '  "apps/extension/.output/tabstow-v$VERSION-chrome.zip" \\',
-        '  apps/extension/.output/SHA256SUMS \\',
-        '  --verify-tag \\',
-        '  --generate-notes \\',
-        '  --title "$TAG"',
-      ].join('\n'),
+    expectInOrder(releaseRun, [
+      'set +e',
+      'RELEASE_PROBE_OUTPUT="$(gh api --include "/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" 2>&1)"',
+      'RELEASE_PROBE_STATUS=$?',
+      'set -e',
+      'RELEASE_HTTP_STATUS=',
+      'case "$RELEASE_PROBE_STATUS:$RELEASE_HTTP_STATUS" in',
+      '0:200)',
+      'RELEASE_EXISTS=true',
+      '1:404)',
+      'RELEASE_EXISTS=false',
+      '*)',
+      'printf \'%s\\n\' "$RELEASE_PROBE_OUTPUT" >&2',
+      'exit 1',
+      'if [[ "$RELEASE_EXISTS" == "false" ]]; then',
+      'gh release create "$TAG"',
+      'else',
+      'ASSET_NAMES=',
+      'MISSING_ASSETS=()',
+      'gh release upload "$TAG" "${MISSING_ASSETS[@]}"',
+    ]);
+    expect(releaseRun).toMatch(
+      /gh release create "\$TAG" \\\n\s+"\$RELEASE_ZIP" \\\n\s+"\$CHECKSUMS" \\\n\s+--verify-tag \\\n\s+--generate-notes/,
     );
+    expect(releaseRun).toContain(
+      'if ! ASSET_NAMES="$(gh release view "$TAG" --json assets --jq \'.assets[].name\')"; then',
+    );
+    expect(releaseRun).toContain('if ! grep -Fxq "$RELEASE_ZIP_NAME" <<< "$ASSET_NAMES"; then');
+    expect(releaseRun).toContain('MISSING_ASSETS+=("$RELEASE_ZIP")');
+    expect(releaseRun).toContain('if ! grep -Fxq "$CHECKSUMS_NAME" <<< "$ASSET_NAMES"; then');
+    expect(releaseRun).toContain('MISSING_ASSETS+=("$CHECKSUMS")');
   });
 });
 
@@ -229,6 +288,20 @@ describe('release test integration', () => {
     expect(packageJson.scripts.test).toMatch(/&& bun run test:release$/);
     expect(packageJson.scripts['test:release']).toBe(
       'bunx vitest@4.1.10 run scripts/verify-release.test.ts scripts/release-workflow.test.ts',
+    );
+  });
+});
+
+describe('release recovery documentation', () => {
+  it('documents the safe current-version resume procedure', () => {
+    expect(readmeText).toContain(
+      'If a release run fails after pushing its tag, rerun the workflow with `current`.',
+    );
+    expect(readmeText).toContain(
+      'Recovery proceeds only when the existing tag resolves to the current default-branch commit.',
+    );
+    expect(readmeText).toContain(
+      'The rerun creates a missing Release or uploads only the missing `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` assets.',
     );
   });
 });

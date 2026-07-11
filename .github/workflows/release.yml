@@ -83,13 +83,37 @@ jobs:
           fi
 
           TAG="v$VERSION"
-          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
-            echo "Tag $TAG already exists." >&2
-            exit 1
-          fi
+          set +e
+          TAG_PROBE_OUTPUT="$(git ls-remote --exit-code --tags origin "refs/tags/$TAG" "refs/tags/$TAG^{}" 2>&1)"
+          TAG_PROBE_STATUS=$?
+          set -e
+          case "$TAG_PROBE_STATUS" in
+            0)
+              if [[ "$BUMP" != "current" ]]; then
+                echo "Tag $TAG already exists; bump releases cannot resume." >&2
+                exit 1
+              fi
+              TAG_COMMIT="$(printf '%s\n' "$TAG_PROBE_OUTPUT" | awk -v tag_ref="refs/tags/$TAG^{}" '$2 == tag_ref { print $1 }')"
+              HEAD_COMMIT="$(git rev-parse HEAD)"
+              if [[ -z "$TAG_COMMIT" || "$TAG_COMMIT" != "$HEAD_COMMIT" ]]; then
+                echo "Tag $TAG does not resolve to the current default-branch HEAD." >&2
+                exit 1
+              fi
+              RESUME=true
+              ;;
+            2)
+              RESUME=false
+              ;;
+            *)
+              printf '%s\n' "$TAG_PROBE_OUTPUT" >&2
+              echo "Unable to inspect tag $TAG on origin." >&2
+              exit 1
+              ;;
+          esac
 
           printf 'version=%s\n' "$VERSION" >> "$GITHUB_OUTPUT"
           printf 'tag=%s\n' "$TAG" >> "$GITHUB_OUTPUT"
+          printf 'resume=%s\n' "$RESUME" >> "$GITHUB_OUTPUT"
 
       - name: Typecheck, test, and build the Chrome ZIP
         run: |
@@ -119,6 +143,7 @@ jobs:
           test -s "$CHECKSUMS"
 
       - name: Commit, tag, and push
+        if: ${{ steps.release.outputs.resume != 'true' }}
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
@@ -168,9 +193,57 @@ jobs:
           TAG: ${{ steps.release.outputs.tag }}
         run: |
           set -euo pipefail
-          gh release create "$TAG" \
-            "apps/extension/.output/tabstow-v$VERSION-chrome.zip" \
-            apps/extension/.output/SHA256SUMS \
-            --verify-tag \
-            --generate-notes \
-            --title "$TAG"
+
+          set +e
+          RELEASE_PROBE_OUTPUT="$(gh api --include "/repos/$GITHUB_REPOSITORY/releases/tags/$TAG" 2>&1)"
+          RELEASE_PROBE_STATUS=$?
+          set -e
+          RELEASE_HTTP_STATUS="$(printf '%s\n' "$RELEASE_PROBE_OUTPUT" | awk '
+            $1 ~ /^HTTP\// && $2 ~ /^[0-9][0-9][0-9]$/ { status = $2 }
+            match($0, /\(HTTP [0-9][0-9][0-9]\)/) { status = substr($0, RSTART + 6, 3) }
+            END { print status }
+          ')"
+
+          case "$RELEASE_PROBE_STATUS:$RELEASE_HTTP_STATUS" in
+            0:200)
+              RELEASE_EXISTS=true
+              ;;
+            1:404)
+              RELEASE_EXISTS=false
+              ;;
+            *)
+              printf '%s\n' "$RELEASE_PROBE_OUTPUT" >&2
+              echo "Unable to inspect GitHub Release $TAG." >&2
+              exit 1
+              ;;
+          esac
+
+          RELEASE_ZIP="apps/extension/.output/tabstow-v$VERSION-chrome.zip"
+          CHECKSUMS="apps/extension/.output/SHA256SUMS"
+          if [[ "$RELEASE_EXISTS" == "false" ]]; then
+            gh release create "$TAG" \
+              "$RELEASE_ZIP" \
+              "$CHECKSUMS" \
+              --verify-tag \
+              --generate-notes \
+              --title "$TAG"
+          else
+            if ! ASSET_NAMES="$(gh release view "$TAG" --json assets --jq '.assets[].name')"; then
+              echo "Unable to inspect assets for GitHub Release $TAG." >&2
+              exit 1
+            fi
+
+            RELEASE_ZIP_NAME="${RELEASE_ZIP##*/}"
+            CHECKSUMS_NAME="${CHECKSUMS##*/}"
+            MISSING_ASSETS=()
+            if ! grep -Fxq "$RELEASE_ZIP_NAME" <<< "$ASSET_NAMES"; then
+              MISSING_ASSETS+=("$RELEASE_ZIP")
+            fi
+            if ! grep -Fxq "$CHECKSUMS_NAME" <<< "$ASSET_NAMES"; then
+              MISSING_ASSETS+=("$CHECKSUMS")
+            fi
+
+            if (( ${#MISSING_ASSETS[@]} > 0 )); then
+              gh release upload "$TAG" "${MISSING_ASSETS[@]}"
+            fi
+          fi

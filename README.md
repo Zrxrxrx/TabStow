@@ -44,6 +44,8 @@ bun run zip
 
 For the first release, open **Actions** in GitHub, select the **Release** workflow, choose **Run workflow**, and leave **Version to publish or increment** set to `current`. The checked-in extension version is `1.0.0`, so this publishes `v1.0.0`. For each later release, run the workflow again and select the desired `patch`, `minor`, or `major` bump.
 
+If a release run fails after pushing its tag, rerun the workflow with `current`. Recovery proceeds only when the existing tag resolves to the current default-branch commit. The rerun creates a missing Release or uploads only the missing `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` assets.
+
 To install or update from a GitHub Release:
 
 1. Open the desired Release and download both `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` into the same directory.
