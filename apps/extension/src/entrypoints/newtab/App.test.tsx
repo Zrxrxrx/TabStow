@@ -1077,7 +1077,7 @@ describe('App', () => {
     const pendingClose = deferred<AppResult<{ closed: true; tabCount: number }>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: DUPLICATE_TABS, chromeGroups: [] } };
+        return { ok: true, data: activeTabsSnapshot(DUPLICATE_TABS) };
       }
 
       if (message.type === 'active-tabs:list') {
@@ -1159,7 +1159,9 @@ describe('App', () => {
       deviceId: 'device-1',
     };
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
-      if (message.type === 'active-tabs:snapshot') return { ok: true, data: { tabs: activeTabs, chromeGroups: [] } };
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: activeTabsSnapshot(activeTabs) };
+      }
       if (message.type === 'active-tabs:list') return { ok: true, data: activeTabs };
       if (message.type === 'sessions:list') return { ok: true, data: sessions };
       if (message.type === 'sessions:stow-tab') {
@@ -1349,7 +1351,7 @@ describe('App', () => {
     });
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } };
+        return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
       }
       if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
       if (message.type === 'chrome-tab-groups:sync') return { ok: true, data: syncedChromeGroups };
@@ -1418,10 +1420,9 @@ describe('App', () => {
       if (message.type === 'active-tabs:snapshot') {
         return {
           ok: true,
-          data: {
-            tabs: [manualTab, chromeGroupedTab],
+          data: activeTabsSnapshot([manualTab, chromeGroupedTab], {
             chromeGroups: [{ id: 31, windowId: 4, title: 'Reading', color: 'blue', collapsed: false }],
-          },
+          }),
         };
       }
       if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
@@ -1563,7 +1564,7 @@ describe('App', () => {
     let activeTabs = [UNIQUE_TAB];
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: activeTabs, chromeGroups: [] } };
+        return { ok: true, data: activeTabsSnapshot(activeTabs) };
       }
 
       if (message.type === 'active-tabs:list') {
@@ -1595,7 +1596,7 @@ describe('App', () => {
     const pendingStow = deferred<AppResult<StowResult>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } };
+        return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
       }
 
       if (message.type === 'active-tabs:list') {
@@ -1647,7 +1648,7 @@ describe('App', () => {
     const pendingStow = deferred<AppResult<StowResult>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: { tabs: [UNIQUE_TAB], chromeGroups: [] } };
+        return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
       }
 
       if (message.type === 'sessions:list') {
@@ -1716,7 +1717,7 @@ describe('App', () => {
     await renderApp();
     await click(screen().getByText('Stow current window'));
 
-    secondRefresh.resolve({ ok: true, data: { windows: [], tabs: [], chromeGroups: [] } });
+    secondRefresh.resolve({ ok: true, data: activeTabsSnapshot([]) });
     await act(async () => {
       await secondRefresh.promise;
     });
@@ -1724,7 +1725,7 @@ describe('App', () => {
 
     firstRefresh.resolve({
       ok: true,
-      data: { windows: [], tabs: [UNIQUE_TAB], chromeGroups: [] },
+      data: activeTabsSnapshot([UNIQUE_TAB]),
     });
     await act(async () => {
       await firstRefresh.promise;
@@ -1759,7 +1760,7 @@ describe('App', () => {
       if (message.type === 'active-tabs:snapshot') {
         return {
           ok: true,
-          data: { windows: [], tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot,
+          data: activeTabsSnapshot([UNIQUE_TAB]),
         };
       }
 
@@ -1827,7 +1828,7 @@ describe('App', () => {
       if (message.type === 'active-tabs:snapshot') {
         return {
           ok: true,
-          data: { windows: [], tabs: [UNIQUE_TAB], chromeGroups: [] } satisfies ActiveTabsSnapshot,
+          data: activeTabsSnapshot([UNIQUE_TAB]),
         };
       }
 
@@ -1890,12 +1891,44 @@ function defaultWorkspace(): ActiveWorkspaceState {
   };
 }
 
-function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveBrowserTab[]; sessions?: TabSession[] }) {
+function activeTabsSnapshot(
+  tabs: ActiveBrowserTab[],
+  options: {
+    chromeGroups?: ActiveTabsSnapshot['chromeGroups'];
+    focusedWindowId?: number;
+  } = {},
+): ActiveTabsSnapshot {
+  const windowIds = [...new Set(tabs.map((tab) => tab.windowId))].sort((a, b) => a - b);
+  const focusedWindowId = options.focusedWindowId ?? windowIds[0];
+
+  return {
+    windows: windowIds.map((id) => ({
+      id,
+      focused: id === focusedWindowId,
+      incognito: false,
+      type: 'normal',
+    })),
+    tabs,
+    chromeGroups: options.chromeGroups ?? [],
+  };
+}
+
+function mockMessages({
+  activeTabs,
+  chromeGroups = [],
+  focusedWindowId,
+  sessions = SESSIONS,
+}: {
+  activeTabs: ActiveBrowserTab[];
+  chromeGroups?: ActiveTabsSnapshot['chromeGroups'];
+  focusedWindowId?: number;
+  sessions?: TabSession[];
+}) {
   sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
     if (message.type === 'active-tabs:snapshot') {
       return {
         ok: true,
-        data: { windows: [], tabs: activeTabs, chromeGroups: [] } satisfies ActiveTabsSnapshot,
+        data: activeTabsSnapshot(activeTabs, { chromeGroups, focusedWindowId }),
       };
     }
 
@@ -1908,7 +1941,7 @@ function mockMessages({ activeTabs, sessions = SESSIONS }: { activeTabs: ActiveB
     }
 
     if (message.type === 'active-tabs:close') {
-      return { ok: true, data: { closed: true, tabCount: message.tabIds?.length ?? 0 } };
+      return { ok: true, data: { closed: true, tabCount: message.tabIds.length } };
     }
 
     if (message.type === 'active-tabs:focus') {

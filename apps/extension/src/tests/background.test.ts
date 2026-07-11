@@ -193,6 +193,7 @@ describe('background message routing', () => {
     activeTabsMocks.listActiveTabsSnapshot.mockResolvedValue({
       ok: true,
       data: {
+        windows: [{ id: 2, focused: true, incognito: false, type: 'normal' }],
         tabs: [{ id: 3, windowId: 2, index: 0, url: 'https://example.com' }],
         chromeGroups: [],
       },
@@ -207,6 +208,7 @@ describe('background message routing', () => {
     expect(response).toEqual({
       ok: true,
       data: {
+        windows: [{ id: 2, focused: true, incognito: false, type: 'normal' }],
         tabs: [{ id: 3, windowId: 2, index: 0, url: 'https://example.com' }],
         chromeGroups: [],
       },

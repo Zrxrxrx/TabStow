@@ -13,6 +13,7 @@ const browserMocks = vi.hoisted(() => ({
     update: vi.fn(),
   },
   windows: {
+    getAll: vi.fn(),
     update: vi.fn(),
   },
 }));
@@ -25,6 +26,9 @@ describe('active tabs service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     browserMocks.tabGroups.query.mockResolvedValue([]);
+    browserMocks.windows.getAll.mockResolvedValue([
+      { id: 2, focused: true, incognito: false, type: 'normal' },
+    ]);
   });
 
   it('lists active browser tabs from all windows', async () => {
@@ -76,7 +80,7 @@ describe('active tabs service', () => {
     expect(result).toEqual({
       ok: true,
       data: {
-        windows: [],
+        windows: [{ id: 2, focused: true, incognito: false, type: 'normal' }],
         tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
         chromeGroups: [{ id: 31, windowId: 2, title: 'Reading', color: 'blue', collapsed: false }],
       },
@@ -95,10 +99,52 @@ describe('active tabs service', () => {
     expect(result).toEqual({
       ok: true,
       data: {
-        windows: [],
+        windows: [{ id: 2, focused: true, incognito: false, type: 'normal' }],
         tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
         chromeGroups: [],
       },
+    });
+  });
+
+  it('returns eligible tabs and groups only from normal windows', async () => {
+    browserMocks.windows.getAll.mockResolvedValue([
+      { id: 2, focused: true, incognito: false, type: 'normal' },
+      { id: 3, focused: false, incognito: false, type: 'popup' },
+      { focused: false, incognito: false, type: 'normal' },
+    ]);
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 2, index: 0, url: 'https://visible.example/' },
+      { id: 2, windowId: 2, index: 1, url: 'chrome://settings' },
+      { id: 3, windowId: 3, index: 0, url: 'https://popup.example/' },
+    ]);
+    browserMocks.tabGroups.query.mockResolvedValue([
+      { id: 31, windowId: 2, title: 'Normal', color: 'blue', collapsed: false },
+      { id: 32, windowId: 3, title: 'Popup', color: 'red', collapsed: false },
+    ]);
+
+    const { listActiveTabsSnapshot } = await import('./active-tabs-service');
+
+    await expect(listActiveTabsSnapshot()).resolves.toEqual({
+      ok: true,
+      data: {
+        windows: [{ id: 2, focused: true, incognito: false, type: 'normal' }],
+        tabs: [{ id: 1, windowId: 2, index: 0, url: 'https://visible.example/' }],
+        chromeGroups: [
+          { id: 31, windowId: 2, title: 'Normal', color: 'blue', collapsed: false },
+        ],
+      },
+    });
+  });
+
+  it('returns a Chrome tabs error when normal windows cannot be read', async () => {
+    browserMocks.tabs.query.mockResolvedValue([]);
+    browserMocks.windows.getAll.mockRejectedValue(new Error('Windows unavailable'));
+
+    const { listActiveTabsSnapshot } = await import('./active-tabs-service');
+
+    await expect(listActiveTabsSnapshot()).resolves.toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'Windows unavailable' },
     });
   });
 

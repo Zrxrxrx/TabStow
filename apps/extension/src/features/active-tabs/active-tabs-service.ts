@@ -1,7 +1,12 @@
 import { browser } from '@/lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
-import type { ActiveBrowserTab, ActiveTabsSnapshot, ChromeTabGroupInfo } from './types';
+import type {
+  ActiveBrowserTab,
+  ActiveChromeWindowInfo,
+  ActiveTabsSnapshot,
+  ChromeTabGroupInfo,
+} from './types';
 
 export async function listActiveTabs(): Promise<AppResult<ActiveBrowserTab[]>> {
   try {
@@ -20,15 +25,42 @@ async function listChromeTabGroups(): Promise<ChromeTabGroupInfo[]> {
   }
 }
 
-export async function listActiveTabsSnapshot(): Promise<AppResult<ActiveTabsSnapshot>> {
-  const response = await listActiveTabs();
-  if (!response.ok) return response;
+function normalizeNormalWindows(windows: chrome.windows.Window[]): ActiveChromeWindowInfo[] {
+  return windows
+    .filter(
+      (window): window is chrome.windows.Window & { id: number; type: 'normal' } =>
+        typeof window.id === 'number' && window.type === 'normal',
+    )
+    .map((window) => ({
+      id: window.id,
+      focused: window.focused,
+      incognito: window.incognito,
+      type: 'normal',
+    }));
+}
 
-  return ok({
-    windows: [],
-    tabs: response.data,
-    chromeGroups: await listChromeTabGroups(),
-  });
+export async function listActiveTabsSnapshot(): Promise<AppResult<ActiveTabsSnapshot>> {
+  const tabsResponse = await listActiveTabs();
+  if (!tabsResponse.ok) return tabsResponse;
+
+  try {
+    const [rawWindows, rawGroups] = await Promise.all([
+      browser.windows.getAll({ populate: false, windowTypes: ['normal'] }),
+      listChromeTabGroups(),
+    ]);
+    const normalWindows = normalizeNormalWindows(rawWindows);
+    const normalWindowIds = new Set(normalWindows.map((window) => window.id));
+    const tabs = tabsResponse.data.filter((tab) => normalWindowIds.has(tab.windowId));
+    const visibleWindowIds = new Set(tabs.map((tab) => tab.windowId));
+
+    return ok({
+      windows: normalWindows.filter((window) => visibleWindowIds.has(window.id)),
+      tabs,
+      chromeGroups: rawGroups.filter((group) => visibleWindowIds.has(group.windowId)),
+    });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
 }
 
 export async function focusActiveTab(
