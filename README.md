@@ -40,6 +40,26 @@ Package:
 bun run zip
 ```
 
+## Releases
+
+For the first release, open **Actions** in GitHub, select the **Release** workflow, choose **Run workflow**, and leave **Version to publish or increment** set to `current`. The checked-in extension version is `1.0.0`, so this publishes `v1.0.0`. For each later release, run the workflow again and select the desired `patch`, `minor`, or `major` bump.
+
+To install or update from a GitHub Release:
+
+1. Open the desired Release and download both `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` into the same directory.
+2. From that directory, verify the ZIP before extracting it:
+
+   ```bash
+   # Linux
+   sha256sum -c SHA256SUMS
+
+   # macOS
+   shasum -a 256 -c SHA256SUMS
+   ```
+
+3. Extract the ZIP into a stable local directory that will not be moved or deleted. Open `chrome://extensions`, enable **Developer mode**, choose **Load unpacked**, and select the extracted directory containing `manifest.json`.
+4. For an update, verify the new download, replace the contents of that same stable directory with the new ZIP contents, then choose **Reload** for Tabstow on `chrome://extensions`.
+
 ## Gist Sync
 
 Create a GitHub Gist manually, add a file named `tabstow.sync.json`, and paste the GitHub token, Gist ID, and filename into the Tabstow options page. The token must have permission to read and update the configured Gist. Tabstow does not create a Gist automatically.
