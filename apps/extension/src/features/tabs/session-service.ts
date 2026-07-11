@@ -286,7 +286,10 @@ export async function restoreSession(
       });
     }
   } catch (error) {
-    return err('chrome-tabs-error', toErrorMessage(error));
+    return err(
+      'chrome-tabs-error',
+      `${toErrorMessage(error)} Some tabs may already have opened; the saved session was kept.`,
+    );
   }
 
   try {

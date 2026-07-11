@@ -76,6 +76,7 @@ describe('HistoryApp', () => {
       'chrome-extension://tabstow-test/newtab.html',
     );
     expect(getByText('Opened from Saved for later')).not.toBeNull();
+    expect(getByText('https://example.com/')).not.toBeNull();
     expect(getByRole('button', 'Open Example in background')).not.toBeNull();
     expect(container.querySelector('time')?.getAttribute('datetime')).toBe(ENTRY.movedAt);
   });

@@ -377,6 +377,20 @@ describe('background message routing', () => {
     });
   });
 
+  it('routes saved session restore messages with exact IDs', async () => {
+    const result = { ok: true, data: { restored: true, tabCount: 2 } };
+    sessionServiceMocks.restoreSession.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:restore',
+      sessionId: 'session-1',
+    });
+
+    expect(sessionServiceMocks.restoreSession).toHaveBeenCalledWith('session-1');
+    expect(response).toBe(result);
+  });
+
   it('routes saved tab delete messages into History', async () => {
     dbMocks.moveSavedTabToHistory.mockResolvedValue({ id: 'history-1' });
 
@@ -601,6 +615,29 @@ describe('background message routing', () => {
 
     expect(dbMocks.deleteHistoryEntry).toHaveBeenCalledWith('history-1');
     expect(response).toEqual({ ok: true, data: { deleted: true } });
+  });
+
+  it('rejects malformed History restore and delete IDs', async () => {
+    await import('../entrypoints/background');
+    const restored = await dispatchRuntimeMessage({
+      type: 'history:restore',
+      historyId: '',
+    });
+    const deleted = await dispatchRuntimeMessage({
+      type: 'history:delete',
+      historyId: null,
+    });
+
+    expect(dbMocks.restoreHistoryEntry).not.toHaveBeenCalled();
+    expect(dbMocks.deleteHistoryEntry).not.toHaveBeenCalled();
+    expect(restored.response).toEqual({
+      ok: false,
+      error: {
+        code: 'history-entry-not-found',
+        message: 'History entry was not found.',
+      },
+    });
+    expect(deleted.response).toEqual(restored.response);
   });
 
   it('routes chrome tab group collapse messages', async () => {

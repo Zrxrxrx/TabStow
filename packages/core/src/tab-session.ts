@@ -39,20 +39,20 @@ export function sortSessionsForDisplay(sessions: TabSession[]): TabSession[] {
 
 export function deduplicateSessionsByUrl(sessions: TabSession[]): TabSession[] {
   const winners = new Map<string, { sessionId: string; tabId: string }>();
-  const rankedSessions = [...sessions].sort(
-    (a, b) => b.updatedAt.localeCompare(a.updatedAt) || a.id.localeCompare(b.id),
-  );
-
-  for (const session of rankedSessions) {
-    const rankedTabs = [...session.tabs].sort(
-      (a, b) => b.createdAt.localeCompare(a.createdAt) || a.id.localeCompare(b.id),
+  const rankedTabs = sessions
+    .flatMap((session) => session.tabs.map((tab) => ({ session, tab })))
+    .sort(
+      (a, b) =>
+        b.session.updatedAt.localeCompare(a.session.updatedAt) ||
+        b.tab.createdAt.localeCompare(a.tab.createdAt) ||
+        a.session.id.localeCompare(b.session.id) ||
+        a.tab.id.localeCompare(b.tab.id),
     );
 
-    for (const tab of rankedTabs) {
-      const normalizedUrl = normalizeSavedTabUrl(tab.url);
-      if (normalizedUrl !== null && !winners.has(normalizedUrl)) {
-        winners.set(normalizedUrl, { sessionId: session.id, tabId: tab.id });
-      }
+  for (const { session, tab } of rankedTabs) {
+    const normalizedUrl = normalizeSavedTabUrl(tab.url);
+    if (normalizedUrl !== null && !winners.has(normalizedUrl)) {
+      winners.set(normalizedUrl, { sessionId: session.id, tabId: tab.id });
     }
   }
 

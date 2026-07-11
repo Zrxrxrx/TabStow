@@ -194,7 +194,10 @@ describe('session service', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: { code: 'chrome-tabs-error', message: 'create failed' },
+      error: {
+        code: 'chrome-tabs-error',
+        message: 'create failed Some tabs may already have opened; the saved session was kept.',
+      },
     });
     expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
   });

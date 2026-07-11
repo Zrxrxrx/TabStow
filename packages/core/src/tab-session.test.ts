@@ -50,6 +50,17 @@ it('keeps the newest saved copy and removes emptied sessions', () => {
   expect(deduplicateSessionsByUrl([older, newer])).toEqual([newer]);
 });
 
+it('uses tab creation time before stable IDs when session update times tie', () => {
+  const olderTab = session('a-session', '2026-07-11T00:00:00.000Z', [
+    tab('a-tab', 'https://example.com/read#old', '2026-07-10T00:00:00.000Z'),
+  ]);
+  const newerTab = session('z-session', '2026-07-11T00:00:00.000Z', [
+    tab('z-tab', 'https://example.com/read#new', '2026-07-11T00:00:00.000Z'),
+  ]);
+
+  expect(deduplicateSessionsByUrl([olderTab, newerTab])).toEqual([newerTab]);
+});
+
 it('keeps the last duplicate in one incoming save batch', () => {
   expect(
     deduplicateIncomingTabs([

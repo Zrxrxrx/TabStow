@@ -133,7 +133,10 @@ export function HistoryApp() {
                     pageUrl={tab.url}
                     title={tab.title}
                   />
-                  <span>{tab.title}</span>
+                  <span className="history-tab-copy">
+                    <span>{tab.title}</span>
+                    <span className="history-tab-url">{tab.url}</span>
+                  </span>
                   <button
                     aria-label={t(locale, 'historyOpenInBackground', { title: tab.title })}
                     disabled={busyAction !== null}

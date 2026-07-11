@@ -296,6 +296,31 @@ describe('session database', () => {
     expect((await listHistory())[0]?.reason).toBe('deleted');
   });
 
+  it('lists History entries newest first', async () => {
+    const older = makeSession(
+      'older',
+      'https://example.com/older',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const newer = makeSession(
+      'newer',
+      'https://example.com/newer',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const { createSession, db, listHistory, moveSessionToHistory } = await importDatabase();
+    await createSession(older);
+    const olderEntry = await moveSessionToHistory('older', 'deleted');
+    await createSession(newer);
+    const newerEntry = await moveSessionToHistory('newer', 'deleted');
+    await db.history.update(olderEntry.id, { movedAt: '2026-07-10T00:00:00.000Z' });
+    await db.history.update(newerEntry.id, { movedAt: '2026-07-11T00:00:00.000Z' });
+
+    expect((await listHistory()).map(({ id }) => id)).toEqual([
+      newerEntry.id,
+      olderEntry.id,
+    ]);
+  });
+
   it('rolls back Saved and History when a move transaction aborts', async () => {
     const historyId = '00000000-0000-4000-8000-000000000001';
     vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(historyId);
@@ -372,6 +397,38 @@ describe('session database', () => {
     expect(await getHistoryEntry(historyEntry.id)).toBeUndefined();
   });
 
+  it('rolls back Saved changes when a History restore transaction fails', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/source',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const existing = makeSession(
+      'existing',
+      'https://example.com/existing',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const {
+      createSession,
+      db,
+      listHistory,
+      listSessions,
+      moveSessionToHistory,
+      restoreHistoryEntry,
+    } = await importDatabase();
+    await createSession(source);
+    const historyEntry = await moveSessionToHistory('source', 'deleted');
+    await createSession(existing);
+    const sessionsBefore = await listSessions();
+    const historyBefore = await listHistory();
+    vi.spyOn(db.history, 'delete').mockRejectedValueOnce(new Error('delete failed'));
+
+    await expect(restoreHistoryEntry(historyEntry.id)).rejects.toThrow('delete failed');
+
+    expect(await listSessions()).toEqual(sessionsBefore);
+    expect(await listHistory()).toEqual(historyBefore);
+  });
+
   it('permanently deletes only the selected History entry', async () => {
     const source = makeSession(
       'source',
@@ -432,6 +489,35 @@ describe('session database', () => {
     ]);
     expect((await getSession('source'))?.updatedAt).not.toBe(source.updatedAt);
     expect((await getSession('destination'))?.updatedAt).not.toBe(destination.updatedAt);
+  });
+
+  it('deletes an emptied source session after moving its final tab', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/source',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const destination = makeSession(
+      'destination',
+      'https://example.com/destination',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const { createSession, getSession, moveSavedTab } = await importDatabase();
+    await createSession(source);
+    await createSession(destination);
+
+    await moveSavedTab({
+      sourceSessionId: 'source',
+      tabId: 'source-tab',
+      destinationSessionId: 'destination',
+      destinationIndex: 1,
+    });
+
+    expect(await getSession('source')).toBeUndefined();
+    expect((await getSession('destination'))?.tabs.map(({ id }) => id)).toEqual([
+      'destination-tab',
+      'source-tab',
+    ]);
   });
 
   it('reorders a saved tab within one session at the exact requested index', async () => {
