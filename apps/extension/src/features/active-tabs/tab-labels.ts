@@ -1,13 +1,5 @@
 import type { ActiveBrowserTab } from './types';
 
-const LANDING_RULES = [
-  { hostname: 'mail.google.com', rejectHashPrefixes: ['#inbox/', '#sent/', '#search/'] },
-  { hostname: 'x.com', paths: ['/home'] },
-  { hostname: 'www.linkedin.com', paths: ['/'] },
-  { hostname: 'github.com', paths: ['/'] },
-  { hostname: 'www.youtube.com', paths: ['/'] },
-] as const;
-
 export function getTabHostname(tab: Pick<ActiveBrowserTab, 'url'>): string {
   try {
     if (tab.url?.startsWith('file://')) return 'local-files';
@@ -65,22 +57,4 @@ export function getTabLabel(tab: Pick<ActiveBrowserTab, 'title' | 'url'>): strin
 
   const hostname = getTabHostname(tab);
   return hostname ? friendlyDomain(hostname) : tab.url ?? 'Tab';
-}
-
-export function isLandingPage(url: string | undefined): boolean {
-  if (!url) return false;
-
-  try {
-    const parsed = new URL(url);
-    return LANDING_RULES.some((rule) => {
-      if (parsed.hostname !== rule.hostname) return false;
-      if ('rejectHashPrefixes' in rule) {
-        return !rule.rejectHashPrefixes.some((prefix) => parsed.hash.includes(prefix));
-      }
-      const paths: readonly string[] = 'paths' in rule ? rule.paths : [];
-      return paths.includes(parsed.pathname);
-    });
-  } catch {
-    return false;
-  }
 }

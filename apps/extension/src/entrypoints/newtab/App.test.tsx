@@ -313,7 +313,10 @@ describe('App', () => {
     const activeText = container.querySelector('.active-window-list')?.textContent ?? '';
     expect(activeText.indexOf('Before')).toBeLessThan(activeText.indexOf('Reading'));
     expect(activeText.indexOf('Reading')).toBeLessThan(activeText.indexOf('After'));
-    expect(() => screen().getByText('Import Chrome groups')).toThrow();
+    expect(container.textContent).not.toContain('Import Chrome groups');
+    expect(container.textContent).not.toContain('Move to domain group');
+    expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'sync'].join(':'));
+    expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'import'].join(':'));
   });
 
   it('coalesces Chrome tab, group, and window events into one refresh', async () => {

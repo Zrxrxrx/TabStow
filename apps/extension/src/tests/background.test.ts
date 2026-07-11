@@ -64,8 +64,6 @@ const activeTabsMocks = vi.hoisted(() => ({
 
 const chromeTabGroupMocks = vi.hoisted(() => ({
   collapseChromeTabGroups: vi.fn(),
-  importChromeTabGroups: vi.fn(),
-  syncChromeTabGroups: vi.fn(),
 }));
 
 const quickLinkMocks = vi.hoisted(() => ({
@@ -280,48 +278,6 @@ describe('background message routing', () => {
     await dispatchRuntimeMessage({ type: 'sessions:stow-tab', tabId: 42 });
 
     expect(sessionServiceMocks.saveTabsAsSession).toHaveBeenCalledWith([42]);
-  });
-
-  it('routes chrome tab group sync messages', async () => {
-    chromeTabGroupMocks.syncChromeTabGroups.mockResolvedValue({
-      ok: true,
-      data: { enabled: true, mappings: [] },
-    });
-
-    await import('../entrypoints/background');
-
-    await dispatchRuntimeMessage({
-      type: 'chrome-tab-groups:sync',
-      groups: [],
-      state: { enabled: true, mappings: [] },
-    });
-
-    expect(chromeTabGroupMocks.syncChromeTabGroups).toHaveBeenCalledWith([], { enabled: true, mappings: [] });
-  });
-
-  it('routes chrome tab group import messages', async () => {
-    chromeTabGroupMocks.importChromeTabGroups.mockResolvedValue({
-      ok: true,
-      data: {
-        manualGroups: { groups: [], assignments: {} },
-        chromeTabGroups: { enabled: true, mappings: [] },
-      },
-    });
-
-    await import('../entrypoints/background');
-
-    const payload = {
-      tabs: [],
-      manualGroups: { groups: [], assignments: {} },
-      state: { enabled: true, mappings: [] },
-    };
-    await dispatchRuntimeMessage({ type: 'chrome-tab-groups:import', ...payload });
-
-    expect(chromeTabGroupMocks.importChromeTabGroups).toHaveBeenCalledWith(
-      payload.tabs,
-      payload.manualGroups,
-      payload.state,
-    );
   });
 
   it('routes chrome tab group collapse messages', async () => {

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { buildActiveTabGroups, findDuplicateTabGroups } from './active-tab-groups';
-import { getTabLabel, isLandingPage } from './tab-labels';
+import { findDuplicateTabGroups } from './active-tab-groups';
+import { getTabLabel } from './tab-labels';
 import type { ActiveBrowserTab } from './types';
 
 const tabs: ActiveBrowserTab[] = [
@@ -18,67 +18,12 @@ const multiWindowTabs: ActiveBrowserTab[] = [
 ];
 
 describe('active tab labels', () => {
-  it('identifies landing pages', () => {
-    expect(isLandingPage('https://github.com/')).toBe(true);
-    expect(isLandingPage('https://github.com/openai/tabstow/pull/4')).toBe(false);
-  });
-
   it('uses a readable GitHub title', () => {
     expect(getTabLabel(tabs[1])).toBe('openai/tabstow PR #4');
   });
 });
 
-describe('active tab groups', () => {
-  it('groups homepage-style tabs separately from domain work tabs', () => {
-    const groups = buildActiveTabGroups(tabs, { groups: [], assignments: {} }, { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} });
-
-    expect(groups.map((group) => group.key)).toContain('landing:homepages');
-    expect(groups.find((group) => group.key === 'domain:github.com')?.tabs.map((tab) => tab.id)).toEqual([2]);
-  });
-
-  it('applies manual group assignments before domain grouping', () => {
-    const groups = buildActiveTabGroups(
-      tabs,
-      { groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-06T00:00:00.000Z' }], assignments: { '2': 'manual-1' } },
-      { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
-    );
-
-    expect(groups.find((group) => group.key === 'manual:manual-1')?.tabs.map((tab) => tab.id)).toEqual([2]);
-    expect(groups.find((group) => group.key === 'domain:github.com')).toBeUndefined();
-  });
-
-  it('prefers native Chrome group membership over stale manual assignments', () => {
-    const groups = buildActiveTabGroups(
-      [
-        {
-          id: 2,
-          windowId: 7,
-          groupId: 31,
-          index: 1,
-          active: true,
-          pinned: false,
-          title: 'Issue tracker',
-          url: 'https://github.com/openai/tabstow/issues/10',
-        },
-      ],
-      {
-        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-06T00:00:00.000Z' }],
-        assignments: { '2': 'manual-1' },
-      },
-      { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
-      [{ id: 31, windowId: 7, title: 'Reading', color: 'blue', collapsed: false }],
-    );
-
-    expect(groups).toEqual([
-      expect.objectContaining({
-        key: 'chrome:7:31',
-        kind: 'chrome',
-        title: 'Reading',
-        tabs: [expect.objectContaining({ id: 2 })],
-      }),
-    ]);
-  });
-
+describe('duplicate tab groups', () => {
   it('finds duplicate tabs by exact URL and keeps the first tab out of the close list', () => {
     expect(findDuplicateTabGroups(tabs)).toEqual([
       {
@@ -89,10 +34,7 @@ describe('active tab groups', () => {
     ]);
   });
 
-  it('orders tabs and duplicate retention deterministically across windows', () => {
-    const groups = buildActiveTabGroups(multiWindowTabs, { groups: [], assignments: {} }, { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} });
-
-    expect(groups.find((group) => group.key === 'domain:example.com')?.tabs.map((tab) => tab.id)).toEqual([11, 12, 10]);
+  it('orders duplicate retention deterministically across windows', () => {
     expect(findDuplicateTabGroups(multiWindowTabs)).toEqual([
       {
         url: 'https://example.com/a',

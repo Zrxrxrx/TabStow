@@ -14,11 +14,7 @@ import {
   moveActiveTab,
   moveActiveTabGroup,
 } from '@/features/active-tabs/active-tab-moves';
-import {
-  collapseChromeTabGroups,
-  importChromeTabGroups,
-  syncChromeTabGroups,
-} from '@/features/chrome-tab-groups/chrome-tab-groups';
+import { collapseChromeTabGroups } from '@/features/chrome-tab-groups/chrome-tab-groups';
 import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
@@ -85,10 +81,6 @@ async function handleMessage(
         return ok(await updateQuickLinks((links) => links.filter((link) => link.id !== message.linkId)));
       case 'quick-links:reorder':
         return ok(await updateQuickLinks((links) => reorderQuickLinks(links, message.orderedIds)));
-      case 'chrome-tab-groups:sync':
-        return syncChromeTabGroups(message.groups, message.state);
-      case 'chrome-tab-groups:import':
-        return importChromeTabGroups(message.tabs, message.manualGroups, message.state);
       case 'chrome-tab-groups:collapse-window':
         return collapseChromeTabGroups(message.windowId);
       case 'settings:get':

@@ -1,15 +1,11 @@
 import type { ExtensionSettings, TabSession } from '@tabstow/core';
-import type { ChromeTabGroupsState } from '@/features/active-tabs/active-workspace-storage';
 import type {
   ActiveBrowserTab,
   ActiveGroupMoveRequest,
-  ActiveTabGroup,
   ActiveTabMoveRequest,
   ActiveTabsMoveResult,
   ActiveTabsSnapshot,
-  ManualGroupsState,
 } from '@/features/active-tabs/types';
-import type { ImportedChromeGroupsResult } from '@/features/chrome-tab-groups/chrome-tab-groups';
 import type { QuickLink, QuickLinkIcon } from '@/features/quick-links/quick-links';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
@@ -46,13 +42,6 @@ export type ExtensionMessage =
   | { type: 'quick-links:update'; linkId: string; patch: { label?: string; icon?: QuickLinkIcon | null } }
   | { type: 'quick-links:remove'; linkId: string }
   | { type: 'quick-links:reorder'; orderedIds: string[] }
-  | { type: 'chrome-tab-groups:sync'; groups: ActiveTabGroup[]; state: ChromeTabGroupsState }
-  | {
-      type: 'chrome-tab-groups:import';
-      tabs: ActiveBrowserTab[];
-      manualGroups: ManualGroupsState;
-      state: ChromeTabGroupsState;
-    }
   | { type: 'chrome-tab-groups:collapse-window'; windowId: number }
   | { type: 'settings:get' }
   | { type: 'settings:update'; settings: Partial<ExtensionSettings> }
@@ -69,8 +58,6 @@ export type ExtensionMessageResponse =
   | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>
   | AppResult<SyncResult>
-  | AppResult<ChromeTabGroupsState>
-  | AppResult<ImportedChromeGroupsResult>
   | AppResult<{ deleted: true }>
   | AppResult<{ focused: true }>
   | AppResult<{ closed: true; tabCount: number }>
