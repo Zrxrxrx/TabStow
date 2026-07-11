@@ -82,3 +82,40 @@ export type DuplicateTabGroup = {
   keepTabId: number;
   duplicateTabIds: number[];
 };
+
+export type ActiveTabLane =
+  | { kind: 'pinned' }
+  | { kind: 'ungrouped' }
+  | { kind: 'group'; groupId: number };
+
+export type ActiveTabsAnchor =
+  | { kind: 'tab'; tabId: number }
+  | { kind: 'group'; groupId: number };
+
+export type ActiveTabsPosition =
+  | { kind: 'before' | 'after'; anchor: ActiveTabsAnchor }
+  | { kind: 'end' };
+
+export type ActiveTabMoveRequest = {
+  tabId: number;
+  destination: {
+    windowId: number;
+    lane: ActiveTabLane;
+    position: ActiveTabsPosition;
+  };
+};
+
+export type ActiveGroupMoveRequest = {
+  groupId: number;
+  sourceWindowId: number;
+  destination: {
+    windowId: number;
+    position: ActiveTabsPosition;
+  };
+};
+
+export type ActiveTabsMoveResult = { moved: boolean };
+
+export type ActiveTabsDragSource =
+  | { kind: 'tab'; tabId: number; windowId: number; pinned: boolean; incognito: boolean }
+  | { kind: 'group'; groupId: number; windowId: number; incognito: boolean };
