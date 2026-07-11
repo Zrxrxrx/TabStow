@@ -162,9 +162,51 @@ const INVALID_QUICK_LINK_TAB: ActiveBrowserTab = {
   windowId: 4,
 };
 
+function createAppChromeEvent() {
+  const listeners = new Set<(...args: unknown[]) => void>();
+  return {
+    addListener: vi.fn((listener: (...args: unknown[]) => void) => listeners.add(listener)),
+    removeListener: vi.fn((listener: (...args: unknown[]) => void) => listeners.delete(listener)),
+    emit: (...args: unknown[]) => {
+      for (const listener of listeners) listener(...args);
+    },
+  };
+}
+
+function installAppChromeEvents() {
+  const tabs = {
+    onCreated: createAppChromeEvent(),
+    onUpdated: createAppChromeEvent(),
+    onRemoved: createAppChromeEvent(),
+    onMoved: createAppChromeEvent(),
+    onAttached: createAppChromeEvent(),
+    onDetached: createAppChromeEvent(),
+    onActivated: createAppChromeEvent(),
+    onReplaced: createAppChromeEvent(),
+  };
+  const tabGroups = {
+    onCreated: createAppChromeEvent(),
+    onUpdated: createAppChromeEvent(),
+    onRemoved: createAppChromeEvent(),
+    onMoved: createAppChromeEvent(),
+  };
+  const windows = {
+    onCreated: createAppChromeEvent(),
+    onRemoved: createAppChromeEvent(),
+    onFocusChanged: createAppChromeEvent(),
+  };
+  return {
+    tabs,
+    tabGroups,
+    windows,
+    chrome: { runtime: chromeRuntimeMocks, tabs, tabGroups, windows },
+  };
+}
+
 let container: HTMLDivElement;
 let root: Root;
 let promptSpy: ReturnType<typeof vi.spyOn>;
+let chromeChangeEvents: ReturnType<typeof installAppChromeEvents>;
 
 describe('App', () => {
   beforeEach(() => {
@@ -221,11 +263,10 @@ describe('App', () => {
     document.documentElement.style.removeProperty('--dashboard-background-image');
     chromeRuntimeMocks.getURL.mockClear();
     chromeRuntimeMocks.openOptionsPage.mockClear();
+    chromeChangeEvents = installAppChromeEvents();
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
-      value: {
-        runtime: chromeRuntimeMocks,
-      },
+      value: chromeChangeEvents.chrome,
     });
   });
 
@@ -235,6 +276,7 @@ describe('App', () => {
       root.unmount();
     });
     container.remove();
+    vi.useRealTimers();
   });
 
   it('renders focused Chrome windows, pinned tabs, native groups, and ungrouped tabs in order', async () => {
@@ -272,6 +314,22 @@ describe('App', () => {
     expect(activeText.indexOf('Before')).toBeLessThan(activeText.indexOf('Reading'));
     expect(activeText.indexOf('Reading')).toBeLessThan(activeText.indexOf('After'));
     expect(() => screen().getByText('Import Chrome groups')).toThrow();
+  });
+
+  it('coalesces Chrome tab, group, and window events into one refresh', async () => {
+    vi.useFakeTimers();
+    mockMessages({ activeTabs: [UNIQUE_TAB], focusedWindowId: 4 });
+    await renderApp();
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(1);
+
+    await act(async () => {
+      chromeChangeEvents.tabs.onAttached.emit(12, { newWindowId: 4, newPosition: 0 });
+      chromeChangeEvents.tabGroups.onMoved.emit({ id: 31, windowId: 4 });
+      chromeChangeEvents.windows.onFocusChanged.emit(4);
+      await vi.advanceTimersByTimeAsync(150);
+    });
+
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
   });
 
   it('drops an unpinned tab onto a Chrome group header', async () => {

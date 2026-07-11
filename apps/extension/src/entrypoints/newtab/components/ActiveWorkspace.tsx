@@ -2,6 +2,7 @@ import { Layers } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { findDuplicateTabGroups } from '@/features/active-tabs/active-tab-groups';
 import { buildActiveTabWindows } from '@/features/active-tabs/active-tab-windows';
+import { subscribeToActiveTabsChanges } from '@/features/active-tabs/active-tabs-events';
 import type {
   ActiveBrowserTab,
   ActiveTabsDragSource,
@@ -96,37 +97,19 @@ export function ActiveWorkspace({
   }, [refreshKey]);
 
   useEffect(() => {
-    if (typeof chrome === 'undefined') return;
-
-    const tabsApi = chrome?.tabs;
-    const tabGroupsApi = chrome?.tabGroups;
     let timeoutId: number | null = null;
-
-    function scheduleRefresh() {
+    const unsubscribe = subscribeToActiveTabsChanges(() => {
       if (timeoutId !== null) window.clearTimeout(timeoutId);
       timeoutId = window.setTimeout(() => {
         timeoutId = null;
         void refresh();
       }, 150);
-    }
-
-    tabsApi?.onCreated?.addListener(scheduleRefresh);
-    tabsApi?.onUpdated?.addListener(scheduleRefresh);
-    tabsApi?.onRemoved?.addListener(scheduleRefresh);
-    tabsApi?.onMoved?.addListener(scheduleRefresh);
-    tabGroupsApi?.onCreated?.addListener(scheduleRefresh);
-    tabGroupsApi?.onUpdated?.addListener(scheduleRefresh);
-    tabGroupsApi?.onRemoved?.addListener(scheduleRefresh);
+    });
 
     return () => {
+      refreshTokenRef.current += 1;
       if (timeoutId !== null) window.clearTimeout(timeoutId);
-      tabsApi?.onCreated?.removeListener(scheduleRefresh);
-      tabsApi?.onUpdated?.removeListener(scheduleRefresh);
-      tabsApi?.onRemoved?.removeListener(scheduleRefresh);
-      tabsApi?.onMoved?.removeListener(scheduleRefresh);
-      tabGroupsApi?.onCreated?.removeListener(scheduleRefresh);
-      tabGroupsApi?.onUpdated?.removeListener(scheduleRefresh);
-      tabGroupsApi?.onRemoved?.removeListener(scheduleRefresh);
+      unsubscribe();
     };
   }, []);
 
