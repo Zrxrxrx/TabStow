@@ -34,6 +34,7 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           fetch-depth: 0
+          persist-credentials: false
 
       - name: Set up Bun
         uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
@@ -52,7 +53,11 @@ jobs:
 
           case "$BUMP" in
             current)
-              if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+              if ! TRACKED_STATUS="$(git status --porcelain --untracked-files=no)"; then
+                echo "Unable to inspect the tracked worktree." >&2
+                exit 1
+              fi
+              if [[ -n "$TRACKED_STATUS" ]]; then
                 echo "Publishing the current version requires a clean tracked worktree." >&2
                 exit 1
               fi
@@ -115,6 +120,7 @@ jobs:
 
       - name: Commit, tag, and push
         env:
+          GH_TOKEN: ${{ github.token }}
           VERSION: ${{ steps.release.outputs.version }}
           TAG: ${{ steps.release.outputs.tag }}
         run: |
@@ -124,7 +130,11 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           if [[ "$BUMP" == "current" ]]; then
-            if [[ -n "$(git status --porcelain --untracked-files=no)" ]]; then
+            if ! TRACKED_STATUS="$(git status --porcelain --untracked-files=no)"; then
+              echo "Unable to inspect the tracked worktree." >&2
+              exit 1
+            fi
+            if [[ -n "$TRACKED_STATUS" ]]; then
               echo "Publishing the current version requires a clean tracked worktree." >&2
               exit 1
             fi
@@ -143,10 +153,12 @@ jobs:
           fi
 
           git tag -a "$TAG" -m "Release $TAG"
+          PUSH_URL="https://github.com/$GITHUB_REPOSITORY.git"
+          AUTH_HEADER="$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
           if [[ "$BUMP" == "current" ]]; then
-            git push origin "refs/tags/$TAG"
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $AUTH_HEADER" push "$PUSH_URL" "refs/tags/$TAG"
           else
-            git push --atomic origin "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$TAG"
+            git -c http.https://github.com/.extraheader="AUTHORIZATION: basic $AUTH_HEADER" push --atomic "$PUSH_URL" "HEAD:refs/heads/$DEFAULT_BRANCH" "refs/tags/$TAG"
           fi
 
       - name: Create the GitHub Release
