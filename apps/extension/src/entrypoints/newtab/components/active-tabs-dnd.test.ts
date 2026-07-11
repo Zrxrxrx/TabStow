@@ -15,6 +15,10 @@ function fakeDataTransfer(): DataTransfer {
   } as unknown as DataTransfer;
 }
 
+it('uses the Tabstow active-tabs drag MIME', () => {
+  expect(ACTIVE_TABS_DRAG_MIME).toBe('application/x-tabstow-active-tabs');
+});
+
 it('round-trips a tab source and resolves a compatible tab request', () => {
   const transfer = fakeDataTransfer();
   const source = {

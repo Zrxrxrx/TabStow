@@ -7,6 +7,7 @@ import { reorderQuickLinks, updateQuickLink, type QuickLink } from '@/features/q
 import type { AppResult } from '@/lib/errors';
 import type { ExtensionMessage, StowResult } from '@/lib/messages';
 import { App } from './App';
+import { ActiveWorkspace } from './components/ActiveWorkspace';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;
@@ -597,6 +598,71 @@ describe('App', () => {
     expect(screen().getByText('Newest Chrome state')).not.toBeNull();
     expect(screen().getByLabelText('Drag Newest Chrome state')).toHaveProperty('disabled', false);
     expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', false);
+  });
+
+  it('settles a pending drag refresh on unmount without post-unmount updates', async () => {
+    const pendingRefresh = deferred<AppResult<ActiveTabsSnapshot>>();
+    const onStatus = vi.fn();
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },
+      { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
+    ];
+    const snapshot = activeTabsSnapshot(tabs, {
+      focusedWindowId: 8,
+      chromeGroups: [
+        { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+      ],
+    });
+    let snapshotCalls = 0;
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        snapshotCalls += 1;
+        return snapshotCalls === 1 ? { ok: true, data: snapshot } : pendingRefresh.promise;
+      }
+      if (message.type === 'active-tabs:move-tab') {
+        return { ok: true, data: { moved: true } };
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await act(async () => {
+      root.render(
+        <ActiveWorkspace
+          busy={false}
+          locale="en"
+          onStatus={onStatus}
+          onStowTab={async () => {}}
+          refreshKey={0}
+        />,
+      );
+    });
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    await drop(screen().getByLabelText('Drop into Reading'), transfer);
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(snapshotCalls).toBe(2);
+    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
+
+    await act(async () => {
+      root.unmount();
+      await Promise.resolve();
+    });
+    expect(onStatus).not.toHaveBeenCalled();
+
+    pendingRefresh.resolve({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'Late refresh failure' },
+    });
+    await act(async () => {
+      await pendingRefresh.promise;
+      await Promise.resolve();
+    });
+
+    expect(onStatus).not.toHaveBeenCalled();
   });
 
   it('reports a failed move and refreshes Chrome state', async () => {

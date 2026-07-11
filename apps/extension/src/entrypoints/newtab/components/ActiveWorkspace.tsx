@@ -49,13 +49,21 @@ export function ActiveWorkspace({
   const movePendingRef = useRef(false);
   const refreshTokenRef = useRef(0);
   const authoritativeRefreshWaitersRef = useRef(new Set<() => void>());
+  const activeRef = useRef(true);
+
+  function settleAuthoritativeRefreshWaiters() {
+    const waiters = [...authoritativeRefreshWaitersRef.current];
+    authoritativeRefreshWaitersRef.current.clear();
+    for (const resolve of waiters) resolve();
+  }
 
   async function refresh() {
+    if (!activeRef.current) return;
     const refreshToken = ++refreshTokenRef.current;
     const response = await sendExtensionMessage<AppResult<ActiveTabsSnapshot>>({
       type: 'active-tabs:snapshot',
     });
-    if (refreshToken !== refreshTokenRef.current) return;
+    if (!activeRef.current || refreshToken !== refreshTokenRef.current) return;
     setSnapshotReady(true);
     if (!response.ok) {
       onStatus('error', response.error.message);
@@ -63,17 +71,25 @@ export function ActiveWorkspace({
       setSnapshot(response.data);
     }
 
-    const waiters = [...authoritativeRefreshWaitersRef.current];
-    authoritativeRefreshWaitersRef.current.clear();
-    for (const resolve of waiters) resolve();
+    settleAuthoritativeRefreshWaiters();
   }
 
   function refreshThroughLatest(): Promise<void> {
+    if (!activeRef.current) return Promise.resolve();
     return new Promise((resolve) => {
       authoritativeRefreshWaitersRef.current.add(resolve);
       void refresh();
     });
   }
+
+  useEffect(() => {
+    activeRef.current = true;
+    return () => {
+      activeRef.current = false;
+      refreshTokenRef.current += 1;
+      settleAuthoritativeRefreshWaiters();
+    };
+  }, []);
 
   useEffect(() => {
     void refresh();
@@ -199,6 +215,7 @@ export function ActiveWorkspace({
   function endDrag(event?: DragEvent) {
     event?.stopPropagation();
     dragSourceRef.current = null;
+    if (!activeRef.current) return;
     setDragSource(null);
     setActiveDropTargetKey(null);
   }
@@ -225,11 +242,11 @@ export function ActiveWorkspace({
               type: 'active-tabs:move-group',
               request: dropRequest.request,
             });
-      if (!response.ok) onStatus('error', response.error.message);
+      if (!response.ok && activeRef.current) onStatus('error', response.error.message);
     } finally {
       await refreshThroughLatest();
       movePendingRef.current = false;
-      setMovePending(false);
+      if (activeRef.current) setMovePending(false);
       endDrag();
     }
   }
