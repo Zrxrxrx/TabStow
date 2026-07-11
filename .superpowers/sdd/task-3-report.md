@@ -170,3 +170,50 @@ An independent read-only reviewer found no Critical or Important issues and asse
 ## Concerns
 
 No production blocker remains. The only open concerns are the two non-blocking test-hardening opportunities noted above.
+
+## Reviewer fix: duplicate saved-tab IDs
+
+The approval review found that `moveSavedTabToHistory` located one matching tab but removed every tab with the same ID. Because the current schema/import boundary accepts duplicate tab IDs, tabs with distinct URLs could be silently discarded without reaching History.
+
+### RED
+
+Added a regression test with two source tabs sharing `source-tab` while using different URLs. The test selects the first occurrence and requires the second occurrence to remain in Saved.
+
+Command:
+
+```bash
+rtk bun run --cwd apps/extension test -- src/db/db.test.ts
+```
+
+Observed the intended failure:
+
+```text
+Test Files  1 failed (1)
+Tests       1 failed | 16 passed (17)
+AssertionError: expected undefined to deeply equal [ 'https://example.com/duplicate-id' ]
+```
+
+The source session was `undefined`, confirming the implementation removed both same-ID tabs and then deleted the emptied session.
+
+### GREEN
+
+Changed `moveSavedTabToHistory` to locate the selected array index and remove exactly one element with `splice`. No schema, import, or unrelated move behavior changed.
+
+Reran the same command:
+
+```text
+Test Files  1 passed (1)
+Tests       17 passed (17)
+```
+
+### Final verification after the fix
+
+```text
+Full tests: 28 files passed, 238 tests passed
+- Core: 3 files, 19 tests
+- Extension: 25 files, 219 tests
+Typecheck: core and extension passed
+git diff --check: passed
+```
+
+Self-review confirmed the change removes exactly the array element returned by the existing first-match selection semantics, preserves the other same-ID tab and its distinct URL, and leaves the surrounding transaction and empty-source behavior unchanged.

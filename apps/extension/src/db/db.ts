@@ -186,12 +186,15 @@ export async function moveSavedTabToHistory(
     const source = await db.sessions.get(sourceSessionId);
     if (!source) throw new Error(`Session not found: ${sourceSessionId}`);
 
-    const tab = source.tabs.find(({ id }) => id === tabId);
+    const tabIndex = source.tabs.findIndex(({ id }) => id === tabId);
+    if (tabIndex < 0) throw new Error(`Saved tab not found: ${tabId}`);
+
+    const remainingTabs = [...source.tabs];
+    const [tab] = remainingTabs.splice(tabIndex, 1);
     if (!tab) throw new Error(`Saved tab not found: ${tabId}`);
 
     const movedAt = new Date().toISOString();
     const entry = createHistoryEntry(source, [tab], reason, movedAt);
-    const remainingTabs = source.tabs.filter(({ id }) => id !== tabId);
 
     if (remainingTabs.length === 0) {
       await db.sessions.delete(source.id);

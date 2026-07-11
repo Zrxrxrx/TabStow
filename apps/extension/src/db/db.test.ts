@@ -233,6 +233,30 @@ describe('session database', () => {
     expect((await listHistory()).map(({ id }) => id)).toEqual([moved.id]);
   });
 
+  it('moves only the located saved tab when another tab shares its ID', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/selected',
+      '2026-07-01T00:00:00.000Z',
+    );
+    source.tabs.push(
+      makeTab(
+        'source-tab',
+        'https://example.com/duplicate-id',
+        '2026-07-02T00:00:00.000Z',
+      ),
+    );
+    const { createSession, getSession, moveSavedTabToHistory } = await importDatabase();
+    await createSession(source);
+
+    const moved = await moveSavedTabToHistory('source', 'source-tab', 'opened');
+
+    expect(moved.tabs.map(({ url }) => url)).toEqual(['https://example.com/selected']);
+    expect((await getSession('source'))?.tabs.map(({ url }) => url)).toEqual([
+      'https://example.com/duplicate-id',
+    ]);
+  });
+
   it('deletes the source session when its final tab moves into History', async () => {
     const source = makeSession(
       'source',
