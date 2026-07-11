@@ -281,7 +281,15 @@ describe('App', () => {
 
   it('renders focused Chrome windows, pinned tabs, native groups, and ungrouped tabs in order', async () => {
     const tabs: ActiveBrowserTab[] = [
-      { ...UNIQUE_TAB, id: 20, windowId: 8, index: 0, pinned: true, title: 'Pinned' },
+      {
+        ...UNIQUE_TAB,
+        favIconUrl: 'https://docs.example.com/favicon.ico',
+        id: 20,
+        windowId: 8,
+        index: 0,
+        pinned: true,
+        title: 'Pinned',
+      },
       { ...UNIQUE_TAB, id: 21, windowId: 8, index: 1, groupId: -1, title: 'Before' },
       { ...UNIQUE_TAB, id: 22, windowId: 8, index: 2, groupId: 31, title: 'Grouped' },
       { ...UNIQUE_TAB, id: 23, windowId: 8, index: 3, groupId: -1, title: 'After' },
@@ -310,11 +318,16 @@ describe('App', () => {
     expect(screen().getByText('Pinned tabs')).not.toBeNull();
     expect(screen().getByText('Reading')).not.toBeNull();
     expect(screen().getByText('Collapsed')).not.toBeNull();
+    expect(
+      container.querySelector<HTMLImageElement>('img.active-tab-favicon')?.getAttribute('src'),
+    ).toBe('https://docs.example.com/favicon.ico');
     const activeText = container.querySelector('.active-window-list')?.textContent ?? '';
     expect(activeText.indexOf('Before')).toBeLessThan(activeText.indexOf('Reading'));
     expect(activeText.indexOf('Reading')).toBeLessThan(activeText.indexOf('After'));
     expect(container.textContent).not.toContain('Import Chrome groups');
     expect(container.textContent).not.toContain('Move to domain group');
+    expect(container.textContent).not.toContain('Refresh from Chrome');
+    expect(container.textContent).not.toContain('Collapse Chrome groups');
     expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'sync'].join(':'));
     expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'import'].join(':'));
   });
@@ -558,7 +571,7 @@ describe('App', () => {
     await drop(screen().getByLabelText('Drop into Reading'), transfer);
 
     expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
 
     pendingMove.resolve({ ok: true, data: { moved: false } });
     await act(async () => {
@@ -568,7 +581,7 @@ describe('App', () => {
 
     expect(snapshotCalls).toBe(2);
     expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
 
     pendingRefresh.resolve({ ok: true, data: snapshot });
     await act(async () => {
@@ -577,7 +590,7 @@ describe('App', () => {
     });
 
     expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', false);
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', false);
+    expectChromeControlsAbsent();
   });
 
   it('keeps a drag pending until a superseding Chrome refresh settles', async () => {
@@ -659,7 +672,7 @@ describe('App', () => {
 
     const dragHandle = screen().getByLabelText('Drag Before');
     expect(dragHandle).toHaveProperty('disabled', true);
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
     expect(() => screen().getByText('Stale Chrome state')).toThrow();
 
     const secondTransfer = createDataTransfer();
@@ -675,7 +688,7 @@ describe('App', () => {
 
     expect(screen().getByText('Newest Chrome state')).not.toBeNull();
     expect(screen().getByLabelText('Drag Newest Chrome state')).toHaveProperty('disabled', false);
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', false);
+    expectChromeControlsAbsent();
   });
 
   it('settles a pending drag refresh on unmount without post-unmount updates', async () => {
@@ -1605,8 +1618,7 @@ describe('App', () => {
     expect(duplicateClose).toHaveProperty('disabled', true);
     expect(groupClose).toHaveProperty('disabled', true);
     expect(singleClose).toHaveProperty('disabled', true);
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
     expect(closeCalls()).toHaveLength(1);
 
     await click(groupClose);
@@ -1625,7 +1637,7 @@ describe('App', () => {
 
     await renderApp();
     const focusButton = screen().getByRole('button', {
-      name: 'IInbox - Gmailhttps://mail.google.com/mail/u/0/#inbox',
+      name: 'Inbox - Gmailhttps://mail.google.com/mail/u/0/#inbox',
     });
     expect(focusButton).toHaveProperty('className', expect.stringContaining('tab-open-button'));
 
@@ -1789,7 +1801,7 @@ describe('App', () => {
     expect(safeRow?.getAttribute('href')).toBe('https://docs.example.com/path');
   });
 
-  it('disables Chrome group controls while the active tab snapshot is loading', async () => {
+  it('omits manual Chrome controls while the active tab snapshot is loading', async () => {
     const pendingSnapshot = deferred<AppResult<ActiveTabsSnapshot>>();
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
       if (message.type === 'active-tabs:snapshot') return pendingSnapshot.promise;
@@ -1799,8 +1811,7 @@ describe('App', () => {
 
     await renderApp();
 
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
 
     pendingSnapshot.resolve({ ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) });
     await act(async () => {
@@ -1808,24 +1819,21 @@ describe('App', () => {
     });
   });
 
-  it('disables Chrome group collapse when there is no active window to collapse', async () => {
+  it('omits manual Chrome controls when there is no active window', async () => {
     mockMessages({ activeTabs: [] });
 
     await renderApp();
 
-    expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
   });
 
-  it('collapses groups in the focused Chrome window from snapshot metadata', async () => {
+  it('does not offer manual Chrome controls for the focused window', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB], focusedWindowId: 4 });
 
     await renderApp();
-    await click(screen().getByText('Collapse Chrome groups'));
 
-    expect(sendExtensionMessage).toHaveBeenCalledWith({
-      type: 'chrome-tab-groups:collapse-window',
-      windowId: 4,
-    });
+    expectChromeControlsAbsent();
+    expect(sentMessageTypes()).not.toContain('chrome-tab-groups:collapse-window');
   });
 
   it('closes a single tab from its row action', async () => {
@@ -1898,8 +1906,7 @@ describe('App', () => {
     await click(screen().getByText('Stow current window'));
 
     expect(() => screen().getByText('Stow this window')).toThrow();
-    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
+    expectChromeControlsAbsent();
 
     pendingStow.resolve({
       ok: true,
@@ -2391,6 +2398,11 @@ function sentMessageTypes() {
 
 function closeCalls() {
   return sendExtensionMessage.mock.calls.filter((call) => call[0]?.type === 'active-tabs:close');
+}
+
+function expectChromeControlsAbsent() {
+  expect(container.textContent).not.toContain('Refresh from Chrome');
+  expect(container.textContent).not.toContain('Collapse Chrome groups');
 }
 
 function screen() {

@@ -1,5 +1,6 @@
 import { Archive, Trash2, X } from 'lucide-react';
 import { Fragment, type DragEvent } from 'react';
+import { TabFavicon } from '@/components/TabFavicon';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type {
   ActiveBrowserTab,
@@ -216,9 +217,12 @@ export function ActiveWindowSection(props: Props) {
           onClick={() => props.onFocusTab(tab)}
           disabled={props.disabled}
         >
-          <span className="favicon tone-blue" aria-hidden="true">
-            {(label.match(/[A-Za-z0-9]/)?.[0] ?? 'T').toUpperCase()}
-          </span>
+          <TabFavicon
+            className="active-tab-favicon"
+            favIconUrl={tab.favIconUrl}
+            pageUrl={tab.url ?? ''}
+            title={label}
+          />
           <span className="tab-copy">
             <span className="tab-title">{label}</span>
             <span className="tab-url">{tab.url ?? ''}</span>

@@ -327,6 +327,20 @@ h3 {
   flex: 0 0 auto;
 }
 
+.tab-favicon {
+  display: block;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
+.active-tab-favicon {
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: var(--meta);
+  box-shadow: var(--elev-ring);
+}
+
 .tone-blue { background: var(--accent); }
 .tone-green { background: var(--success); }
 .tone-red { background: var(--danger); }
@@ -619,8 +633,7 @@ h3 {
   background: color-mix(in oklab, var(--accent), transparent 88%);
 }
 
-.saved-tab-favicon,
-.saved-tab-fallback {
+.saved-tab-favicon {
   width: 22px;
   height: 22px;
   border-radius: 6px;

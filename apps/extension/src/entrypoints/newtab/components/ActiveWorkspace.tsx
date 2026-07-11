@@ -118,7 +118,6 @@ export function ActiveWorkspace({
     () => findDuplicateTabGroups(snapshot.tabs),
     [snapshot.tabs],
   );
-  const currentWindowId = snapshot.windows.find((window) => window.focused)?.id;
   const controlsDisabled = busy || closePending || movePending || !snapshotReady;
 
   async function closeTabs(tabIds: number[]) {
@@ -160,27 +159,6 @@ export function ActiveWorkspace({
       windowId: tab.windowId,
     });
     if (!response.ok) onStatus('error', response.error.message);
-  }
-
-  async function collapseCurrentWindowGroups() {
-    if (
-      busy ||
-      closePendingRef.current ||
-      movePendingRef.current ||
-      typeof currentWindowId !== 'number'
-    ) {
-      return;
-    }
-
-    const response = await sendExtensionMessage<AppResult<{ collapsed: true; groupCount: number }>>({
-      type: 'chrome-tab-groups:collapse-window',
-      windowId: currentWindowId,
-    });
-    if (response.ok) {
-      onStatus('success', `Collapsed ${response.data.groupCount} Chrome groups.`);
-      return;
-    }
-    onStatus('error', response.error.message);
   }
 
   function startDrag(event: DragEvent, source: ActiveTabsDragSource) {
@@ -258,27 +236,6 @@ export function ActiveWorkspace({
         <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
           {snapshot.tabs.length} open
         </span>
-      </div>
-
-      <div className="meta-row" data-od-id="active-actions">
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void refresh()}
-          disabled={controlsDisabled}
-        >
-          <Layers size={16} aria-hidden="true" />
-          {t(locale, 'refreshFromChrome')}
-        </button>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void collapseCurrentWindowGroups()}
-          disabled={controlsDisabled || typeof currentWindowId !== 'number'}
-        >
-          <Layers size={16} aria-hidden="true" />
-          {t(locale, 'collapseChromeGroups')}
-        </button>
       </div>
 
       <GroupNav

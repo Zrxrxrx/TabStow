@@ -1,7 +1,8 @@
 import { RefreshCcw, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { StatusMessage } from '@/components/StatusMessage';
+import { TabFavicon } from '@/components/TabFavicon';
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type SyncResult } from '@/lib/messages';
@@ -30,17 +31,6 @@ function formatDate(value: string): string {
   }).format(new Date(value));
 }
 
-function faviconUrlForSavedTab(tab: TabSession['tabs'][number]): string | null {
-  try {
-    const url = new URL(tab.url);
-    if (!isSafeSavedTabUrl(tab.url)) return null;
-    if (typeof chrome === 'undefined' || typeof chrome.runtime?.getURL !== 'function') return null;
-    return chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(url.toString())}&size=32`);
-  } catch {
-    return null;
-  }
-}
-
 function isSafeSavedTabUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -50,33 +40,14 @@ function isSafeSavedTabUrl(url: string): boolean {
   }
 }
 
-function savedTabFallbackLabel(tab: TabSession['tabs'][number]): string {
-  return (tab.title.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase();
-}
-
-function SavedTabFavicon({ tab }: { tab: TabSession['tabs'][number] }) {
-  const [failed, setFailed] = useState(false);
-  const src = failed ? null : faviconUrlForSavedTab(tab);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [tab.url]);
-
-  if (!src) {
-    return (
-      <span className="favicon tone-blue saved-tab-fallback" aria-hidden="true">
-        {savedTabFallbackLabel(tab)}
-      </span>
-    );
-  }
-
-  return <img alt="" aria-hidden="true" className="saved-tab-favicon" onError={() => setFailed(true)} src={src} />;
-}
-
 function SavedTabRow({ locale, tab }: { locale: Locale; tab: TabSession['tabs'][number] }) {
   const content = (
     <>
-      <SavedTabFavicon tab={tab} />
+      <TabFavicon
+        className="saved-tab-favicon"
+        pageUrl={tab.url}
+        title={tab.title || tab.url}
+      />
       <span className="tab-copy">
         <span className="tab-title">{tab.title || tab.url}</span>
         <span className="tab-url">{tab.url}</span>
