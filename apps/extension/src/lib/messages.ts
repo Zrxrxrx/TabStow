@@ -7,10 +7,9 @@ import type {
   ActiveTabsSnapshot,
 } from '@/features/active-tabs/types';
 import type { QuickLink, QuickLinkIcon } from '@/features/quick-links/quick-links';
+import type { HistoryEntry, MoveSavedTabRequest } from '@/features/history/types';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
-
-export type RestoreMode = 'current-window' | 'new-window';
 
 export type StowResult = {
   session: TabSession;
@@ -29,8 +28,16 @@ export type ExtensionMessage =
   | { type: 'sessions:list' }
   | { type: 'sessions:stow-current-window' }
   | { type: 'sessions:stow-tab'; tabId: number }
-  | { type: 'sessions:restore'; sessionId: string; mode: RestoreMode }
+  | { type: 'sessions:open-tab'; sessionId: string; tabId: string; consume: boolean }
+  | { type: 'sessions:restore'; sessionId: string }
+  | { type: 'sessions:delete-tab'; sessionId: string; tabId: string }
   | { type: 'sessions:delete'; sessionId: string }
+  | { type: 'sessions:reorder'; orderedIds: string[] }
+  | { type: 'sessions:move-tab'; request: MoveSavedTabRequest }
+  | { type: 'history:list' }
+  | { type: 'history:open-tab'; historyId: string; tabId: string }
+  | { type: 'history:restore'; historyId: string }
+  | { type: 'history:delete'; historyId: string }
   | { type: 'active-tabs:list' }
   | { type: 'active-tabs:snapshot' }
   | { type: 'active-tabs:move-tab'; request: ActiveTabMoveRequest }
@@ -52,6 +59,7 @@ export type ExtensionMessageResponse =
   | AppResult<TabSession[]>
   | AppResult<TabSession>
   | AppResult<StowResult>
+  | AppResult<HistoryEntry[]>
   | AppResult<ActiveBrowserTab[]>
   | AppResult<ActiveTabsMoveResult>
   | AppResult<ActiveTabsSnapshot>
@@ -59,6 +67,9 @@ export type ExtensionMessageResponse =
   | AppResult<ExtensionSettings>
   | AppResult<SyncResult>
   | AppResult<{ deleted: true }>
+  | AppResult<{ opened: true }>
+  | AppResult<{ opened: true; consumed: boolean }>
+  | AppResult<{ moved: true }>
   | AppResult<{ focused: true }>
   | AppResult<{ closed: true; tabCount: number }>
   | AppResult<{ collapsed: true; groupCount: number }>

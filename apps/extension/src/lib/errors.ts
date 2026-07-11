@@ -6,6 +6,10 @@ export type AppErrorCode =
   | 'chrome-tabs-error'
   | 'no-eligible-tabs'
   | 'session-not-found'
+  | 'saved-tab-not-found'
+  | 'history-entry-not-found'
+  | 'invalid-tab-url'
+  | 'invalid-saved-move'
   | 'empty-session'
   | 'unknown-error';
 

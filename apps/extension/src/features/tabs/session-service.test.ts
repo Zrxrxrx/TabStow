@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DEFAULT_SETTINGS, type TabSession } from '@tabstow/core';
+import type { HistoryEntry } from '../history/types';
 
 const browserMocks = vi.hoisted(() => ({
   runtime: {
@@ -10,16 +11,15 @@ const browserMocks = vi.hoisted(() => ({
     get: vi.fn(),
     query: vi.fn(),
     remove: vi.fn(),
-    update: vi.fn(),
-  },
-  windows: {
-    create: vi.fn(),
   },
 }));
 
 const dbMocks = vi.hoisted(() => ({
   createSession: vi.fn(),
+  getHistoryEntry: vi.fn(),
   getSession: vi.fn(),
+  moveSavedTabToHistory: vi.fn(),
+  moveSessionToHistory: vi.fn(),
 }));
 
 const settingsMocks = vi.hoisted(() => ({
@@ -34,7 +34,47 @@ vi.mock('../../db/db', () => dbMocks);
 
 vi.mock('../settings/settings-storage', () => settingsMocks);
 
-import { restoreSession, saveCurrentWindowAsSession, saveTabsAsSession } from './session-service';
+import {
+  openHistoryTab,
+  openSavedTab,
+  restoreSession,
+  saveCurrentWindowAsSession,
+  saveTabsAsSession,
+} from './session-service';
+
+const sessionWithTwoTabs: TabSession = {
+  id: 'session-1',
+  title: 'Example session',
+  tabs: [
+    {
+      id: 'tab-1',
+      url: 'https://example.com/one',
+      title: 'One',
+      createdAt: '2026-07-06T00:00:00.000Z',
+      pinned: true,
+    },
+    {
+      id: 'tab-2',
+      url: 'https://example.com/two',
+      title: 'Two',
+      createdAt: '2026-07-06T00:00:00.000Z',
+    },
+  ],
+  createdAt: '2026-07-06T00:00:00.000Z',
+  updatedAt: '2026-07-06T00:00:00.000Z',
+  deviceId: 'device-1',
+};
+
+const historyEntry: HistoryEntry = {
+  id: 'history-1',
+  sourceSessionId: 'session-1',
+  sourceTitle: 'Example session',
+  tabs: sessionWithTwoTabs.tabs,
+  originalCreatedAt: sessionWithTwoTabs.createdAt,
+  movedAt: '2026-07-07T00:00:00.000Z',
+  reason: 'opened',
+  deviceId: 'device-1',
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -45,42 +85,131 @@ beforeEach(() => {
 });
 
 describe('session service', () => {
-  it('reapplies pinned tabs when restoring a session into a new window', async () => {
-    const session: TabSession = {
-      id: 'session-1',
-      title: 'Example session',
-      tabs: [
-        {
-          id: 'tab-1',
-          url: 'https://example.com/one',
-          title: 'One',
-          createdAt: '2026-07-06T00:00:00.000Z',
-          pinned: true,
-        },
-        {
-          id: 'tab-2',
-          url: 'https://example.com/two',
-          title: 'Two',
-          createdAt: '2026-07-06T00:00:00.000Z',
-        },
-      ],
-      createdAt: '2026-07-06T00:00:00.000Z',
-      updatedAt: '2026-07-06T00:00:00.000Z',
-      deviceId: 'device-1',
-    };
+  it('opens a saved tab in the background before consuming it', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    browserMocks.tabs.create.mockResolvedValue({ id: 91 });
+    dbMocks.moveSavedTabToHistory.mockResolvedValue(historyEntry);
 
-    dbMocks.getSession.mockResolvedValue(session);
-    browserMocks.windows.create.mockResolvedValue({ id: 99 });
-    browserMocks.tabs.query.mockResolvedValue([
-      { id: 10, windowId: 99, pinned: false },
-      { id: 11, windowId: 99, pinned: false },
-    ]);
+    await expect(openSavedTab('session-1', 'tab-1', true)).resolves.toEqual({
+      ok: true,
+      data: { opened: true, consumed: true },
+    });
+    expect(browserMocks.tabs.create).toHaveBeenCalledWith({
+      url: 'https://example.com/one',
+      active: false,
+    });
+    expect(browserMocks.tabs.create).toHaveBeenCalledBefore(
+      dbMocks.moveSavedTabToHistory,
+    );
+    expect(dbMocks.moveSavedTabToHistory).toHaveBeenCalledWith(
+      'session-1',
+      'tab-1',
+      'opened',
+    );
+  });
 
-    const result = await restoreSession('session-1', 'new-window');
+  it('does not consume a middle-click open', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    browserMocks.tabs.create.mockResolvedValue({ id: 91 });
+
+    await expect(openSavedTab('session-1', 'tab-1', false)).resolves.toEqual({
+      ok: true,
+      data: { opened: true, consumed: false },
+    });
+    expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing saved tab without opening or consuming it', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+
+    await expect(openSavedTab('session-1', 'missing', true)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'saved-tab-not-found',
+        message: 'Saved tab was not found.',
+      },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
+  });
+
+  it('rejects a blocked saved tab URL without opening or consuming it', async () => {
+    dbMocks.getSession.mockResolvedValue({
+      ...sessionWithTwoTabs,
+      tabs: [{ ...sessionWithTwoTabs.tabs[0]!, url: 'chrome://settings' }],
+    });
+
+    await expect(openSavedTab('session-1', 'tab-1', true)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-tab-url',
+        message: 'Saved tab URL cannot be opened.',
+      },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
+  });
+
+  it('opens every saved tab in order before moving the session to History', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    browserMocks.tabs.create.mockResolvedValue({ id: 91 });
+    dbMocks.moveSessionToHistory.mockResolvedValue(historyEntry);
+
+    const result = await restoreSession('session-1');
 
     expect(result).toEqual({ ok: true, data: { restored: true, tabCount: 2 } });
-    expect(browserMocks.tabs.update).toHaveBeenCalledTimes(1);
-    expect(browserMocks.tabs.update).toHaveBeenCalledWith(10, { pinned: true });
+    expect(browserMocks.tabs.create.mock.calls).toEqual([
+      [{ url: 'https://example.com/one', active: false, pinned: true }],
+      [{ url: 'https://example.com/two', active: false, pinned: undefined }],
+    ]);
+    expect(browserMocks.tabs.create).toHaveBeenCalledBefore(
+      dbMocks.moveSessionToHistory,
+    );
+    expect(dbMocks.moveSessionToHistory).toHaveBeenCalledWith('session-1', 'restored');
+  });
+
+  it('keeps the session when one restore-all tab create fails', async () => {
+    dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
+    browserMocks.tabs.create
+      .mockResolvedValueOnce({ id: 1 })
+      .mockRejectedValueOnce(new Error('create failed'));
+
+    const result = await restoreSession('session-1');
+
+    expect(result).toEqual({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'create failed' },
+    });
+    expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
+  });
+
+  it('opens a History tab without mutating the History entry', async () => {
+    dbMocks.getHistoryEntry.mockResolvedValue(historyEntry);
+    browserMocks.tabs.create.mockResolvedValue({ id: 91 });
+
+    await expect(openHistoryTab('history-1', 'tab-2')).resolves.toEqual({
+      ok: true,
+      data: { opened: true },
+    });
+    expect(browserMocks.tabs.create).toHaveBeenCalledWith({
+      url: 'https://example.com/two',
+      active: false,
+    });
+    expect(dbMocks.moveSavedTabToHistory).not.toHaveBeenCalled();
+    expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
+  });
+
+  it('rejects a missing History entry without opening a tab', async () => {
+    dbMocks.getHistoryEntry.mockResolvedValue(undefined);
+
+    await expect(openHistoryTab('missing', 'tab-1')).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'history-entry-not-found',
+        message: 'History entry was not found.',
+      },
+    });
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
   });
 
   it('keeps a saved session when closing tabs fails after persistence', async () => {
@@ -99,7 +228,7 @@ describe('session service', () => {
         active: true,
       },
     ]);
-    dbMocks.createSession.mockResolvedValue(undefined);
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => session);
     browserMocks.tabs.create.mockResolvedValue({ id: 99 });
     browserMocks.tabs.remove.mockRejectedValue(new Error('tab removal failed'));
 
@@ -131,7 +260,7 @@ describe('session service', () => {
         active: true,
       },
     ]);
-    dbMocks.createSession.mockResolvedValue(undefined);
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => session);
     browserMocks.tabs.create.mockRejectedValue(new Error('survivor tab failed'));
     browserMocks.tabs.remove.mockResolvedValue(undefined);
 
@@ -164,7 +293,7 @@ describe('session service', () => {
         active: true,
       },
     ]);
-    dbMocks.createSession.mockResolvedValue(undefined);
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => session);
     browserMocks.tabs.create.mockResolvedValue({ id: 88 });
     browserMocks.tabs.remove.mockResolvedValue(undefined);
 
@@ -183,6 +312,47 @@ describe('session service', () => {
       url: 'chrome-extension://tabstow/newtab.html',
       active: true,
     });
+  });
+
+  it('returns the authoritative deduplicated window session while closing every included live tab', async () => {
+    browserMocks.tabs.query.mockResolvedValue([
+      {
+        id: 22,
+        windowId: 55,
+        url: 'https://example.com/article#first',
+        title: 'First',
+        pinned: false,
+        active: true,
+      },
+      {
+        id: 23,
+        windowId: 55,
+        url: 'https://example.com/article',
+        title: 'Second',
+        pinned: false,
+        active: false,
+      },
+    ]);
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => ({
+      ...session,
+      tabs: [session.tabs[1]!],
+    }));
+    browserMocks.tabs.create.mockResolvedValue({ id: 88 });
+    browserMocks.tabs.remove.mockResolvedValue(undefined);
+
+    const result = await saveCurrentWindowAsSession(55);
+
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        session: expect.objectContaining({
+          tabs: [expect.objectContaining({ title: 'Second' })],
+        }),
+        savedTabCount: 1,
+        closedTabCount: 2,
+      }),
+    });
+    expect(browserMocks.tabs.remove).toHaveBeenCalledWith([22, 23]);
   });
 
   it('saves a selected tab as a one-tab session and closes it', async () => {
@@ -271,6 +441,43 @@ describe('session service', () => {
     });
   });
 
+  it('returns the authoritative deduplicated session while closing every requested live tab', async () => {
+    browserMocks.tabs.get
+      .mockResolvedValueOnce({
+        id: 40,
+        windowId: 12,
+        url: 'https://example.com/article#first',
+        title: 'First',
+        pinned: false,
+      })
+      .mockResolvedValueOnce({
+        id: 41,
+        windowId: 12,
+        url: 'https://example.com/article',
+        title: 'Second',
+        pinned: false,
+      });
+    dbMocks.createSession.mockImplementation(async (session: TabSession) => ({
+      ...session,
+      tabs: [session.tabs[1]!],
+    }));
+    browserMocks.tabs.remove.mockResolvedValue(undefined);
+
+    const result = await saveTabsAsSession([40, 41]);
+
+    expect(result).toEqual({
+      ok: true,
+      data: expect.objectContaining({
+        session: expect.objectContaining({
+          tabs: [expect.objectContaining({ title: 'Second' })],
+        }),
+        savedTabCount: 1,
+        closedTabCount: 2,
+      }),
+    });
+    expect(browserMocks.tabs.remove).toHaveBeenCalledWith([40, 41]);
+  });
+
   it('rejects restoring an empty saved session with a typed error', async () => {
     dbMocks.getSession.mockResolvedValue({
       id: 'session-1',
@@ -281,7 +488,7 @@ describe('session service', () => {
       deviceId: 'device-1',
     } satisfies TabSession);
 
-    const result = await restoreSession('session-1', 'current-window');
+    const result = await restoreSession('session-1');
 
     expect(result).toEqual({
       ok: false,
@@ -291,6 +498,6 @@ describe('session service', () => {
       },
     });
     expect(browserMocks.tabs.create).not.toHaveBeenCalled();
-    expect(browserMocks.windows.create).not.toHaveBeenCalled();
+    expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
   });
 });

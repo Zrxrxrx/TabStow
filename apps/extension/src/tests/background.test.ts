@@ -28,8 +28,14 @@ const contextMenuMocks = vi.hoisted(() => ({
 }));
 
 const dbMocks = vi.hoisted(() => ({
-  deleteSession: vi.fn(),
+  deleteHistoryEntry: vi.fn(),
+  listHistory: vi.fn(),
   listSessions: vi.fn(),
+  moveSavedTab: vi.fn(),
+  moveSavedTabToHistory: vi.fn(),
+  moveSessionToHistory: vi.fn(),
+  reorderSessions: vi.fn(),
+  restoreHistoryEntry: vi.fn(),
 }));
 
 const settingsMocks = vi.hoisted(() => ({
@@ -47,6 +53,8 @@ const actionFeedbackMocks = vi.hoisted(() => ({
 }));
 
 const sessionServiceMocks = vi.hoisted(() => ({
+  openHistoryTab: vi.fn(),
+  openSavedTab: vi.fn(),
   restoreSession: vi.fn(),
   saveCurrentWindowAsSession: vi.fn(),
   saveTabsAsSession: vi.fn(),
@@ -278,6 +286,176 @@ describe('background message routing', () => {
     await dispatchRuntimeMessage({ type: 'sessions:stow-tab', tabId: 42 });
 
     expect(sessionServiceMocks.saveTabsAsSession).toHaveBeenCalledWith([42]);
+  });
+
+  it('routes saved tab open messages with exact IDs and consume intent', async () => {
+    const result = { ok: true, data: { opened: true, consumed: true } };
+    sessionServiceMocks.openSavedTab.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: 'tab-2',
+      consume: true,
+    });
+
+    expect(sessionServiceMocks.openSavedTab).toHaveBeenCalledWith(
+      'session-1',
+      'tab-2',
+      true,
+    );
+    expect(response).toBe(result);
+  });
+
+  it('routes saved tab delete messages into History', async () => {
+    dbMocks.moveSavedTabToHistory.mockResolvedValue({ id: 'history-1' });
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:delete-tab',
+      sessionId: 'session-1',
+      tabId: 'tab-2',
+    });
+
+    expect(dbMocks.moveSavedTabToHistory).toHaveBeenCalledWith(
+      'session-1',
+      'tab-2',
+      'deleted',
+    );
+    expect(response).toEqual({ ok: true, data: { deleted: true } });
+  });
+
+  it('routes saved session reorder messages with exact IDs', async () => {
+    const sessions = [{ id: 'session-2' }, { id: 'session-1' }];
+    dbMocks.reorderSessions.mockResolvedValue(sessions);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:reorder',
+      orderedIds: ['session-2', 'session-1'],
+    });
+
+    expect(dbMocks.reorderSessions).toHaveBeenCalledWith(['session-2', 'session-1']);
+    expect(response).toEqual({ ok: true, data: sessions });
+  });
+
+  it('routes valid saved tab move requests unchanged', async () => {
+    const request = {
+      sourceSessionId: 'session-1',
+      tabId: 'tab-2',
+      destinationSessionId: 'session-2',
+      destinationIndex: 1,
+    };
+    dbMocks.moveSavedTab.mockResolvedValue(undefined);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'sessions:move-tab', request });
+
+    expect(dbMocks.moveSavedTab).toHaveBeenCalledWith(request);
+    expect(response).toEqual({ ok: true, data: { moved: true } });
+  });
+
+  it('rejects malformed saved tab moves before they reach the database', async () => {
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:move-tab',
+      request: {
+        sourceSessionId: 'session-1',
+        tabId: 'tab-2',
+        destinationSessionId: 'session-2',
+        destinationIndex: -1,
+      },
+    });
+
+    expect(dbMocks.moveSavedTab).not.toHaveBeenCalled();
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-saved-move',
+        message: 'Saved tab move request is invalid.',
+      },
+    });
+  });
+
+  it('rejects a missing saved tab move request before it reaches the database', async () => {
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'sessions:move-tab' });
+
+    expect(dbMocks.moveSavedTab).not.toHaveBeenCalled();
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-saved-move',
+        message: 'Saved tab move request is invalid.',
+      },
+    });
+  });
+
+  it('moves deleted saved sessions to History', async () => {
+    dbMocks.moveSessionToHistory.mockResolvedValue({ id: 'history-1' });
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:delete',
+      sessionId: 'session-1',
+    });
+
+    expect(dbMocks.moveSessionToHistory).toHaveBeenCalledWith('session-1', 'deleted');
+    expect(response).toEqual({ ok: true, data: { deleted: true } });
+  });
+
+  it('routes History list messages', async () => {
+    const entries = [{ id: 'history-1' }];
+    dbMocks.listHistory.mockResolvedValue(entries);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'history:list' });
+
+    expect(dbMocks.listHistory).toHaveBeenCalledTimes(1);
+    expect(response).toEqual({ ok: true, data: entries });
+  });
+
+  it('routes History tab open messages with exact IDs', async () => {
+    const result = { ok: true, data: { opened: true } };
+    sessionServiceMocks.openHistoryTab.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'history:open-tab',
+      historyId: 'history-1',
+      tabId: 'tab-2',
+    });
+
+    expect(sessionServiceMocks.openHistoryTab).toHaveBeenCalledWith('history-1', 'tab-2');
+    expect(response).toBe(result);
+  });
+
+  it('routes History restore messages with exact IDs', async () => {
+    const restored = { id: 'session-restored' };
+    dbMocks.restoreHistoryEntry.mockResolvedValue(restored);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'history:restore',
+      historyId: 'history-1',
+    });
+
+    expect(dbMocks.restoreHistoryEntry).toHaveBeenCalledWith('history-1');
+    expect(response).toEqual({ ok: true, data: restored });
+  });
+
+  it('routes History delete messages with exact IDs', async () => {
+    dbMocks.deleteHistoryEntry.mockResolvedValue(undefined);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'history:delete',
+      historyId: 'history-1',
+    });
+
+    expect(dbMocks.deleteHistoryEntry).toHaveBeenCalledWith('history-1');
+    expect(response).toEqual({ ok: true, data: { deleted: true } });
   });
 
   it('routes chrome tab group collapse messages', async () => {

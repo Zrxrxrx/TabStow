@@ -1,9 +1,15 @@
 import type { SavedTab, TabSession } from '@tabstow/core';
-import { createSession, getSession } from '../../db/db';
+import {
+  createSession,
+  getHistoryEntry,
+  getSession,
+  moveSavedTabToHistory,
+  moveSessionToHistory,
+} from '../../db/db';
 import { getSettings } from '../settings/settings-storage';
 import { browser } from '../../lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '../../lib/errors';
-import type { RestoreMode, StowResult } from '../../lib/messages';
+import type { StowResult } from '../../lib/messages';
 import {
   isBlockedTabUrl,
   isStowableTab,
@@ -88,7 +94,7 @@ export async function saveCurrentWindowAsSession(windowId?: number): Promise<App
       deviceId: settings.deviceId,
     };
 
-    await createSession(session);
+    const savedSession = await createSession(session);
 
     const tabIdsToClose = eligibleTabs
       .filter((tab) => shouldCloseSavedTab(tab, settings))
@@ -98,7 +104,7 @@ export async function saveCurrentWindowAsSession(windowId?: number): Promise<App
     let closedTabCount = 0;
 
     try {
-      await ensureWindowSurvivesRemoval(session.sourceWindowId, tabs.length, tabIdsToClose);
+      await ensureWindowSurvivesRemoval(savedSession.sourceWindowId, tabs.length, tabIdsToClose);
     } catch {
       // Best effort only; the session is already persisted.
     }
@@ -113,8 +119,8 @@ export async function saveCurrentWindowAsSession(windowId?: number): Promise<App
     }
 
     return ok({
-      session,
-      savedTabCount: savedTabs.length,
+      session: savedSession,
+      savedTabCount: savedSession.tabs.length,
       closedTabCount,
     });
   } catch (error) {
@@ -144,7 +150,7 @@ export async function saveTabsAsSession(tabIds: number[]): Promise<AppResult<Sto
       deviceId: settings.deviceId,
     };
 
-    await createSession(session);
+    const savedSession = await createSession(session);
 
     const tabIdsToClose = eligibleTabs
       .map((tab) => tab.id)
@@ -161,8 +167,8 @@ export async function saveTabsAsSession(tabIds: number[]): Promise<AppResult<Sto
     }
 
     return ok({
-      session,
-      savedTabCount: savedTabs.length,
+      session: savedSession,
+      savedTabCount: savedSession.tabs.length,
       closedTabCount,
     });
   } catch (error) {
@@ -170,9 +176,63 @@ export async function saveTabsAsSession(tabIds: number[]): Promise<AppResult<Sto
   }
 }
 
+export async function openSavedTab(
+  sessionId: string,
+  tabId: string,
+  consume: boolean,
+): Promise<AppResult<{ opened: true; consumed: boolean }>> {
+  try {
+    const session = await getSession(sessionId);
+    if (!session) {
+      return err('session-not-found', 'Saved session was not found.');
+    }
+
+    const tab = session.tabs.find(({ id }) => id === tabId);
+    if (!tab) {
+      return err('saved-tab-not-found', 'Saved tab was not found.');
+    }
+    if (isBlockedTabUrl(tab.url)) {
+      return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
+    }
+
+    await browser.tabs.create({ url: tab.url, active: false });
+    if (consume) {
+      await moveSavedTabToHistory(sessionId, tabId, 'opened');
+    }
+
+    return ok({ opened: true, consumed: consume });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
+export async function openHistoryTab(
+  historyId: string,
+  tabId: string,
+): Promise<AppResult<{ opened: true }>> {
+  try {
+    const entry = await getHistoryEntry(historyId);
+    if (!entry) {
+      return err('history-entry-not-found', 'History entry was not found.');
+    }
+
+    const tab = entry.tabs.find(({ id }) => id === tabId);
+    if (!tab) {
+      return err('saved-tab-not-found', 'Saved tab was not found.');
+    }
+    if (isBlockedTabUrl(tab.url)) {
+      return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
+    }
+
+    await browser.tabs.create({ url: tab.url, active: false });
+    return ok({ opened: true });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
 export async function restoreSession(
   sessionId: string,
-  mode: RestoreMode,
 ): Promise<AppResult<{ restored: true; tabCount: number }>> {
   try {
     const session = await getSession(sessionId);
@@ -183,40 +243,19 @@ export async function restoreSession(
       return err('empty-session', 'Saved session has no tabs to restore.');
     }
 
-    if (mode === 'new-window') {
-      const createdWindow = await browser.windows.create({
-        url: session.tabs.map((tab) => tab.url),
-        focused: true,
-      });
-
-      const createdWindowId = createdWindow?.id;
-      if (createdWindowId != null) {
-        const restoredTabs = await browser.tabs.query({ windowId: createdWindowId });
-
-        for (const [index, tab] of session.tabs.entries()) {
-          const restoredTab = restoredTabs[index];
-          if (tab.pinned && restoredTab?.id != null) {
-            await browser.tabs.update(restoredTab.id, { pinned: true });
-          }
-        }
-      }
-
-      return ok({ restored: true, tabCount: session.tabs.length });
+    if (session.tabs.some(({ url }) => isBlockedTabUrl(url))) {
+      return err('invalid-tab-url', 'Saved tab URL cannot be opened.');
     }
 
     for (const tab of session.tabs) {
-      const createProperties: chrome.tabs.CreateProperties = {
+      await browser.tabs.create({
         url: tab.url,
         active: false,
-      };
-
-      if (tab.pinned) {
-        createProperties.pinned = true;
-      }
-
-      await browser.tabs.create(createProperties);
+        pinned: tab.pinned || undefined,
+      });
     }
 
+    await moveSessionToHistory(sessionId, 'restored');
     return ok({ restored: true, tabCount: session.tabs.length });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));

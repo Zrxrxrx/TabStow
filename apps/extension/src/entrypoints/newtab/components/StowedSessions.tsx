@@ -192,7 +192,6 @@ export function StowedSessions({
                           sendExtensionMessage<AppResult<{ restored: true; tabCount: number }>>({
                             type: 'sessions:restore',
                             sessionId: session.id,
-                            mode: 'current-window',
                           }),
                         (result) => `Restored ${result.tabCount} tabs.`,
                       )
