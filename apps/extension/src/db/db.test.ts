@@ -57,6 +57,7 @@ async function importDatabase() {
 }
 
 beforeEach(async () => {
+  vi.restoreAllMocks();
   openDatabase?.close();
   openDatabase = undefined;
   await Dexie.delete(DATABASE_NAME);
@@ -198,5 +199,271 @@ describe('session database', () => {
     expect((await listSessions()).map(({ id, sortOrder }) => [id, sortOrder])).toEqual([
       ['newer', 0],
     ]);
+  });
+
+  it('atomically moves one saved tab into History', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/one',
+      '2026-07-01T00:00:00.000Z',
+    );
+    source.tabs.push(
+      makeTab('tab-2', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+    );
+    const {
+      createSession,
+      getSession,
+      listHistory,
+      moveSavedTabToHistory,
+    } = await importDatabase();
+    await createSession(source);
+
+    const moved = await moveSavedTabToHistory('source', 'source-tab', 'opened');
+
+    expect(moved).toMatchObject({
+      sourceSessionId: 'source',
+      sourceTitle: 'source',
+      originalCreatedAt: '2026-07-01T00:00:00.000Z',
+      reason: 'opened',
+      deviceId: 'device',
+    });
+    expect(moved.tabs.map(({ id }) => id)).toEqual(['source-tab']);
+    expect((await getSession('source'))?.tabs.map(({ id }) => id)).toEqual(['tab-2']);
+    expect((await getSession('source'))?.updatedAt).not.toBe(source.updatedAt);
+    expect((await listHistory()).map(({ id }) => id)).toEqual([moved.id]);
+  });
+
+  it('deletes the source session when its final tab moves into History', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/only',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const { createSession, getSession, moveSavedTabToHistory } = await importDatabase();
+    await createSession(source);
+
+    await moveSavedTabToHistory('source', 'source-tab', 'deleted');
+
+    expect(await getSession('source')).toBeUndefined();
+  });
+
+  it('atomically moves a complete saved session into History', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/one',
+      '2026-07-01T00:00:00.000Z',
+    );
+    source.tabs.push(
+      makeTab('tab-2', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+    );
+    const {
+      createSession,
+      getSession,
+      listHistory,
+      moveSessionToHistory,
+    } = await importDatabase();
+    await createSession(source);
+
+    const moved = await moveSessionToHistory('source', 'deleted');
+
+    expect(await getSession('source')).toBeUndefined();
+    expect(moved.tabs.map(({ id }) => id)).toEqual(['source-tab', 'tab-2']);
+    expect((await listHistory())[0]).toEqual(moved);
+    expect((await listHistory())[0]?.reason).toBe('deleted');
+  });
+
+  it('rolls back Saved and History when a move transaction aborts', async () => {
+    const historyId = '00000000-0000-4000-8000-000000000001';
+    vi.spyOn(globalThis.crypto, 'randomUUID').mockReturnValue(historyId);
+    const first = makeSession(
+      'first',
+      'https://example.com/first',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const second = makeSession(
+      'second',
+      'https://example.com/second',
+      '2026-07-02T00:00:00.000Z',
+    );
+    second.tabs.push(
+      makeTab('second-kept', 'https://example.com/kept', '2026-07-03T00:00:00.000Z'),
+    );
+    const {
+      createSession,
+      getSession,
+      listHistory,
+      moveSavedTabToHistory,
+    } = await importDatabase();
+    await createSession(first);
+    await moveSavedTabToHistory('first', 'first-tab', 'opened');
+    await createSession(second);
+    const savedBefore = await getSession('second');
+    const historyBefore = await listHistory();
+
+    await expect(
+      moveSavedTabToHistory('second', 'second-tab', 'opened'),
+    ).rejects.toThrow();
+
+    expect(await getSession('second')).toEqual(savedBefore);
+    expect(await listHistory()).toEqual(historyBefore);
+  });
+
+  it('restores History as a newest session and deduplicates existing Saved URLs', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/read',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const existing = makeSession(
+      'existing',
+      'https://example.com/read#existing',
+      '2026-07-02T00:00:00.000Z',
+    );
+    existing.tabs.push(
+      makeTab('existing-kept', 'https://example.com/kept', '2026-07-03T00:00:00.000Z'),
+    );
+    const {
+      createSession,
+      getHistoryEntry,
+      getSession,
+      listSessions,
+      moveSessionToHistory,
+      restoreHistoryEntry,
+    } = await importDatabase();
+    await createSession(source);
+    const historyEntry = await moveSessionToHistory('source', 'deleted');
+    await createSession(existing);
+
+    const restored = await restoreHistoryEntry(historyEntry.id);
+
+    expect(restored.id).not.toBe('source');
+    expect(restored.tabs.map(({ url }) => url)).toEqual(['https://example.com/read']);
+    expect(restored.sortOrder).toBe(0);
+    expect(restored.createdAt).toBe(restored.updatedAt);
+    expect((await getSession('existing'))?.tabs.map(({ id }) => id)).toEqual([
+      'existing-kept',
+    ]);
+    expect((await getSession('existing'))?.updatedAt).not.toBe(existing.updatedAt);
+    expect((await listSessions()).map(({ id }) => id)).toEqual([restored.id, 'existing']);
+    expect(await getHistoryEntry(historyEntry.id)).toBeUndefined();
+  });
+
+  it('permanently deletes only the selected History entry', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/source',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const kept = makeSession(
+      'kept',
+      'https://example.com/kept',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const {
+      createSession,
+      deleteHistoryEntry,
+      getHistoryEntry,
+      getSession,
+      moveSessionToHistory,
+    } = await importDatabase();
+    await createSession(source);
+    const historyEntry = await moveSessionToHistory('source', 'deleted');
+    await createSession(kept);
+
+    await deleteHistoryEntry(historyEntry.id);
+
+    expect(await getHistoryEntry(historyEntry.id)).toBeUndefined();
+    expect(await getSession('kept')).toBeDefined();
+  });
+
+  it('moves a saved tab between sessions at the requested index', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/one',
+      '2026-07-01T00:00:00.000Z',
+    );
+    source.tabs.push(
+      makeTab('tab-2', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+    );
+    const destination = makeSession(
+      'destination',
+      'https://example.com/destination',
+      '2026-07-03T00:00:00.000Z',
+    );
+    const { createSession, getSession, moveSavedTab } = await importDatabase();
+    await createSession(source);
+    await createSession(destination);
+
+    await moveSavedTab({
+      sourceSessionId: 'source',
+      tabId: 'tab-2',
+      destinationSessionId: 'destination',
+      destinationIndex: 1,
+    });
+
+    expect((await getSession('source'))?.tabs.map(({ id }) => id)).toEqual(['source-tab']);
+    expect((await getSession('destination'))?.tabs.map(({ id }) => id)).toEqual([
+      'destination-tab',
+      'tab-2',
+    ]);
+    expect((await getSession('source'))?.updatedAt).not.toBe(source.updatedAt);
+    expect((await getSession('destination'))?.updatedAt).not.toBe(destination.updatedAt);
+  });
+
+  it('reorders a saved tab within one session at the exact requested index', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/one',
+      '2026-07-01T00:00:00.000Z',
+    );
+    source.tabs.push(
+      makeTab('tab-2', 'https://example.com/two', '2026-07-02T00:00:00.000Z'),
+      makeTab('tab-3', 'https://example.com/three', '2026-07-03T00:00:00.000Z'),
+    );
+    const { createSession, getSession, moveSavedTab } = await importDatabase();
+    await createSession(source);
+
+    await moveSavedTab({
+      sourceSessionId: 'source',
+      tabId: 'source-tab',
+      destinationSessionId: 'source',
+      destinationIndex: 2,
+    });
+
+    expect((await getSession('source'))?.tabs.map(({ id }) => id)).toEqual([
+      'tab-2',
+      'tab-3',
+      'source-tab',
+    ]);
+    expect((await getSession('source'))?.updatedAt).not.toBe(source.updatedAt);
+  });
+
+  it('rejects an invalid saved-tab destination index without changing either table', async () => {
+    const source = makeSession(
+      'source',
+      'https://example.com/source',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const destination = makeSession(
+      'destination',
+      'https://example.com/destination',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const { createSession, listHistory, listSessions, moveSavedTab } = await importDatabase();
+    await createSession(source);
+    await createSession(destination);
+    const sessionsBefore = await listSessions();
+
+    await expect(
+      moveSavedTab({
+        sourceSessionId: 'source',
+        tabId: 'source-tab',
+        destinationSessionId: 'destination',
+        destinationIndex: 2,
+      }),
+    ).rejects.toThrow('Invalid destination index: 2');
+
+    expect(await listSessions()).toEqual(sessionsBefore);
+    expect(await listHistory()).toEqual([]);
   });
 });

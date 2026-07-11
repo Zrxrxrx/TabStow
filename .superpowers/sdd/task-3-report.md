@@ -1,95 +1,172 @@
-# Task 3 Report: Quick Links Integrated Inputs
+# Task 3 Report: Local History And Atomic Saved Mutations
 
-## What changed
+## Outcome
 
-- Updated [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx) to replace all quick-link `window.prompt` flows with integrated `FormDialog` flows for:
-  - adding a quick link by URL
-  - choosing an open tab to add as a quick link
-  - editing quick-link label and emoji icon metadata
-- Kept the existing quick-link persistence path intact by continuing to use `createQuickLink`, `updateQuickLink`, `saveQuickLinks`, and `sendExtensionMessage`.
-- Updated [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx) so the quick-link tests now drive the integrated inputs instead of prompt mocks.
-- Added the required open-tab chooser test and kept the invalid URL coverage on the dialog-based flow.
-- Updated the local `click` and `change` test helpers in the same App test file so submit buttons and controlled inputs behave like the dialog UI in this test harness.
+Implemented the local-only History data model and atomic Saved/History mutations described by `.superpowers/sdd/task-3-brief.md`.
 
-## Tests run
+Changed only the requested production and test files:
 
-### RED
+- `apps/extension/src/features/history/types.ts`
+- `apps/extension/src/db/db.ts`
+- `apps/extension/src/db/db.test.ts`
 
-Updated the quick-link tests first, then ran:
+History remains local to IndexedDB. Existing Saved export/import and Gist sync shapes still contain sessions only.
+
+## Assumptions and success criteria
+
+- `destinationIndex` is the tab's final zero-based index after removal from its source.
+- Mutation errors are ordinary typed `Error` instances with ID/index-specific messages.
+- Deleted source sessions do not need their `updatedAt` changed because the row no longer survives; every surviving modified session does receive a fresh `updatedAt`.
+- Success required focused transaction tests, full tests, typecheck, clean diff validation, self-review, and an independent read-only review.
+
+## RED 1: missing History and move APIs
+
+Added nine focused tests before production changes for:
+
+- moving one saved tab to History while retaining the remaining source tab;
+- deleting the source session when its final tab moves to History;
+- moving a complete session to History;
+- rolling back Saved and History when the transaction aborts;
+- restoring History as a newest Saved session while deduplicating existing Saved URLs;
+- permanently deleting only a History entry;
+- moving a tab between sessions at the requested index;
+- same-session exact-index reorder;
+- invalid-index rejection without changing either table.
+
+Command, run from `apps/extension`:
 
 ```bash
-rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"'
+rtk bun run test -- src/db/db.test.ts
 ```
 
-Observed the expected failure from the old prompt-based UI:
+Expected RED result:
 
 ```text
-5 failed
-- Missing label: Quick link URL
-- Missing role: dialog Choose open tab
-- Missing label: Quick link label
+Test Files  1 failed (1)
+Tests       9 failed | 7 passed (16)
 ```
 
-That matched the task brief: the old UI still relied on `window.prompt` and did not render integrated quick-link fields/dialogs.
+All nine failures were caused by the intended missing exports:
 
-### GREEN
-
-After implementing the Quick Links dialog flow, reran:
-
-```bash
-rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"'
+```text
+TypeError: moveSavedTabToHistory is not a function
+TypeError: moveSessionToHistory is not a function
+TypeError: moveSavedTab is not a function
 ```
 
-Result:
+This confirmed the tests exercised the new API boundary rather than failing because of test setup or syntax errors.
+
+## GREEN 1: minimal implementation
+
+Implemented:
+
+- `HistoryReason`, `HistoryEntry`, and `MoveSavedTabRequest`;
+- the typed Dexie `history` table accessor for the existing v2 schema;
+- newest-first `listHistory` and `getHistoryEntry`;
+- atomic `moveSavedTabToHistory` and `moveSessionToHistory`;
+- atomic `restoreHistoryEntry` using the existing newest-session URL dedupe/resequence path;
+- atomic `deleteHistoryEntry`;
+- atomic same-session reorder and cross-session `moveSavedTab`;
+- missing session/tab/History and invalid-index `Error` messages;
+- empty-source cleanup and `updatedAt` changes for surviving modified sessions.
+
+Focused result:
 
 ```text
 Test Files  1 passed (1)
-Tests       7 passed | 28 skipped (35)
+Tests       16 passed (16)
 ```
 
-## TDD notes
+## RED 2: self-review regression for restore timestamps
 
-- Test updates came first.
-- I verified the first focused run failed for the right reason before changing production code.
-- I then made the minimal QuickLinks changes needed to satisfy the new tests and reran the same focused command to verify green.
+Self-review found that restoring History shortened/resequenced existing Saved sessions without refreshing their `updatedAt`, contrary to the task requirement that every modified surviving session receive a new timestamp.
 
-## Files changed
+Added a focused assertion first:
 
-- [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx)
-- [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx)
+```ts
+expect((await getSession('existing'))?.updatedAt).not.toBe(existing.updatedAt);
+```
 
-## Self-review
+Focused RED result:
 
-- Stayed within the Task 3 file scope for code changes.
-- Did not add permissions, content scripts, background routes, or storage changes.
-- Preserved existing bare-domain quick-link normalization by continuing to rely on `createQuickLink`.
-- Kept upload/reorder/remove behavior untouched.
-- Confirmed the quick-link tests explicitly assert `promptSpy` was not called for the rewritten flows.
+```text
+Test Files  1 failed (1)
+Tests       1 failed | 15 passed (16)
+AssertionError: expected '2026-07-02T00:00:00.000Z' not to be '2026-07-02T00:00:00.000Z'
+```
+
+## GREEN 2: restore updates survivors
+
+Extended the in-transaction newest-session helper with an optional survivor timestamp and supplied the restore time from `restoreHistoryEntry`. This keeps the Task 2 create-session behavior unchanged while ensuring every surviving session modified by restore gets the restore timestamp.
+
+Focused result:
+
+```text
+Test Files  1 passed (1)
+Tests       16 passed (16)
+```
+
+The UUID collision rollback test also restores its `crypto.randomUUID` spy in `beforeEach`, preventing state leakage into later tests.
+
+## Atomicity evidence
+
+The rollback test forces two History inserts to use the same primary key. The second operation changes its Saved source before the History insert raises a constraint error. Assertions prove Dexie rolls the Saved mutation back and leaves both stores byte-for-byte equal to their pre-transaction state.
+
+All five mutation APIs open a read-write Dexie transaction spanning both `db.sessions` and `db.history`:
+
+- `moveSavedTabToHistory`
+- `moveSessionToHistory`
+- `restoreHistoryEntry`
+- `deleteHistoryEntry`
+- `moveSavedTab`
+
+## Final verification
+
+Fresh focused database verification:
+
+```text
+Test Files  1 passed (1)
+Tests       16 passed (16)
+```
+
+Fresh full repository tests:
+
+```bash
+rtk bun run test
+```
+
+```text
+Core:      3 files passed, 19 tests passed
+Extension: 25 files passed, 218 tests passed
+Total:     28 files passed, 237 tests passed
+```
+
+Fresh repository typecheck:
+
+```bash
+rtk bun run typecheck
+```
+
+```text
+Core TypeScript: exit 0
+WXT prepare: finished
+Extension TypeScript: exit 0
+```
+
+Diff validation:
+
+```bash
+rtk git diff --check
+```
+
+Result: exit 0 with no whitespace errors.
+
+## Self-review and independent review
+
+Self-review checked the task brief line by line, transaction store scopes, mutation ordering, rollback behavior, exact insertion indexes, empty-source cleanup, URL dedupe/resequence reuse, timestamp updates, History sync exclusion, and MV3-safe runtime APIs.
+
+An independent read-only reviewer found no Critical or Important issues and assessed the change as merge-ready. It noted two optional test-hardening opportunities: table-driven coverage for every missing-ID/error-message branch and an explicit two-entry newest-first History ordering assertion. The production paths are implemented; these additions were not required to correct a defect in this task.
 
 ## Concerns
 
-- The App test file's local DOM helpers needed small harness updates for submit buttons and controlled inputs, because the new dialog forms depend on browser-like submit/input behavior that the previous helpers did not emulate.
-
-## Task 3 review fix
-
-- Updated [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx) so the open-tab chooser quick-link test proves the dialog primary `Add` button adds the default-selected open tab and still avoids `window.prompt`.
-- Updated [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx) so the chooser keeps row-click submission, default-selects the first available tab, and wires the dialog submit action to the selected tab.
-- Re-ran the required focused verification command:
-
-```bash
-rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"'
-```
-
-- Result: `Test Files  1 passed (1)` and `Tests  7 passed | 28 skipped (35)`.
-
-## Task 3 re-review fix
-
-- Updated [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/App.test.tsx) so the quick-link chooser test covers an invalid `chrome://settings` tab appearing before `https://docs.example.com/spec`, asserts the invalid tab is not rendered as a choice, and verifies the dialog primary `Add` action still adds the valid tab without calling `window.prompt`.
-- Updated [/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx](/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx) to filter open-tab choices through the same quick-link URL acceptance as `createQuickLink`, and to update chooser submission state with functional `setDialog` calls so a failed submit keeps the current selection instead of restoring stale dialog state.
-- Re-ran the required focused verification command:
-
-```bash
-rtk zsh -lc 'cd apps/extension && bun run test -- src/entrypoints/newtab/App.test.tsx -t "quick link"'
-```
-
-- Result: `Test Files  1 passed (1)` and `Tests  7 passed | 28 skipped (35)`.
+No production blocker remains. The only open concerns are the two non-blocking test-hardening opportunities noted above.
