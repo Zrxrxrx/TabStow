@@ -4,7 +4,7 @@
 
 **Goal:** Publish reproducible Tabstow Chrome ZIP releases through a manually dispatched GitHub Action, beginning with `v1.0.0`.
 
-**Architecture:** Keep the extension package version as the source of truth. A small tested verifier guards package/lock/manifest/tag consistency, while one workflow owns bumping, validation, Git mutation, packaging, checksums, GitHub Release creation, and safe post-tag publication recovery.
+**Architecture:** Keep the extension package version as the source of truth. A small tested verifier guards package/lock/manifest/tag consistency, while one workflow owns bumping, validation, Git mutation, packaging, checksums, GitHub Release creation, and safe post-tag recovery of the coupled ZIP/checksum asset pair.
 
 **Tech Stack:** Bun 1.3.6, TypeScript, Vitest, WXT 0.20.27, GitHub Actions, GitHub CLI
 
@@ -13,7 +13,7 @@
 - Use Bun for all dependency and script commands.
 - The first release is exactly `v1.0.0`.
 - Chrome extension runtime code must not gain Bun-only or Node-only APIs; release tooling may use Node APIs.
-- Release assets are `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS`.
+- Release assets are the coupled pair `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS`.
 - No Chrome Web Store publishing, CRX generation, new extension permissions, or credentials.
 
 ---
@@ -61,11 +61,11 @@
 
 **Interfaces:**
 - Consumes: workflow input `current|patch|minor|major`, the verifier CLI, root test/typecheck/zip scripts, GitHub's default branch, and existing tag/Release state.
-- Produces: an annotated `vX.Y.Z` tag and a new or repaired GitHub Release containing the ZIP and checksum; a same-HEAD `current` resume performs no Git mutation.
+- Produces: an annotated `vX.Y.Z` tag and a GitHub Release containing a valid coupled ZIP/checksum pair; a same-HEAD `current` resume performs no Git mutation.
 
-- [ ] **Step 1: Write a failing workflow-contract test.** Assert choice inputs, `contents: write`, frozen installs, Bun version preparation, checks, verifier execution, atomic push for bumps, fail-closed tag and Release probes, existing-tag rejection for bumps, non-annotated tags, and tags at any commit other than the current default-branch HEAD, same-HEAD annotated `current` resumption, skipped Git mutation on resume, `--verify-tag`, and create-or-repair handling for both expected assets.
+- [ ] **Step 1: Write a failing workflow-contract test.** Assert choice inputs, `contents: write`, frozen installs, Bun version preparation, checks, verifier execution, atomic push for bumps, fail-closed tag and Release probes, existing-tag rejection for bumps, non-annotated tags, and tags at any commit other than the current default-branch HEAD, same-HEAD annotated `current` resumption, skipped Git mutation on resume, `--verify-tag`, creation of a missing Release with a fresh asset pair, complete-pair download and checksum verification with delete-both-and-rerun failure guidance, ZIP-only checksum derivation from the published ZIP with only the checksum uploaded, checksum-only orphan deletion followed by fresh-pair upload, and fresh-pair upload when both assets are absent.
 - [ ] **Step 2: Run the focused test and confirm it fails because `.github/workflows/release.yml` is missing.**
-- [ ] **Step 3: Implement the workflow with `set -euo pipefail`, a release concurrency group, pinned setup actions, fail-closed tag/API inspection, existing-tag rejection for bump inputs, same-HEAD annotated `current` resumption that skips Git mutation, generated release notes, and missing-only asset repair.**
+- [ ] **Step 3: Implement the workflow with `set -euo pipefail`, a release concurrency group, pinned setup actions, fail-closed tag/API inspection, existing-tag rejection for bump inputs, same-HEAD annotated `current` resumption that skips Git mutation, generated release notes, and coupled-pair recovery: download and verify a complete pair and fail mismatches with delete-both-and-rerun guidance; derive and upload only a checksum from a lone published ZIP; delete an orphan checksum before uploading a fresh pair; and upload a fresh pair when neither asset exists.**
 - [ ] **Step 4: Run the focused workflow-contract test, including the recovery assertions, to green.**
 
 ### Task 4: Operator documentation and end-to-end verification
@@ -77,7 +77,7 @@
 - Consumes: the implemented GitHub workflow.
 - Produces: exact first-release, subsequent-release, post-tag recovery, download, and unpacked-extension instructions.
 
-- [ ] **Step 1: Document that the first Actions run selects `current` to publish `v1.0.0`; later runs select the desired bump. Document `current` as the recovery path after a post-push failure: only a same-HEAD annotated tag resumes, checks rerun and assets are rebuilt and verified, Git mutation is skipped, and a missing Release or only missing expected assets are published.**
+- [ ] **Step 1: Document that the first Actions run selects `current` to publish `v1.0.0`; later runs select the desired bump. Document `current` as the recovery path after a post-push failure: only a same-HEAD annotated tag resumes, checks rerun, Git mutation is skipped, and the ZIP/checksum pair is recovered by downloading and verifying a complete pair, failing mismatches with delete-both-and-rerun guidance, deriving and uploading only a checksum from a lone published ZIP, deleting an orphan checksum before uploading a fresh pair, or uploading a fresh pair when both assets are absent.**
 - [ ] **Step 2: Run `bun run typecheck`, `bun run test`, and `bun run zip`.**
 - [ ] **Step 3: Run `bun run release:verify -- v1.0.0 apps/extension/.output/chrome-mv3/manifest.json`.**
 - [ ] **Step 4: Confirm the generated ZIP is `apps/extension/.output/tabstow-1.0.0-chrome.zip`.**
