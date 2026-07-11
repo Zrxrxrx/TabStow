@@ -44,7 +44,15 @@ bun run zip
 
 For the first release, open **Actions** in GitHub, select the **Release** workflow, choose **Run workflow**, and leave **Version to publish or increment** set to `current`. The checked-in extension version is `1.0.0`, so this publishes `v1.0.0`. For each later release, run the workflow again and select the desired `patch`, `minor`, or `major` bump.
 
-If a release run fails after pushing its tag, rerun the workflow with `current`. Recovery proceeds only when the existing tag resolves to the current default-branch commit. Recovery treats `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` as a coupled pair. A lone ZIP gets a checksum generated from that exact published file; an orphan checksum is removed before a fresh pair is uploaded. If a complete published pair fails checksum verification, delete both assets and rerun with `current`.
+If a release run fails after pushing its tag, rerun the workflow with `current`. Recovery is allowed only when the existing tag is annotated and peels to the checked-out default-branch HEAD. The rerun repeats typechecking, tests, the ZIP build, and release verification, but skips commit, tag, and push.
+
+Recovery treats `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` as a coupled pair.
+
+- If the Release does not exist, it is created with the freshly rebuilt pair.
+- If both assets exist, the published pair is downloaded and verified together. A valid pair is left unchanged. If a complete published pair fails checksum verification, delete both assets and rerun with `current`.
+- If only the ZIP exists, its checksum is generated from that exact published ZIP and only that checksum is uploaded.
+- If only the checksum exists, it is deleted before the freshly rebuilt pair is uploaded.
+- If both assets are missing, the freshly rebuilt pair is uploaded.
 
 To install or update from a GitHub Release:
 

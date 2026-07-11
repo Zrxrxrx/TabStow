@@ -279,6 +279,12 @@ describe('release workflow behavior', () => {
     expect(releaseRun).toContain(
       'if ! ASSET_RECORDS="$(gh release view "$TAG" --json assets --jq \'.assets[] | [.name, .apiUrl] | @tsv\')"; then',
     );
+    expect(releaseRun).toContain(
+      'RELEASE_ZIP_API_URL="$(printf \'%s\\n\' "$ASSET_RECORDS" | awk -F \'\\t\' -v name="$RELEASE_ZIP_NAME" \'$1 == name { print $2 }\')"',
+    );
+    expect(releaseRun).toContain(
+      'CHECKSUMS_API_URL="$(printf \'%s\\n\' "$ASSET_RECORDS" | awk -F \'\\t\' -v name="$CHECKSUMS_NAME" \'$1 == name { print $2 }\')"',
+    );
     expectInOrder(releaseRun, [
       'RELEASE_ZIP_API_URL=',
       'CHECKSUMS_API_URL=',
@@ -361,10 +367,28 @@ describe('release recovery documentation', () => {
       'If a release run fails after pushing its tag, rerun the workflow with `current`.',
     );
     expect(readmeText).toContain(
-      'Recovery proceeds only when the existing tag resolves to the current default-branch commit.',
+      'Recovery is allowed only when the existing tag is annotated and peels to the checked-out default-branch HEAD.',
+    );
+    expect(readmeText).toContain(
+      'The rerun repeats typechecking, tests, the ZIP build, and release verification, but skips commit, tag, and push.',
     );
     expect(readmeText).toContain(
       'Recovery treats `tabstow-vX.Y.Z-chrome.zip` and `SHA256SUMS` as a coupled pair.',
+    );
+    expect(readmeText).toContain(
+      'If the Release does not exist, it is created with the freshly rebuilt pair.',
+    );
+    expect(readmeText).toContain(
+      'If both assets are missing, the freshly rebuilt pair is uploaded.',
+    );
+    expect(readmeText).toContain(
+      'If both assets exist, the published pair is downloaded and verified together.',
+    );
+    expect(readmeText).toContain(
+      'If only the ZIP exists, its checksum is generated from that exact published ZIP and only that checksum is uploaded.',
+    );
+    expect(readmeText).toContain(
+      'If only the checksum exists, it is deleted before the freshly rebuilt pair is uploaded.',
     );
     expect(readmeText).toContain(
       'If a complete published pair fails checksum verification, delete both assets and rerun with `current`.',
