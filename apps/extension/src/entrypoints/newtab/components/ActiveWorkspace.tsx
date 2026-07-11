@@ -1,20 +1,12 @@
-import { Archive, Layers, Trash2, X } from 'lucide-react';
+import { Layers } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  buildActiveTabGroups,
-  findDuplicateTabGroups,
-} from '@/features/active-tabs/active-tab-groups';
-import {
-  getActiveWorkspaceState,
-  updateActiveWorkspaceState,
-  type ActiveWorkspaceState,
-} from '@/features/active-tabs/active-workspace-storage';
-import { clearTabManualGroup, pruneManualGroups } from '@/features/active-tabs/manual-groups';
-import { getTabLabel } from '@/features/active-tabs/tab-labels';
-import type { ActiveBrowserTab, ActiveTabsSnapshot, ChromeTabGroupInfo } from '@/features/active-tabs/types';
+import { findDuplicateTabGroups } from '@/features/active-tabs/active-tab-groups';
+import { buildActiveTabWindows } from '@/features/active-tabs/active-tab-windows';
+import type { ActiveBrowserTab, ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import { ActiveWindowSection } from './ActiveWindowSection';
 import { GroupNav } from './GroupNav';
 
 type Props = {
@@ -25,6 +17,8 @@ type Props = {
   refreshKey: number;
 };
 
+const EMPTY_SNAPSHOT: ActiveTabsSnapshot = { windows: [], tabs: [], chromeGroups: [] };
+
 export function ActiveWorkspace({
   busy,
   locale,
@@ -32,61 +26,25 @@ export function ActiveWorkspace({
   onStowTab,
   refreshKey,
 }: Props) {
-  const [tabs, setTabs] = useState<ActiveBrowserTab[]>([]);
-  const [chromeGroups, setChromeGroups] = useState<ChromeTabGroupInfo[]>([]);
-  const [workspace, setWorkspace] = useState<ActiveWorkspaceState | null>(null);
+  const [snapshot, setSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_SNAPSHOT);
+  const [snapshotReady, setSnapshotReady] = useState(false);
   const [closePending, setClosePending] = useState(false);
-  const groupRefs = useRef(new Map<string, HTMLElement>());
+  const targetRefs = useRef(new Map<string, HTMLElement>());
   const closePendingRef = useRef(false);
   const refreshTokenRef = useRef(0);
 
-  function enableChromeTabGroups(state: ActiveWorkspaceState): ActiveWorkspaceState {
-    if (state.chromeTabGroups.enabled) return state;
-
-    return {
-      ...state,
-      chromeTabGroups: {
-        ...state.chromeTabGroups,
-        enabled: true,
-      },
-    };
-  }
-
   async function refresh() {
     const refreshToken = ++refreshTokenRef.current;
-    const [tabsResponse, state] = await Promise.all([
-      sendExtensionMessage<AppResult<ActiveTabsSnapshot>>({ type: 'active-tabs:snapshot' }),
-      getActiveWorkspaceState(),
-    ]);
-
+    const response = await sendExtensionMessage<AppResult<ActiveTabsSnapshot>>({
+      type: 'active-tabs:snapshot',
+    });
     if (refreshToken !== refreshTokenRef.current) return;
-
-    if (!tabsResponse.ok) {
-      onStatus('error', tabsResponse.error.message);
+    setSnapshotReady(true);
+    if (!response.ok) {
+      onStatus('error', response.error.message);
       return;
     }
-
-    const snapshot = tabsResponse.data;
-    const openIds = snapshot.tabs
-      .map((tab) => tab.id)
-      .filter((id): id is number => typeof id === 'number');
-    const prunedManualGroups = pruneManualGroups(state.manualGroups, openIds);
-    const manualGroupsChanged = JSON.stringify(prunedManualGroups) !== JSON.stringify(state.manualGroups);
-    const enabledChromeGroupsState = enableChromeTabGroups(state);
-    const chromeGroupsChanged = enabledChromeGroupsState !== state;
-    const nextState =
-      manualGroupsChanged || chromeGroupsChanged
-        ? await updateActiveWorkspaceState({
-            ...(manualGroupsChanged ? { manualGroups: prunedManualGroups } : {}),
-            ...(chromeGroupsChanged ? { chromeTabGroups: enabledChromeGroupsState.chromeTabGroups } : {}),
-          })
-        : state;
-
-    if (refreshToken !== refreshTokenRef.current) return;
-
-    setTabs(snapshot.tabs);
-    setChromeGroups(snapshot.chromeGroups);
-    setWorkspace(nextState);
+    setSnapshot(response.data);
   }
 
   useEffect(() => {
@@ -128,13 +86,13 @@ export function ActiveWorkspace({
     };
   }, []);
 
-  const groups = useMemo(
-    () => (workspace ? buildActiveTabGroups(tabs, workspace.manualGroups, workspace.order, chromeGroups) : []),
-    [chromeGroups, tabs, workspace],
+  const windows = useMemo(() => buildActiveTabWindows(snapshot), [snapshot]);
+  const duplicateGroups = useMemo(
+    () => findDuplicateTabGroups(snapshot.tabs),
+    [snapshot.tabs],
   );
-  const duplicateGroups = useMemo(() => findDuplicateTabGroups(tabs), [tabs]);
-  const currentWindowId = tabs.find((tab) => tab.active && typeof tab.windowId === 'number')?.windowId
-    ?? tabs.find((tab) => typeof tab.windowId === 'number')?.windowId;
+  const currentWindowId = snapshot.windows.find((window) => window.focused)?.id;
+  const controlsDisabled = busy || closePending || !snapshotReady;
 
   async function closeTabs(tabIds: number[]) {
     if (busy || closePendingRef.current || tabIds.length === 0) return;
@@ -159,10 +117,6 @@ export function ActiveWorkspace({
     }
   }
 
-  const closeDisabled = busy || closePending;
-  const chromeGroupControlsDisabled = busy || closePending || !workspace;
-  const chromeGroupCollapseDisabled = chromeGroupControlsDisabled || typeof currentWindowId !== 'number';
-
   async function focusTab(tab: ActiveBrowserTab) {
     if (typeof tab.id !== 'number' || typeof tab.windowId !== 'number') return;
     const response = await sendExtensionMessage<AppResult<{ focused: true }>>({
@@ -171,64 +125,6 @@ export function ActiveWorkspace({
       windowId: tab.windowId,
     });
     if (!response.ok) onStatus('error', response.error.message);
-  }
-
-  async function removeTabFromManualGroup(tab: ActiveBrowserTab) {
-    if (!workspace || typeof tab.id !== 'number') return;
-    const openTabIds = tabs
-      .map((openTab) => openTab.id)
-      .filter((id): id is number => typeof id === 'number');
-    const manualGroups = pruneManualGroups(clearTabManualGroup(workspace.manualGroups, tab.id), openTabIds);
-    const nextWorkspace = await updateActiveWorkspaceState({ manualGroups });
-    setWorkspace(nextWorkspace);
-    await syncChromeGroupsForWorkspace(nextWorkspace);
-  }
-
-  async function syncChromeGroupsForWorkspace(nextWorkspace: ActiveWorkspaceState) {
-    const syncedInputWorkspace = enableChromeTabGroups(nextWorkspace);
-    const workspaceForSync =
-      syncedInputWorkspace === nextWorkspace
-        ? nextWorkspace
-        : await updateActiveWorkspaceState({ chromeTabGroups: syncedInputWorkspace.chromeTabGroups });
-    if (workspaceForSync !== nextWorkspace) setWorkspace(workspaceForSync);
-    const nextGroups = buildActiveTabGroups(tabs, nextWorkspace.manualGroups, nextWorkspace.order, chromeGroups);
-    const response = await sendExtensionMessage<AppResult<ActiveWorkspaceState['chromeTabGroups']>>({
-      type: 'chrome-tab-groups:sync',
-      groups: nextGroups,
-      state: workspaceForSync.chromeTabGroups,
-    });
-    if (response.ok) {
-      const syncedWorkspace = await updateActiveWorkspaceState({ chromeTabGroups: response.data });
-      setWorkspace(syncedWorkspace);
-      return;
-    }
-    onStatus('error', response.error.message);
-  }
-
-  async function importExistingChromeGroups() {
-    if (!workspace || busy || closePendingRef.current) return;
-    const response = await sendExtensionMessage<
-      AppResult<{
-        manualGroups: ActiveWorkspaceState['manualGroups'];
-        chromeTabGroups: ActiveWorkspaceState['chromeTabGroups'];
-      }>
-    >({
-      type: 'chrome-tab-groups:import',
-      tabs,
-      manualGroups: workspace.manualGroups,
-      state: { ...workspace.chromeTabGroups, enabled: true },
-    });
-    if (response.ok) {
-      setWorkspace(
-        await updateActiveWorkspaceState({
-          manualGroups: response.data.manualGroups,
-          chromeTabGroups: response.data.chromeTabGroups,
-        }),
-      );
-      onStatus('success', 'Imported Chrome tab groups.');
-      return;
-    }
-    onStatus('error', response.error.message);
   }
 
   async function collapseCurrentWindowGroups() {
@@ -245,55 +141,58 @@ export function ActiveWorkspace({
     onStatus('error', response.error.message);
   }
 
+  function registerTarget(key: string, node: HTMLElement | null) {
+    if (node) {
+      targetRefs.current.set(key, node);
+      return;
+    }
+    targetRefs.current.delete(key);
+  }
+
   return (
-    <section className="panel column active-workspace" aria-labelledby="active-tabs-title" data-od-id="active-tabs-column">
+    <section
+      className="panel column active-workspace"
+      aria-labelledby="active-tabs-title"
+      data-od-id="active-tabs-column"
+    >
       <div className="section-header">
         <div>
           <h2 id="active-tabs-title" data-od-id="active-tabs-title">
             {t(locale, 'activeTabs')}
           </h2>
-          <p className="subtle">Equivalent to open Chrome tabs, grouped by domain or manual workspace.</p>
+          <p className="subtle">{t(locale, 'activeTabsSubtitle')}</p>
         </div>
         <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
-          {tabs.length} open
+          {snapshot.tabs.length} open
         </span>
       </div>
 
       <div className="meta-row" data-od-id="active-actions">
-        <span className="status-pill">{t(locale, 'chromeGroupsSynced')}</span>
         <button
           type="button"
           className="secondary-button"
           onClick={() => void refresh()}
-          disabled={chromeGroupControlsDisabled}
+          disabled={controlsDisabled}
         >
           <Layers size={16} aria-hidden="true" />
-          {t(locale, 'refreshChromeGroups')}
+          {t(locale, 'refreshFromChrome')}
         </button>
         <button
           type="button"
           className="secondary-button"
           onClick={() => void collapseCurrentWindowGroups()}
-          disabled={chromeGroupCollapseDisabled}
+          disabled={controlsDisabled || typeof currentWindowId !== 'number'}
         >
           <Layers size={16} aria-hidden="true" />
           {t(locale, 'collapseChromeGroups')}
         </button>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() => void importExistingChromeGroups()}
-          disabled={chromeGroupControlsDisabled}
-        >
-          <Layers size={16} aria-hidden="true" />
-          {t(locale, 'importChromeGroups')}
-        </button>
       </div>
 
       <GroupNav
-        groups={groups}
-        onJump={(groupKey) =>
-          groupRefs.current.get(groupKey)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
+        locale={locale}
+        windows={windows}
+        onJump={(key) =>
+          targetRefs.current.get(key)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
         }
       />
 
@@ -301,8 +200,10 @@ export function ActiveWorkspace({
         <button
           type="button"
           className="secondary-button"
-          onClick={() => void closeTabs(duplicateGroups.flatMap((group) => group.duplicateTabIds))}
-          disabled={closeDisabled}
+          onClick={() =>
+            void closeTabs(duplicateGroups.flatMap((group) => group.duplicateTabIds))
+          }
+          disabled={controlsDisabled}
         >
           <Layers size={16} aria-hidden="true" />
           Close {duplicateGroups.reduce((count, group) => count + group.duplicateTabIds.length, 0)}{' '}
@@ -310,88 +211,19 @@ export function ActiveWorkspace({
         </button>
       )}
 
-      <div className="active-group-list">
-        {groups.map((group) => (
-          <article
-            className="tab-group"
-            key={group.key}
-            ref={(node) => {
-              if (node) {
-                groupRefs.current.set(group.key, node);
-                return;
-              }
-
-              groupRefs.current.delete(group.key);
-            }}
-          >
-            <header>
-              <h3>{group.title}</h3>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={`Close ${group.title} tabs`}
-                onClick={() =>
-                  void closeTabs(
-                    group.tabs
-                      .map((tab) => tab.id)
-                      .filter((id): id is number => typeof id === 'number'),
-                  )
-                }
-                disabled={closeDisabled}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </header>
-            <div className="active-tab-list">
-              {group.tabs.map((tab) => {
-                const tabLabel = getTabLabel(tab);
-
-                return (
-                  <div className="tab-row" key={tab.id ?? tab.url}>
-                    <button className="tab-open-button" type="button" onClick={() => void focusTab(tab)}>
-                      <span className="favicon tone-blue" aria-hidden="true">
-                        {(tabLabel.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
-                      </span>
-                      <span className="tab-copy">
-                        <span className="tab-title">{tabLabel}</span>
-                        <span className="tab-url">{tab.url ?? ''}</span>
-                      </span>
-                    </button>
-                    <div className="row-actions">
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={t(locale, 'saveTabForLater', { label: tabLabel })}
-                        onClick={() => void onStowTab(tab)}
-                        disabled={closeDisabled || typeof tab.id !== 'number'}
-                      >
-                        <Archive size={14} aria-hidden="true" />
-                      </button>
-                      {group.kind === 'manual' && (
-                        <button
-                          type="button"
-                          className="icon-button"
-                          aria-label={t(locale, 'moveToDomainGroup')}
-                          onClick={() => void removeTabFromManualGroup(tab)}
-                        >
-                          <X size={14} aria-hidden="true" />
-                        </button>
-                      )}
-                      <button
-                        type="button"
-                        className="icon-button"
-                        aria-label={`Close ${tabLabel}`}
-                        onClick={() => typeof tab.id === 'number' && void closeTabs([tab.id])}
-                        disabled={closeDisabled}
-                      >
-                        <Trash2 size={14} aria-hidden="true" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </article>
+      <div className="active-window-list">
+        {windows.map((window, displayIndex) => (
+          <ActiveWindowSection
+            disabled={controlsDisabled}
+            displayIndex={displayIndex}
+            key={window.key}
+            locale={locale}
+            window={window}
+            onCloseTabs={(tabIds) => void closeTabs(tabIds)}
+            onFocusTab={(tab) => void focusTab(tab)}
+            onRegisterTarget={registerTarget}
+            onStowTab={(tab) => void onStowTab(tab)}
+          />
         ))}
       </div>
     </section>

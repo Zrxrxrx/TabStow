@@ -2,8 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
-import type { ActiveWorkspaceState } from '@/features/active-tabs/active-workspace-storage';
-import type { ActiveBrowserTab, ActiveTabsSnapshot, ManualGroupsState } from '@/features/active-tabs/types';
+import type { ActiveBrowserTab, ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import { reorderQuickLinks, updateQuickLink, type QuickLink } from '@/features/quick-links/quick-links';
 import type { AppResult } from '@/lib/errors';
 import type { ExtensionMessage, StowResult } from '@/lib/messages';
@@ -14,10 +13,6 @@ import { App } from './App';
 
 const { sendExtensionMessage } = vi.hoisted(() => ({
   sendExtensionMessage: vi.fn(),
-}));
-const { getActiveWorkspaceState, updateActiveWorkspaceState } = vi.hoisted(() => ({
-  getActiveWorkspaceState: vi.fn(),
-  updateActiveWorkspaceState: vi.fn(),
 }));
 const { getQuickLinks, saveQuickLinks, updateQuickLinks } = vi.hoisted(() => ({
   getQuickLinks: vi.fn(),
@@ -56,11 +51,6 @@ const { saveCustomBackgroundFile, resolveCustomBackgroundUrl, deleteCustomBackgr
 
 vi.mock('@/lib/messages', () => ({
   sendExtensionMessage,
-}));
-
-vi.mock('@/features/active-tabs/active-workspace-storage', () => ({
-  getActiveWorkspaceState,
-  updateActiveWorkspaceState,
 }));
 
 vi.mock('@/features/quick-links/quick-links-storage', () => ({
@@ -181,8 +171,6 @@ describe('App', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     sendExtensionMessage.mockReset();
-    getActiveWorkspaceState.mockReset();
-    updateActiveWorkspaceState.mockReset();
     getQuickLinks.mockReset();
     saveQuickLinks.mockReset();
     updateQuickLinks.mockReset();
@@ -199,18 +187,6 @@ describe('App', () => {
     saveCustomBackgroundFile.mockReset();
     resolveCustomBackgroundUrl.mockReset();
     deleteCustomBackground.mockReset();
-    getActiveWorkspaceState.mockResolvedValue(defaultWorkspace());
-    updateActiveWorkspaceState.mockImplementation(
-      async (state: {
-        manualGroups?: ManualGroupsState;
-        chromeTabGroups?: ReturnType<typeof defaultWorkspace>['chromeTabGroups'];
-      }) => ({
-        ...defaultWorkspace(),
-        ...state,
-        manualGroups: state.manualGroups ?? defaultWorkspace().manualGroups,
-        chromeTabGroups: state.chromeTabGroups ?? defaultWorkspace().chromeTabGroups,
-      }),
-    );
     getQuickLinks.mockResolvedValue([]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
     updateQuickLinks.mockImplementation(async (update: (currentLinks: unknown[]) => unknown[] | Promise<unknown[]>) => {
@@ -260,22 +236,41 @@ describe('App', () => {
     container.remove();
   });
 
-  it('renders Chrome group controls below the active workspace header without a duplicate stow hint', async () => {
-    mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
+  it('renders focused Chrome windows, pinned tabs, native groups, and ungrouped tabs in order', async () => {
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 20, windowId: 8, index: 0, pinned: true, title: 'Pinned' },
+      { ...UNIQUE_TAB, id: 21, windowId: 8, index: 1, groupId: -1, title: 'Before' },
+      { ...UNIQUE_TAB, id: 22, windowId: 8, index: 2, groupId: 31, title: 'Grouped' },
+      { ...UNIQUE_TAB, id: 23, windowId: 8, index: 3, groupId: -1, title: 'After' },
+      { ...UNIQUE_TAB, id: 24, windowId: 3, index: 0, groupId: -1, title: 'Other window' },
+    ];
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return {
+          ok: true,
+          data: activeTabsSnapshot(tabs, {
+            focusedWindowId: 8,
+            chromeGroups: [
+              { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: true },
+            ],
+          }),
+        };
+      }
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
 
     await renderApp();
 
-    expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
-    expect(screen().getByText('1 open')).not.toBeNull();
-    expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:snapshot', 'sessions:list']));
-
-    const mainText = container.textContent ?? '';
-    expect(mainText.indexOf('Active tabs')).toBeLessThan(mainText.indexOf('No saved sessions yet.'));
-    expect(container.querySelector('.active-workspace .section-header')).not.toBeNull();
-    expect(container.querySelector('.active-workspace .tabs-toolbar')).not.toBeNull();
-    expect(container.querySelector('.active-workspace .meta-row')).not.toBeNull();
-    expect(() => screen().getByText('Stow this window')).toThrow();
-    expect(container.querySelector('.active-workspace .active-workspace-hint')).toBeNull();
+    expect(screen().getByRole('heading', { name: 'Current window' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Window 2' })).not.toBeNull();
+    expect(screen().getByText('Pinned tabs')).not.toBeNull();
+    expect(screen().getByText('Reading')).not.toBeNull();
+    expect(screen().getByText('Collapsed')).not.toBeNull();
+    const activeText = container.querySelector('.active-window-list')?.textContent ?? '';
+    expect(activeText.indexOf('Before')).toBeLessThan(activeText.indexOf('Reading'));
+    expect(activeText.indexOf('Reading')).toBeLessThan(activeText.indexOf('After'));
+    expect(() => screen().getByText('Import Chrome groups')).toThrow();
   });
 
   it('renders utility panels from stored quick links, todos, and theme preferences', async () => {
@@ -444,16 +439,6 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Close extra drawer' }));
 
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
-  });
-
-  it('shows Chrome group sync as a default passive status instead of a checkbox', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-
-    await renderApp();
-
-    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
-    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
-    expect(sentMessageTypes()).toEqual(expect.arrayContaining(['active-tabs:snapshot', 'sessions:list']));
   });
 
   it('keeps v1 layout class contract stable for CSS', async () => {
@@ -1075,9 +1060,19 @@ describe('App', () => {
 
   it('disables active workspace close controls and guards close reentry while a close is pending', async () => {
     const pendingClose = deferred<AppResult<{ closed: true; tabCount: number }>>();
+    const groupedTabs = DUPLICATE_TABS.map((tab) =>
+      tab.id === 7 ? tab : { ...tab, groupId: 31 },
+    );
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
       if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: activeTabsSnapshot(DUPLICATE_TABS) };
+        return {
+          ok: true,
+          data: activeTabsSnapshot(groupedTabs, {
+            chromeGroups: [
+              { id: 31, windowId: 3, title: 'Issues', color: 'blue', collapsed: false },
+            ],
+          }),
+        };
       }
 
       if (message.type === 'active-tabs:list') {
@@ -1099,15 +1094,13 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Close 2 duplicates' }));
 
     const duplicateClose = screen().getByRole('button', { name: 'Close 2 duplicates' });
-    const groupClose = screen().getByLabelText('Close github com tabs');
+    const groupClose = screen().getByLabelText('Close Issues tabs');
     const singleClose = screen().getByLabelText('Close openai/tabstow Issue #10');
     expect(duplicateClose).toHaveProperty('disabled', true);
     expect(groupClose).toHaveProperty('disabled', true);
     expect(singleClose).toHaveProperty('disabled', true);
-    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
-    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
     expect(closeCalls()).toHaveLength(1);
 
     await click(groupClose);
@@ -1290,211 +1283,22 @@ describe('App', () => {
     expect(safeRow?.getAttribute('href')).toBe('https://docs.example.com/path');
   });
 
-  it('migrates a stored disabled Chrome group sync state on load', async () => {
-    const legacyChromeTabGroups: ActiveWorkspaceState['chromeTabGroups'] = {
-      enabled: false,
-      mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
-    };
-    let storedWorkspace: ActiveWorkspaceState = {
-      ...defaultWorkspace(),
-      chromeTabGroups: legacyChromeTabGroups,
-    };
-    getActiveWorkspaceState.mockImplementation(async () => storedWorkspace);
-    updateActiveWorkspaceState.mockImplementation(async (partial: Partial<ReturnType<typeof defaultWorkspace>>) => {
-      storedWorkspace = {
-        ...storedWorkspace,
-        ...partial,
-        manualGroups: partial.manualGroups ?? storedWorkspace.manualGroups,
-        order: partial.order ?? storedWorkspace.order,
-        chromeTabGroups: partial.chromeTabGroups ?? storedWorkspace.chromeTabGroups,
-      };
-      return storedWorkspace;
-    });
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-
-    await renderApp();
-
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      chromeTabGroups: {
-        enabled: true,
-        mappings: legacyChromeTabGroups.mappings,
-      },
-    });
-  });
-
-  it('syncs cleared manual groups to Chrome groups with legacy disabled sync state forced on', async () => {
-    const syncedChromeGroups: ActiveWorkspaceState['chromeTabGroups'] = {
-      enabled: true,
-      mappings: [],
-    };
-    let storedWorkspace: ActiveWorkspaceState = {
-      ...defaultWorkspace(),
-      manualGroups: {
-        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
-        assignments: { '12': 'manual-1' },
-      },
-      chromeTabGroups: {
-        enabled: false,
-        mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
-      },
-    };
-    getActiveWorkspaceState.mockImplementation(async () => storedWorkspace);
-    updateActiveWorkspaceState.mockImplementation(async (partial: Partial<ReturnType<typeof defaultWorkspace>>) => {
-      storedWorkspace = {
-        ...storedWorkspace,
-        ...partial,
-        manualGroups: partial.manualGroups ?? storedWorkspace.manualGroups,
-        order: partial.order ?? storedWorkspace.order,
-        chromeTabGroups: partial.chromeTabGroups ?? storedWorkspace.chromeTabGroups,
-      };
-      return storedWorkspace;
-    });
+  it('disables Chrome group controls while the active tab snapshot is loading', async () => {
+    const pendingSnapshot = deferred<AppResult<ActiveTabsSnapshot>>();
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
-      if (message.type === 'active-tabs:snapshot') {
-        return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
-      }
+      if (message.type === 'active-tabs:snapshot') return pendingSnapshot.promise;
       if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
-      if (message.type === 'chrome-tab-groups:sync') return { ok: true, data: syncedChromeGroups };
       throw new Error(`Unexpected message: ${message.type}`);
     });
 
     await renderApp();
-    await click(screen().getByLabelText('Move to domain group'));
 
-    expect(sendExtensionMessage).toHaveBeenCalledWith({
-      type: 'chrome-tab-groups:sync',
-      groups: expect.any(Array),
-      state: expect.objectContaining({ enabled: true }),
-    });
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      chromeTabGroups: {
-        enabled: true,
-        mappings: [{ virtualGroupKey: 'manual:manual-1', windowId: 4, chromeGroupId: 88 }],
-      },
-    });
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      chromeTabGroups: syncedChromeGroups,
-    });
-  });
-
-  it('keeps native Chrome group membership when syncing after manual group changes', async () => {
-    const manualTab: ActiveBrowserTab = {
-      active: true,
-      groupId: -1,
-      id: 12,
-      index: 0,
-      pinned: false,
-      title: 'Spec draft',
-      url: 'https://docs.example.com/spec',
-      windowId: 4,
-    };
-    const chromeGroupedTab: ActiveBrowserTab = {
-      active: false,
-      groupId: 31,
-      id: 21,
-      index: 1,
-      pinned: false,
-      title: 'Issue tracker',
-      url: 'https://github.com/openai/tabstow/issues/10',
-      windowId: 4,
-    };
-    let storedWorkspace: ActiveWorkspaceState = {
-      ...defaultWorkspace(),
-      manualGroups: {
-        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
-        assignments: { '12': 'manual-1', '21': 'manual-1' },
-      },
-    };
-    getActiveWorkspaceState.mockImplementation(async () => storedWorkspace);
-    updateActiveWorkspaceState.mockImplementation(async (partial: Partial<ReturnType<typeof defaultWorkspace>>) => {
-      storedWorkspace = {
-        ...storedWorkspace,
-        ...partial,
-        manualGroups: partial.manualGroups ?? storedWorkspace.manualGroups,
-        order: partial.order ?? storedWorkspace.order,
-        chromeTabGroups: partial.chromeTabGroups ?? storedWorkspace.chromeTabGroups,
-      };
-      return storedWorkspace;
-    });
-    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
-      if (message.type === 'active-tabs:snapshot') {
-        return {
-          ok: true,
-          data: activeTabsSnapshot([manualTab, chromeGroupedTab], {
-            chromeGroups: [{ id: 31, windowId: 4, title: 'Reading', color: 'blue', collapsed: false }],
-          }),
-        };
-      }
-      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
-      if (message.type === 'chrome-tab-groups:sync') return { ok: true, data: message.state };
-      throw new Error(`Unexpected message: ${message.type}`);
-    });
-
-    await renderApp();
-    await click(screen().getByLabelText('Move to domain group'));
-
-    const syncCall = sendExtensionMessage.mock.calls
-      .map(([message]) => message as ExtensionMessage)
-      .find((message) => message.type === 'chrome-tab-groups:sync') as Extract<
-      ExtensionMessage,
-      { type: 'chrome-tab-groups:sync' }
-    >;
-
-    expect(syncCall).toMatchObject({
-      type: 'chrome-tab-groups:sync',
-      groups: expect.arrayContaining([
-        expect.objectContaining({
-          kind: 'domain',
-          tabs: [expect.objectContaining({ id: 12 })],
-        }),
-        expect.objectContaining({
-          key: 'chrome:4:31',
-          kind: 'chrome',
-          title: 'Reading',
-          tabs: [expect.objectContaining({ id: 21 })],
-        }),
-      ]),
-    });
-    expect(syncCall.groups).not.toEqual(expect.arrayContaining([expect.objectContaining({ kind: 'manual' })]));
-  });
-
-  it('clears a manual group assignment when moving a tab back to its domain group', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    getActiveWorkspaceState.mockResolvedValue({
-      ...defaultWorkspace(),
-      manualGroups: {
-        groups: [{ id: 'manual-1', name: 'Launch', createdAt: '2026-07-07T00:00:00.000Z' }],
-        assignments: { '12': 'manual-1' },
-      },
-    });
-
-    await renderApp();
-    await click(screen().getByLabelText('Move to domain group'));
-
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      manualGroups: {
-        groups: [],
-        assignments: {},
-      },
-    });
-  });
-
-  it('disables Chrome group controls while the active workspace state is loading', async () => {
-    const pendingWorkspace = deferred<ReturnType<typeof defaultWorkspace>>();
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    getActiveWorkspaceState.mockReturnValue(pendingWorkspace.promise);
-
-    await renderApp();
-
-    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
-    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
-    expect(screen().getByText('Refresh Chrome groups')).toHaveProperty('disabled', true);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
 
-    pendingWorkspace.resolve(defaultWorkspace());
+    pendingSnapshot.resolve({ ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) });
     await act(async () => {
-      await pendingWorkspace.promise;
+      await pendingSnapshot.promise;
     });
   });
 
@@ -1506,45 +1310,15 @@ describe('App', () => {
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
   });
 
-  it('imports existing Chrome tab groups into the active workspace state', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-
-    await renderApp();
-    await click(screen().getByText('Import Chrome groups'));
-
-    expect(sendExtensionMessage).toHaveBeenCalledWith({
-      type: 'chrome-tab-groups:import',
-      tabs: [UNIQUE_TAB],
-      manualGroups: {
-        groups: [],
-        assignments: {},
-      },
-      state: {
-        enabled: true,
-        mappings: [],
-      },
-    });
-    expect(updateActiveWorkspaceState).toHaveBeenCalledWith({
-      manualGroups: {
-        groups: [],
-        assignments: {},
-      },
-      chromeTabGroups: {
-        enabled: true,
-        mappings: [],
-      },
-    });
-  });
-
-  it('collapses Chrome groups for the active window', async () => {
-    mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
+  it('collapses groups in the focused Chrome window from snapshot metadata', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], focusedWindowId: 4 });
 
     await renderApp();
     await click(screen().getByText('Collapse Chrome groups'));
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'chrome-tab-groups:collapse-window',
-      windowId: 3,
+      windowId: 4,
     });
   });
 
@@ -1618,11 +1392,8 @@ describe('App', () => {
     await click(screen().getByText('Stow current window'));
 
     expect(() => screen().getByText('Stow this window')).toThrow();
-    expect(container.querySelector('.active-workspace .meta-row input[type="checkbox"]')).toBeNull();
-    expect(screen().getByText('Chrome groups synced')).not.toBeNull();
-    expect(screen().getByText('Refresh Chrome groups')).toHaveProperty('disabled', true);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
     expect(screen().getByText('Collapse Chrome groups')).toHaveProperty('disabled', true);
-    expect(screen().getByText('Import Chrome groups')).toHaveProperty('disabled', true);
 
     pendingStow.resolve({
       ok: true,
@@ -1883,14 +1654,6 @@ describe('App', () => {
   });
 });
 
-function defaultWorkspace(): ActiveWorkspaceState {
-  return {
-    manualGroups: { groups: [], assignments: {} },
-    order: { groupOrder: [], pinnedGroupKeys: [], groupTabOrder: {} },
-    chromeTabGroups: { enabled: true, mappings: [] },
-  };
-}
-
 function activeTabsSnapshot(
   tabs: ActiveBrowserTab[],
   options: {
@@ -1973,20 +1736,6 @@ function mockMessages({
     if (message.type === 'quick-links:reorder') {
       const saved = await saveQuickLinks(reorderQuickLinks((await getQuickLinks()) as QuickLink[], message.orderedIds));
       return { ok: true, data: saved };
-    }
-
-    if (message.type === 'chrome-tab-groups:sync') {
-      return { ok: true, data: message.state };
-    }
-
-    if (message.type === 'chrome-tab-groups:import') {
-      return {
-        ok: true,
-        data: {
-          manualGroups: message.manualGroups,
-          chromeTabGroups: message.state,
-        },
-      };
     }
 
     if (message.type === 'chrome-tab-groups:collapse-window') {

@@ -46,7 +46,9 @@ describe('i18n', () => {
     expect(t('zh-CN', 'surfaceTransparency')).toBe('界面透明度');
     expect(t('zh-CN', 'language')).toBe('语言');
     expect(t('zh-CN', 'customBackground')).toBe('自定义背景');
-    expect(t('zh-CN', 'syncManualGroups')).toBe('同步手动分组到 Chrome 标签页分组');
+    expect(t('zh-CN', 'windowNumber', { number: 2 })).toBe('窗口 2');
+    expect(t('zh-CN', 'chromeGroupFallback', { id: 31 })).toBe('Chrome 分组 31');
+    expect(t('zh-CN', 'dragTab', { label: '示例' })).toBe('拖动 示例');
     expect(t('zh-CN', 'moveToManualGroup')).toBe('移至手动分组');
     expect(t('zh-CN', 'saveTabForLater', { label: '示例' })).toBe('保存 示例 到稍后查看');
     expect(t('zh-CN', 'quickLinkUrl')).toBe('快捷链接网址');
