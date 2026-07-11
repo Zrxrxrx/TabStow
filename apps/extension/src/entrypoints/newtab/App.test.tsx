@@ -501,6 +501,104 @@ describe('App', () => {
     expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', false);
   });
 
+  it('keeps a drag pending until a superseding Chrome refresh settles', async () => {
+    const staleRefresh = deferred<AppResult<ActiveTabsSnapshot>>();
+    const latestRefresh = deferred<AppResult<ActiveTabsSnapshot>>();
+    const blockedSecondMove = deferred<AppResult<{ moved: boolean }>>();
+    const initialTabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },
+      { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
+    ];
+    const staleTabs = initialTabs.map((tab) =>
+      tab.id === 21 ? { ...tab, title: 'Stale Chrome state' } : tab,
+    );
+    const latestTabs = initialTabs.map((tab) =>
+      tab.id === 21 ? { ...tab, title: 'Newest Chrome state' } : tab,
+    );
+    const snapshotOptions = {
+      focusedWindowId: 8,
+      chromeGroups: [
+        { id: 31, windowId: 8, title: 'Reading', color: 'blue', collapsed: false },
+      ] satisfies ActiveTabsSnapshot['chromeGroups'],
+    };
+    let emitTabUpdated: (() => void) | undefined;
+    const onUpdated = {
+      addListener: vi.fn((listener: () => void) => {
+        emitTabUpdated = listener;
+      }),
+      removeListener: vi.fn(),
+    };
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: {
+        runtime: chromeRuntimeMocks,
+        tabs: { onUpdated },
+      },
+    });
+    let snapshotCalls = 0;
+    let moveCalls = 0;
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        snapshotCalls += 1;
+        if (snapshotCalls === 1) {
+          return { ok: true, data: activeTabsSnapshot(initialTabs, snapshotOptions) };
+        }
+        if (snapshotCalls === 2) return staleRefresh.promise;
+        if (snapshotCalls === 3) return latestRefresh.promise;
+        throw new Error(`Unexpected snapshot call: ${snapshotCalls}`);
+      }
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'active-tabs:move-tab') {
+        moveCalls += 1;
+        return moveCalls === 1
+          ? { ok: true, data: { moved: true } }
+          : blockedSecondMove.promise;
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+    await renderApp();
+
+    const transfer = createDataTransfer();
+    await dragStart(screen().getByLabelText('Drag Before'), transfer);
+    await drop(screen().getByLabelText('Drop into Reading'), transfer);
+    await act(async () => {
+      await Promise.resolve();
+    });
+    expect(snapshotCalls).toBe(2);
+
+    await act(async () => {
+      emitTabUpdated?.();
+      await new Promise((resolve) => window.setTimeout(resolve, 175));
+    });
+    expect(snapshotCalls).toBe(3);
+
+    staleRefresh.resolve({ ok: true, data: activeTabsSnapshot(staleTabs, snapshotOptions) });
+    await act(async () => {
+      await staleRefresh.promise;
+      await Promise.resolve();
+    });
+
+    const dragHandle = screen().getByLabelText('Drag Before');
+    expect(dragHandle).toHaveProperty('disabled', true);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', true);
+    expect(() => screen().getByText('Stale Chrome state')).toThrow();
+
+    const secondTransfer = createDataTransfer();
+    await dragStart(dragHandle, secondTransfer);
+    await drop(screen().getByLabelText('Drop into Reading'), secondTransfer);
+    expect(moveCalls).toBe(1);
+
+    latestRefresh.resolve({ ok: true, data: activeTabsSnapshot(latestTabs, snapshotOptions) });
+    await act(async () => {
+      await latestRefresh.promise;
+      await Promise.resolve();
+    });
+
+    expect(screen().getByText('Newest Chrome state')).not.toBeNull();
+    expect(screen().getByLabelText('Drag Newest Chrome state')).toHaveProperty('disabled', false);
+    expect(screen().getByText('Refresh from Chrome')).toHaveProperty('disabled', false);
+  });
+
   it('reports a failed move and refreshes Chrome state', async () => {
     const tabs: ActiveBrowserTab[] = [
       { ...UNIQUE_TAB, id: 21, windowId: 8, index: 0, groupId: -1, title: 'Before' },

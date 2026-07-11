@@ -48,6 +48,7 @@ export function ActiveWorkspace({
   const dragSourceRef = useRef<ActiveTabsDragSource | null>(null);
   const movePendingRef = useRef(false);
   const refreshTokenRef = useRef(0);
+  const authoritativeRefreshWaitersRef = useRef(new Set<() => void>());
 
   async function refresh() {
     const refreshToken = ++refreshTokenRef.current;
@@ -58,9 +59,20 @@ export function ActiveWorkspace({
     setSnapshotReady(true);
     if (!response.ok) {
       onStatus('error', response.error.message);
-      return;
+    } else {
+      setSnapshot(response.data);
     }
-    setSnapshot(response.data);
+
+    const waiters = [...authoritativeRefreshWaitersRef.current];
+    authoritativeRefreshWaitersRef.current.clear();
+    for (const resolve of waiters) resolve();
+  }
+
+  function refreshThroughLatest(): Promise<void> {
+    return new Promise((resolve) => {
+      authoritativeRefreshWaitersRef.current.add(resolve);
+      void refresh();
+    });
   }
 
   useEffect(() => {
@@ -215,7 +227,7 @@ export function ActiveWorkspace({
             });
       if (!response.ok) onStatus('error', response.error.message);
     } finally {
-      await refresh();
+      await refreshThroughLatest();
       movePendingRef.current = false;
       setMovePending(false);
       endDrag();
