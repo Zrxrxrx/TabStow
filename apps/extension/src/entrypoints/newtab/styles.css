@@ -382,6 +382,63 @@ h3 {
   background: var(--surface-warm);
 }
 
+.workspace-container {
+  display: grid;
+  gap: 12px;
+}
+
+.workspace-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 14px;
+  background: color-mix(in oklab, rgba(var(--surface-rgb), var(--surface-opacity)), var(--bg) 14%);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--elev-ring);
+}
+
+.workspace-search {
+  min-width: 0;
+  min-height: 42px;
+  flex: 1 1 auto;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 0 8px 0 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.workspace-search input {
+  width: 100%;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: inherit;
+}
+
+.workspace-search-clear {
+  width: 30px;
+  min-height: 30px;
+}
+
+.workspace-history-link {
+  min-height: 42px;
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 12px;
+  color: inherit;
+  border-radius: var(--radius-md);
+  text-decoration: none;
+}
+
 .workspace-grid {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(460px, 1fr);
@@ -927,6 +984,15 @@ h3 {
 
   .quick-link-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .workspace-header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .workspace-history-link {
+    align-self: flex-start;
   }
 
   .tab-row,

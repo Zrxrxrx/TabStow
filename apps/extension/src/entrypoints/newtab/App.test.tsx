@@ -332,6 +332,121 @@ describe('App', () => {
     expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'import'].join(':'));
   });
 
+  it('filters active and saved tabs locally while keeping web search and tab actions available', async () => {
+    const sessions: TabSession[] = [
+      {
+        id: 'work',
+        title: 'Work',
+        tabs: [
+          {
+            id: 'saved-github',
+            title: 'GitHub saved issue',
+            url: 'https://github.com/openai/tabstow/issues/44',
+            createdAt: '2026-07-11T00:00:00.000Z',
+          },
+          {
+            id: 'saved-mail',
+            title: 'Saved mail',
+            url: 'https://mail.example.com/inbox',
+            createdAt: '2026-07-11T00:00:00.000Z',
+          },
+        ],
+        createdAt: '2026-07-11T00:00:00.000Z',
+        updatedAt: '2026-07-11T00:00:00.000Z',
+        deviceId: 'device-1',
+      },
+      {
+        id: 'reading',
+        title: 'Reading',
+        tabs: [
+          {
+            id: 'saved-article',
+            title: 'Saved article',
+            url: 'https://example.com/article',
+            createdAt: '2026-07-11T00:00:00.000Z',
+          },
+        ],
+        createdAt: '2026-07-10T00:00:00.000Z',
+        updatedAt: '2026-07-10T00:00:00.000Z',
+        deviceId: 'device-1',
+      },
+    ];
+    mockMessages({
+      activeTabs: [
+        {
+          ...UNIQUE_TAB,
+          groupId: 31,
+          id: 22,
+          index: 0,
+          title: 'GitHub active issue',
+          url: 'https://github.example.com/openai/tabstow/issues/45',
+          windowId: 8,
+        },
+        {
+          ...UNIQUE_TAB,
+          groupId: 32,
+          id: 23,
+          index: 1,
+          title: 'Active mail',
+          url: 'https://mail.example.com/inbox',
+          windowId: 8,
+        },
+        {
+          ...UNIQUE_TAB,
+          groupId: -1,
+          id: 24,
+          index: 0,
+          title: 'Other window docs',
+          url: 'https://docs.example.com',
+          windowId: 12,
+        },
+      ],
+      chromeGroups: [
+        { id: 31, windowId: 8, title: 'GitHub group', color: 'blue', collapsed: false },
+        { id: 32, windowId: 8, title: 'Mail group', color: 'red', collapsed: false },
+      ],
+      focusedWindowId: 8,
+      sessions,
+    });
+
+    await renderApp();
+
+    expect(screen().getByLabelText('Search the web')).not.toBeNull();
+    const tabSearch = screen().getByLabelText('Search active and saved tabs');
+    expect(tabSearch.getAttribute('type')).toBe('search');
+    expect(
+      container.querySelector<HTMLAnchorElement>('.workspace-history-link')?.getAttribute('href'),
+    ).toBe('chrome-extension://tabstow-test/history.html');
+
+    await change(tabSearch, 'GITHUB');
+
+    expect(screen().getByText('GitHub active issue')).not.toBeNull();
+    expect(screen().getByText('GitHub group')).not.toBeNull();
+    expect(screen().getByText('GitHub saved issue')).not.toBeNull();
+    expect(container.textContent).not.toContain('Active mail');
+    expect(container.textContent).not.toContain('Mail group');
+    expect(container.textContent).not.toContain('Other window docs');
+    expect(container.textContent).not.toContain('Saved mail');
+    expect(container.textContent).not.toContain('Saved article');
+    expect(screen().getByText('1 open')).not.toBeNull();
+    expect(screen().getByText('1 sessions')).not.toBeNull();
+    expect(screen().getByText('1 tabs')).not.toBeNull();
+
+    const dragHandle = screen().getByLabelText('Drag GitHub active issue') as HTMLButtonElement;
+    expect(dragHandle.disabled).toBe(true);
+    expect(dragHandle.draggable).toBe(false);
+    expect(
+      screen().getByText('GitHub active issue').closest('button') as HTMLButtonElement,
+    ).toHaveProperty('disabled', false);
+    expect(
+      screen().getByLabelText('Save GitHub active issue for later') as HTMLButtonElement,
+    ).toHaveProperty('disabled', false);
+    expect(
+      screen().getByLabelText('Close GitHub active issue') as HTMLButtonElement,
+    ).toHaveProperty('disabled', false);
+    expect(sentMessageTypes()).not.toContain('active-tabs:search');
+  });
+
   it('coalesces Chrome tab, group, and window events into one refresh', async () => {
     vi.useFakeTimers();
     mockMessages({ activeTabs: [UNIQUE_TAB], focusedWindowId: 4 });
@@ -723,6 +838,7 @@ describe('App', () => {
           locale="en"
           onStatus={onStatus}
           onStowTab={async () => {}}
+          query=""
           refreshKey={0}
         />,
       );

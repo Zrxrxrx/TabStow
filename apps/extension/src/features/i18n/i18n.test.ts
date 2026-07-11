@@ -32,6 +32,9 @@ describe('i18n', () => {
     expect(t('en', 'showQuickLinksMode')).toBe('Show quick links');
     expect(t('en', 'lightMode')).toBe('Light mode');
     expect(t('en', 'darkMode')).toBe('Dark mode');
+    expect(t('en', 'searchTabs')).toBe('Search active and saved tabs');
+    expect(t('en', 'clearTabSearch')).toBe('Clear tab search');
+    expect(t('en', 'history')).toBe('History');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -66,6 +69,9 @@ describe('i18n', () => {
     expect(t('zh-CN', 'showQuickLinksMode')).toBe('显示快捷链接');
     expect(t('zh-CN', 'lightMode')).toBe('浅色模式');
     expect(t('zh-CN', 'darkMode')).toBe('深色模式');
+    expect(t('zh-CN', 'searchTabs')).toBe('搜索打开和已保存的标签页');
+    expect(t('zh-CN', 'clearTabSearch')).toBe('清除标签页搜索');
+    expect(t('zh-CN', 'history')).toBe('历史记录');
   });
 
   it('interpolates variables in message templates', async () => {

@@ -16,6 +16,7 @@ import { SearchBox } from './components/SearchBox';
 import { StowedSessions } from './components/StowedSessions';
 import { ThemeControls, useThemePreferencesController } from './components/ThemeControls';
 import { TodosPanel } from './components/TodosPanel';
+import { WorkspaceSearch } from './components/WorkspaceSearch';
 
 type StatusState = {
   tone: 'info' | 'success' | 'error';
@@ -29,6 +30,7 @@ export function App() {
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const [extraOpen, setExtraOpen] = useState(false);
+  const [tabQuery, setTabQuery] = useState('');
   const busyActionRef = useRef<string | null>(null);
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
   const themeControls = useThemePreferencesController();
@@ -204,36 +206,41 @@ export function App() {
 
         <QuickLinks disabled={busyAction !== null} locale={locale} refreshKey={activeWorkspaceRefreshKey} />
 
-        <section className="workspace-grid" aria-label="Tab workspace" data-od-id="workspace-grid">
-          <ActiveWorkspace
-            busy={busyAction !== null}
-            locale={locale}
-            onStatus={(tone, message) => setStatus({ tone, message })}
-            refreshKey={activeWorkspaceRefreshKey}
-            onStowTab={(tab) => {
-              const tabId = tab.id;
-              if (typeof tabId !== 'number') return Promise.resolve();
+        <section className="workspace-container" aria-label="Tab workspace">
+          <WorkspaceSearch locale={locale} value={tabQuery} onChange={setTabQuery} />
+          <section className="workspace-grid" data-od-id="workspace-grid">
+            <ActiveWorkspace
+              busy={busyAction !== null}
+              locale={locale}
+              onStatus={(tone, message) => setStatus({ tone, message })}
+              query={tabQuery}
+              refreshKey={activeWorkspaceRefreshKey}
+              onStowTab={(tab) => {
+                const tabId = tab.id;
+                if (typeof tabId !== 'number') return Promise.resolve();
 
-              return runAction<StowResult>(
-                `stow-tab-${tabId}`,
-                () =>
-                  sendExtensionMessage<AppResult<StowResult>>({
-                    type: 'sessions:stow-tab',
-                    tabId,
-                  }),
-                (result) =>
-                  `Saved ${result.savedTabCount} tab for later and closed ${result.closedTabCount}.`,
-              );
-            }}
-          />
+                return runAction<StowResult>(
+                  `stow-tab-${tabId}`,
+                  () =>
+                    sendExtensionMessage<AppResult<StowResult>>({
+                      type: 'sessions:stow-tab',
+                      tabId,
+                    }),
+                  (result) =>
+                    `Saved ${result.savedTabCount} tab for later and closed ${result.closedTabCount}.`,
+                );
+              }}
+            />
 
-          <StowedSessions
-            busyAction={busyAction}
-            locale={locale}
-            onRunAction={runAction}
-            sessions={sessions}
-            status={status}
-          />
+            <StowedSessions
+              busyAction={busyAction}
+              locale={locale}
+              onRunAction={runAction}
+              query={tabQuery}
+              sessions={sessions}
+              status={status}
+            />
+          </section>
         </section>
       </main>
 

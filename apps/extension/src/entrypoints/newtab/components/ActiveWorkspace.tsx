@@ -10,6 +10,7 @@ import type {
   ActiveTabsSnapshot,
 } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
+import { filterActiveTabsSnapshot } from '@/features/tab-search/tab-search';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import {
@@ -26,6 +27,7 @@ type Props = {
   locale: Locale;
   onStatus: (tone: 'success' | 'error', message: string) => void;
   onStowTab: (tab: ActiveBrowserTab) => Promise<void>;
+  query: string;
   refreshKey: number;
 };
 
@@ -36,6 +38,7 @@ export function ActiveWorkspace({
   locale,
   onStatus,
   onStowTab,
+  query,
   refreshKey,
 }: Props) {
   const [snapshot, setSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_SNAPSHOT);
@@ -113,12 +116,17 @@ export function ActiveWorkspace({
     };
   }, []);
 
-  const windows = useMemo(() => buildActiveTabWindows(snapshot), [snapshot]);
+  const filteredSnapshot = useMemo(
+    () => filterActiveTabsSnapshot(snapshot, query),
+    [query, snapshot],
+  );
+  const windows = useMemo(() => buildActiveTabWindows(filteredSnapshot), [filteredSnapshot]);
   const duplicateGroups = useMemo(
-    () => findDuplicateTabGroups(snapshot.tabs),
-    [snapshot.tabs],
+    () => findDuplicateTabGroups(filteredSnapshot.tabs),
+    [filteredSnapshot.tabs],
   );
   const controlsDisabled = busy || closePending || movePending || !snapshotReady;
+  const dragDisabled = controlsDisabled || query.trim() !== '';
 
   async function closeTabs(tabIds: number[]) {
     if (busy || closePendingRef.current || movePendingRef.current || tabIds.length === 0) return;
@@ -163,7 +171,7 @@ export function ActiveWorkspace({
 
   function startDrag(event: DragEvent, source: ActiveTabsDragSource) {
     event.stopPropagation();
-    if (controlsDisabled || movePendingRef.current) {
+    if (dragDisabled || movePendingRef.current) {
       event.preventDefault();
       return;
     }
@@ -234,7 +242,7 @@ export function ActiveWorkspace({
           <p className="subtle">{t(locale, 'activeTabsSubtitle')}</p>
         </div>
         <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
-          {snapshot.tabs.length} open
+          {filteredSnapshot.tabs.length} open
         </span>
       </div>
 
@@ -267,6 +275,7 @@ export function ActiveWorkspace({
             activeDropTargetKey={activeDropTargetKey}
             disabled={controlsDisabled}
             displayIndex={displayIndex}
+            dragDisabled={dragDisabled}
             dragSource={dragSource}
             key={window.key}
             locale={locale}

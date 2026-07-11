@@ -19,6 +19,7 @@ type Props = {
   activeDropTargetKey: string | null;
   disabled: boolean;
   displayIndex: number;
+  dragDisabled: boolean;
   dragSource: ActiveTabsDragSource | null;
   locale: Locale;
   window: ActiveTabWindow;
@@ -178,7 +179,7 @@ export function ActiveWindowSection(props: Props) {
     return (
       <DropZone
         activeKey={props.activeDropTargetKey}
-        disabled={props.disabled}
+        disabled={props.dragDisabled}
         dragSource={props.dragSource}
         label={label}
         target={target}
@@ -195,8 +196,8 @@ export function ActiveWindowSection(props: Props) {
         <button
           type="button"
           className="drag-handle"
-          draggable={!props.disabled}
-          disabled={props.disabled}
+          draggable={!props.dragDisabled}
+          disabled={props.dragDisabled}
           aria-label={t(props.locale, 'dragTab', { label })}
           onDragStart={(event) =>
             props.onDragStart(event, {
@@ -278,7 +279,7 @@ export function ActiveWindowSection(props: Props) {
     const label = itemLabel(item, props.locale);
     const target = groupEndTarget(props.window, item.groupId);
     const accepts = Boolean(
-      !props.disabled &&
+      !props.dragDisabled &&
         props.dragSource &&
         resolveActiveTabsDropRequest(props.dragSource, target),
     );
@@ -320,8 +321,8 @@ export function ActiveWindowSection(props: Props) {
             <button
               type="button"
               className="drag-handle"
-              draggable={!props.disabled}
-              disabled={props.disabled}
+              draggable={!props.dragDisabled}
+              disabled={props.dragDisabled}
               aria-label={t(props.locale, 'dragGroup', { label })}
               onDragStart={(event) =>
                 props.onDragStart(event, {

@@ -4,6 +4,7 @@ import type { TabSession } from '@tabstow/core';
 import { StatusMessage } from '@/components/StatusMessage';
 import { TabFavicon } from '@/components/TabFavicon';
 import { t, type Locale } from '@/features/i18n/i18n';
+import { filterSavedSessions } from '@/features/tab-search/tab-search';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type SyncResult } from '@/lib/messages';
 
@@ -15,6 +16,7 @@ type StatusState = {
 type Props = {
   busyAction: string | null;
   locale: Locale;
+  query: string;
   sessions: TabSession[];
   status: StatusState;
   onRunAction: <T>(
@@ -81,12 +83,17 @@ export function StowedSessions({
   busyAction,
   locale,
   onRunAction,
+  query,
   sessions,
   status,
 }: Props) {
+  const filteredSessions = useMemo(
+    () => filterSavedSessions(sessions, query),
+    [query, sessions],
+  );
   const totalTabs = useMemo(
-    () => sessions.reduce((count, session) => count + session.tabs.length, 0),
-    [sessions],
+    () => filteredSessions.reduce((count, session) => count + session.tabs.length, 0),
+    [filteredSessions],
   );
 
   return (
@@ -99,7 +106,7 @@ export function StowedSessions({
           <p className="subtle">{t(locale, 'savedSessionsSubtitle')}</p>
         </div>
         <span className="meta-row" id="saved-count" aria-label="Saved sessions and tabs count">
-          <span className="meta-pill">{sessions.length} sessions</span>
+          <span className="meta-pill">{filteredSessions.length} sessions</span>
           <span className="meta-pill">{totalTabs} tabs</span>
         </span>
       </header>
@@ -140,10 +147,10 @@ export function StowedSessions({
       <StatusMessage message={status.message} tone={status.tone} />
 
       <section className="session-list" aria-label="Saved sessions">
-        {sessions.length === 0 ? (
+        {filteredSessions.length === 0 ? (
           <div className="empty-state">{t(locale, 'noSavedSessions')}</div>
         ) : (
-          sessions.map((session) => (
+          filteredSessions.map((session) => (
             <article className="session-card" key={session.id}>
               <header>
                 <div className="tab-copy">
