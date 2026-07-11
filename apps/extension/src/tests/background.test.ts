@@ -57,6 +57,8 @@ const activeTabsMocks = vi.hoisted(() => ({
   focusActiveTab: vi.fn(),
   listActiveTabs: vi.fn(),
   listActiveTabsSnapshot: vi.fn(),
+  moveActiveTab: vi.fn(),
+  moveActiveTabGroup: vi.fn(),
   runDefaultSearch: vi.fn(),
 }));
 
@@ -83,6 +85,10 @@ vi.mock('@/features/settings/settings-storage', () => settingsMocks);
 vi.mock('@/features/sync/sync-service', () => syncMocks);
 vi.mock('@/features/tabs/session-service', () => sessionServiceMocks);
 vi.mock('@/features/active-tabs/active-tabs-service', () => activeTabsMocks);
+vi.mock('@/features/active-tabs/active-tab-moves', () => ({
+  moveActiveTab: activeTabsMocks.moveActiveTab,
+  moveActiveTabGroup: activeTabsMocks.moveActiveTabGroup,
+}));
 vi.mock('@/features/chrome-tab-groups/chrome-tab-groups', () => chromeTabGroupMocks);
 vi.mock('@/features/quick-links/quick-links', () => ({
   reorderQuickLinks: quickLinkMocks.reorderQuickLinks,
@@ -187,6 +193,39 @@ describe('background message routing', () => {
     await dispatchRuntimeMessage({ type: 'active-tabs:close', tabIds: [11, 12] });
 
     expect(activeTabsMocks.closeActiveTabs).toHaveBeenCalledWith([11, 12]);
+  });
+
+  it('routes semantic tab move messages', async () => {
+    const request = {
+      tabId: 10,
+      destination: {
+        windowId: 2,
+        lane: { kind: 'ungrouped' as const },
+        position: { kind: 'end' as const },
+      },
+    };
+    activeTabsMocks.moveActiveTab.mockResolvedValue({ ok: true, data: { moved: false } });
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'active-tabs:move-tab', request });
+
+    expect(activeTabsMocks.moveActiveTab).toHaveBeenCalledWith(request);
+    expect(response).toEqual({ ok: true, data: { moved: false } });
+  });
+
+  it('routes semantic group move messages', async () => {
+    const request = {
+      groupId: 31,
+      sourceWindowId: 2,
+      destination: { windowId: 3, position: { kind: 'end' as const } },
+    };
+    activeTabsMocks.moveActiveTabGroup.mockResolvedValue({ ok: true, data: { moved: true } });
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'active-tabs:move-group', request });
+
+    expect(activeTabsMocks.moveActiveTabGroup).toHaveBeenCalledWith(request);
+    expect(response).toEqual({ ok: true, data: { moved: true } });
   });
 
   it('responds to active tab snapshot messages through sendResponse', async () => {

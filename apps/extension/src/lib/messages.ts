@@ -2,7 +2,10 @@ import type { ExtensionSettings, TabSession } from '@tabstow/core';
 import type { ChromeTabGroupsState } from '@/features/active-tabs/active-workspace-storage';
 import type {
   ActiveBrowserTab,
+  ActiveGroupMoveRequest,
   ActiveTabGroup,
+  ActiveTabMoveRequest,
+  ActiveTabsMoveResult,
   ActiveTabsSnapshot,
   ManualGroupsState,
 } from '@/features/active-tabs/types';
@@ -34,6 +37,8 @@ export type ExtensionMessage =
   | { type: 'sessions:delete'; sessionId: string }
   | { type: 'active-tabs:list' }
   | { type: 'active-tabs:snapshot' }
+  | { type: 'active-tabs:move-tab'; request: ActiveTabMoveRequest }
+  | { type: 'active-tabs:move-group'; request: ActiveGroupMoveRequest }
   | { type: 'active-tabs:focus'; tabId: number; windowId: number }
   | { type: 'active-tabs:close'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
@@ -59,6 +64,7 @@ export type ExtensionMessageResponse =
   | AppResult<TabSession>
   | AppResult<StowResult>
   | AppResult<ActiveBrowserTab[]>
+  | AppResult<ActiveTabsMoveResult>
   | AppResult<ActiveTabsSnapshot>
   | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>

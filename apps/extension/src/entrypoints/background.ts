@@ -11,6 +11,10 @@ import {
   runDefaultSearch,
 } from '@/features/active-tabs/active-tabs-service';
 import {
+  moveActiveTab,
+  moveActiveTabGroup,
+} from '@/features/active-tabs/active-tab-moves';
+import {
   collapseChromeTabGroups,
   importChromeTabGroups,
   syncChromeTabGroups,
@@ -57,6 +61,10 @@ async function handleMessage(
         return listActiveTabs();
       case 'active-tabs:snapshot':
         return listActiveTabsSnapshot();
+      case 'active-tabs:move-tab':
+        return moveActiveTab(message.request);
+      case 'active-tabs:move-group':
+        return moveActiveTabGroup(message.request);
       case 'active-tabs:focus':
         return focusActiveTab(message.tabId, message.windowId);
       case 'active-tabs:close':

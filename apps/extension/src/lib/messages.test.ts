@@ -40,4 +40,21 @@ describe('sendExtensionMessage', () => {
       },
     });
   });
+
+  it('returns semantic tab move responses unchanged', async () => {
+    const request = {
+      tabId: 10,
+      destination: {
+        windowId: 2,
+        lane: { kind: 'ungrouped' as const },
+        position: { kind: 'end' as const },
+      },
+    };
+    const response = { ok: true as const, data: { moved: false } };
+    browserMocks.runtime.sendMessage.mockResolvedValue(response);
+
+    await expect(
+      sendExtensionMessage({ type: 'active-tabs:move-tab', request }),
+    ).resolves.toBe(response);
+  });
 });
