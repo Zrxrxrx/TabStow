@@ -21,6 +21,7 @@ const session: TabSession = {
   id: 'session-1',
   title: 'Session',
   tabs: [],
+  sortOrder: 0,
   createdAt: '2026-07-06T00:00:00.000Z',
   updatedAt: '2026-07-06T00:00:00.000Z',
   deviceId: 'device-1',
@@ -54,9 +55,14 @@ describe('sync documents', () => {
       settings,
     });
 
-    expect(document.settings).not.toHaveProperty('githubToken');
-    expect(document.settings).not.toHaveProperty('theme');
-    expect(parseSyncDocument(document).sessions).toHaveLength(1);
+    const pushedDocument = JSON.parse(JSON.stringify(document));
+
+    expect(pushedDocument.settings).not.toHaveProperty('githubToken');
+    expect(pushedDocument.settings).not.toHaveProperty('theme');
+    expect(pushedDocument).not.toHaveProperty('history');
+    expect(parseSyncDocument(pushedDocument).sessions).toEqual([
+      expect.objectContaining({ id: 'session-1', sortOrder: 0 }),
+    ]);
   });
 
   it('builds and parses sync documents with quick links', () => {

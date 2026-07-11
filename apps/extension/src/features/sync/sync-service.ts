@@ -1,5 +1,6 @@
 import {
   buildSyncDocument,
+  deduplicateSessionsByUrl,
   isZodValidationError,
   mergeSessionsById,
   parseSyncDocument,
@@ -69,7 +70,9 @@ export async function pushToGist(): Promise<AppResult<SyncResult>> {
       const remoteValue = JSON.parse(remoteContent);
       if (!isEmptyObject(remoteValue)) {
         const remoteDocument = parseSyncDocument(remoteValue);
-        sessionsToPush = mergeSessionsById(remoteDocument.sessions, localSessions);
+        sessionsToPush = deduplicateSessionsByUrl(
+          mergeSessionsById(remoteDocument.sessions, localSessions),
+        );
         quickLinksToPush = mergeQuickLinksForPush(remoteDocument.quickLinks, localQuickLinks);
       }
     } catch (error) {
@@ -123,7 +126,9 @@ export async function pullFromGist(): Promise<AppResult<SyncResult>> {
     const client = new GistClient(required.data.githubToken);
     const content = await client.getFileContent(required.data.gistId, required.data.gistFileName);
     const document = parseSyncDocument(JSON.parse(content));
-    const merged = mergeSessionsById(await listSessions(), document.sessions);
+    const merged = deduplicateSessionsByUrl(
+      mergeSessionsById(await listSessions(), document.sessions),
+    );
     const mergedQuickLinks = await updateQuickLinks((currentQuickLinks) =>
       mergeQuickLinksForPull(currentQuickLinks, document.quickLinks),
     );
