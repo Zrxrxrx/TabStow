@@ -2,6 +2,12 @@
 
 Tabstow organizes browser tabs into active browser state and durable saved state for later use.
 
+## Active tabs
+
+**Sleeping Tab**:
+An Active Tab that remains in its browser window while its page memory has been released and will reload when activated.
+_Avoid_: Saved Tab, closed tab
+
 ## Saved tabs
 
 **Saved for Later**:
@@ -25,8 +31,12 @@ The synchronized relative ordering of Tab Sessions and of Saved Tabs within a se
 _Avoid_: Local sort, creation order
 
 **History**:
-The device-local recycle bin for items removed from Saved for Later through opening, restoration, or deletion.
+The device-local recycle bin for items removed from Saved for Later through opening, restoration, or deletion. The V2 New Tab presents this existing History through a compact Recovery Bin entry point.
 _Avoid_: Synced archive
+
+**Recovery Bin**:
+The V2 New Tab preview of the five most recent History entries, with restoration and a link to the complete History page.
+_Avoid_: Second History store, Active Tab undo
 
 ## Synchronization
 
@@ -59,7 +69,7 @@ A condition that requires user action before synchronization can continue, while
 _Avoid_: Data loss, application failure
 
 **Device-local State**:
-State that intentionally remains owned by one device, including GitHub authorization, Sync Gist configuration, Replica ID, History, Todos, theme, and language.
+State that intentionally remains owned by one device, including GitHub authorization, Sync Gist configuration, Replica ID, History, Todos, light/dark theme mode, and language.
 _Avoid_: Unsynced data, pending data
 
 **Quiet-period synchronization**:
