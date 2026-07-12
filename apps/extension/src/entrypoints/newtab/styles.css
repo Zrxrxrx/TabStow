@@ -1508,6 +1508,54 @@ svg {
   background: transparent;
 }
 
+.active-workspace,
+.saved-sessions,
+.session-list,
+.session-card {
+  align-content: start;
+}
+
+.saved-sessions .session-card > header {
+  grid-template-columns: 1fr;
+}
+
+.saved-sessions .session-card > header .row-actions {
+  justify-content: flex-start;
+}
+
+.tab-row,
+.saved-tab-row {
+  position: relative;
+}
+
+.tab-row > .row-actions,
+.saved-tab-row > .saved-tab-delete {
+  position: absolute;
+  top: 50%;
+  right: 7px;
+  opacity: 0;
+  pointer-events: none;
+  transform: translate(5px, -50%);
+  transition: opacity 140ms ease, transform 140ms ease;
+}
+
+.tab-row:hover > .row-actions,
+.tab-row:focus-within > .row-actions,
+.saved-tab-row:hover > .saved-tab-delete,
+.saved-tab-row:focus-within > .saved-tab-delete {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translate(0, -50%);
+}
+
+.tab-row > .tab-open-button {
+  padding-right: 116px;
+}
+
+.saved-tab-row > .saved-tab-open {
+  padding-right: 38px;
+}
+
 .newtab-feedback {
   position: fixed;
   z-index: 18;
@@ -1554,7 +1602,12 @@ svg {
   }
 
   .rail-brand h1 {
-    font-size: 16px;
+    font-size: 14px;
+    letter-spacing: -0.06em;
+  }
+
+  .rail-brand p {
+    font-size: 7px;
   }
 
   .active-window-list {

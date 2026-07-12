@@ -426,7 +426,7 @@ describe('manual QA documentation', () => {
 
     for (const expectedStep of [
       'confirm the dashboard refreshes without manual Refresh or Collapse controls.',
-      'Confirm Active and Saved rows show favicons and fall back to title initials when an icon fails.',
+      'Confirm Active, Saved, Recovery, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails.',
       'confirm only the newest normalized copy remains and query strings remain distinct.',
       'Use quick tab search and confirm Active tabs and Saved for later filter',
       'Reorder saved sessions and tabs, move a tab between sessions',

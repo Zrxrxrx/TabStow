@@ -1,7 +1,10 @@
 # Manual QA
 
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
-- Open a new tab and confirm the Tabstow dashboard appears.
+- Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved for Later region.
+- At 1440px, 1180px, and 1024px widths, confirm all three regions remain visible, the page has no horizontal overflow, and Active/Saved scroll independently.
+- Repeat the width matrix in light/dark mode and English/Simplified Chinese. Confirm the saved theme is applied before content appears and no light-mode flash occurs.
+- Verify empty, typical, and long Quick Link/Active/Saved collections. Rail branding and utility controls stay fixed while the Quick Link list scrolls.
 - Click the extension toolbar icon and confirm the current window's eligible tabs are stowed and no popup opens.
 - Open several ordinary web tabs and use **Stow current window**.
 - Open two normal Chrome windows with pinned, ungrouped, and natively grouped web tabs.
@@ -11,18 +14,23 @@
 - Confirm pinned tabs only accept pinned destinations and retain their pinned state across windows.
 - Change tab order, group membership, group title/color/collapsed state, and window focus directly in Chrome; confirm the dashboard refreshes without manual Refresh or Collapse controls.
 - Reload Tabstow and confirm no local URL/manual grouping or stale local order returns.
-- Confirm Active and Saved rows show favicons and fall back to title initials when an icon fails.
+- Confirm Active, Saved, Recovery, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails. Explicit Quick Link emoji and uploaded images remain intact.
+- Confirm only Chrome tabs with `audible === true` show Audible and only tabs with `discarded === true` show Sleeping. Sleep and policy controls must not send discard/wake mutations.
+- Use the All/current/other-window filters and confirm real counts, horizontal overflow for many windows, and no change to Chrome-owned tab order.
 - Close one tab, close a group, and close duplicates.
 - Add and open a quick link.
+- Enter Quick Link Edit mode, add/edit/upload/remove links, and drag the full row before another link or to the end. Confirm ordinary mode opens links and offers no reorder buttons.
 - Create, complete, search, and clear todos.
-- Change theme mode, palette, transparency, and language preference.
-- Run dashboard search with the default search provider.
+- Toggle fixed light/dark mode and English/Simplified Chinese. Confirm no palette, transparency, system mode, or custom-background control remains.
+- Use Unified Search to filter Active and Saved collections, choose Active/Saved suggestions, press `/` to focus, Escape to clear, and Enter in the input to run the default web search.
+- Confirm **Stow current window** displays the authoritative eligible count, disables at zero, prevents duplicate clicks, uses indeterminate busy copy, and reports the real saved/closed counts on partial success.
 - Confirm the saved session appears and eligible tabs close.
 - Save duplicate URLs with different fragments/default ports and distinct query strings; confirm only the newest normalized copy remains and query strings remain distinct.
 - Use quick tab search and confirm Active tabs and Saved for later filter without running a web search or flattening their groups; confirm Saved drag-and-drop is disabled until the query is cleared.
 - Reorder saved sessions and tabs, move a tab between sessions, reload the extension, and confirm the order persists.
 - Left-click a saved tab and confirm it opens in the background, moves to History, and keeps Tabstow focused; middle-click another and confirm it remains saved.
 - Restore a saved session and delete another, then confirm both move to History and can be restored to Saved for later.
+- Open Recovery Bin and confirm it shows the newest five History entries after sorting by moved time, exposes loading/empty/error states, restores complete entries, refreshes Saved, and links to full History.
 - Open a History tab without consuming it and permanently delete a History entry.
 - Register a test OAuth App with Device Flow enabled, build with `WXT_GITHUB_OAUTH_CLIENT_ID`, and prepare an existing Gist containing `tabstow.sync.json`.
 - In two separate Chrome profiles, choose **Connect GitHub**, complete Device Flow, and bind both profiles to the same existing Gist.
@@ -36,6 +44,8 @@
 - Concurrently add, edit, reorder, and delete Quick Links. Upload an image icon and confirm the image remains local while synchronized label/order/deletion changes still converge.
 - Change **Save pinned tabs when stowing** and **Close pinned tabs after saving** independently on different profiles and confirm revision-based convergence.
 - Disconnect from the network, make local changes, and confirm the New Tab says changes are saved locally. Reconnect and confirm bounded retry completes.
+- Verify the compact sync status for synced, pending, syncing, retrying, paused, setup-needed, and unavailable states. The status button always opens real diagnostics.
+- For a paused incident, confirm details auto-open once, dismissal persists for the same action/reason, setup/authorizing does not reset it, and a connected healthy state resets acknowledgement for a future incident.
 - Use Settings **Pull** and **Push** and confirm Saved URLs deduplicate while local History remains unchanged. Verify those buttons do not appear on the New Tab.
 - Corrupt the non-empty sync file and confirm Tabstow pauses, displays an unable-to-sync message, and offers Open Gist/Retry/Choose another without overwriting it.
 - Rename or remove the bound file and confirm Tabstow pauses instead of silently switching Gists.
