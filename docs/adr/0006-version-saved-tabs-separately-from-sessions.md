@@ -1,0 +1,3 @@
+# Version Saved Tabs separately from Tab Sessions
+
+The next Sync File schema will represent Tab Session metadata and each Saved Tab as separate Sync Entities, with a Saved Tab carrying its session membership, position, revision, and its own Deletion Marker. This lets independent actions within one session—such as consuming one tab while moving another—converge without replacing the entire session, at the cost of migrating the current nested version-one sync document. Tab markers resolve before parent Session markers, so a surviving concurrent move into an otherwise deleted Session preserves both the destination and the moved Tab while unchanged stale children remain deleted.

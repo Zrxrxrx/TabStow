@@ -1,0 +1,3 @@
+# Use event-driven automatic synchronization
+
+Tabstow will read and merge remote state when a New Tab opens and when an existing New Tab becomes visible or focused after a shared 60-second cooldown, without periodic polling. Sync-relevant local changes reset a persisted 60-second quiet-period alarm; open or focus reads do not move that write deadline forward or trigger an early PATCH, while overdue pending work may reconcile immediately. One background coordinator serializes every trigger, recreates missing alarms after worker or browser restart, and completes due work even if the New Tab closes.

@@ -1,0 +1,3 @@
+# Resolve conflicts by entity revision
+
+Tabstow will merge changes to different Sync Entities and resolve competing versions of the same entity by the highest logical counter, using Replica ID as a deterministic tie-breaker rather than trusting device wall clocks. Deletion Markers participate in the same comparison, so only a newer deletion removes content and stale deletions cannot override later work; automatic sync will not create conflict copies or require manual conflict resolution. Deletion Marker expiry, compaction, and device-acknowledgement rules are deferred, so this version will not garbage-collect them.

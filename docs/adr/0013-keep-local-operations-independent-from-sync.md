@@ -1,0 +1,3 @@
+# Keep local operations independent from synchronization
+
+Saved for Later and other local operations will complete as soon as their local transaction succeeds, without waiting for or rolling back because of GitHub. Transient failures retain Pending Synchronization and retry with bounded exponential backoff, while invalid authorization or Sync File data enters Synchronization Paused and never overwrites the remote file. The New Tab will continuously summarize synced, pending, syncing, retrying, or paused state; transient conditions remain non-blocking, actionable failures show a persistent reconnect or Settings route, and Settings holds full errors, the last successful sync time, and Manual Pull and Manual Push.

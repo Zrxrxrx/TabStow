@@ -1,0 +1,3 @@
+# Discover but do not create the Sync Gist
+
+After GitHub authorization, Tabstow will paginate the authenticated user's existing Gists, validate ownership by numeric user ID, and automatically bind only when exactly one valid version-one or version-two `tabstow.sync.json` candidate exists. With no candidate the user may explicitly select an owned Gist and filename, in which case Tabstow may initialize a missing or truly empty Sync File after confirmation but never creates a Gist or overwrites non-empty invalid content; with multiple candidates the user chooses one. Public Gists are never auto-bound and require an explicit warning that synchronized titles and URLs will be public.

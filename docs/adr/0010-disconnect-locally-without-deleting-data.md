@@ -1,0 +1,3 @@
+# Disconnect locally without deleting data
+
+Disconnect will invalidate the current connection generation, cancel alarms and queued work, wait for any already-sent request to settle, then delete the local OAuth credential and active GitHub account state, clear the account-specific Gist Binding, and preserve all local user data without modifying the remote Gist. An already-sent PATCH cannot be withdrawn. Because the extension-only Device Flow architecture cannot securely ship the client secret required for programmatic token revocation, Settings links users to GitHub's authorization page when they want to revoke the grant itself.

@@ -1,0 +1,3 @@
+# Store synchronized state and pending work atomically
+
+Version-two Sync Entities, logical revisions, Deletion Markers, and the pending generation/outbox will share IndexedDB so every Sync-relevant Mutation commits its user data and Pending Synchronization in one transaction. OAuth credentials, Gist Binding, presentation status, and other Device-local State remain in extension storage, while uploaded Quick Link image bytes remain in Cache Storage; this moves synchronized Quick Links and behavior preferences behind an IndexedDB-backed repository to prevent a service-worker shutdown between data persistence and dirty marking from losing a synchronization trigger.

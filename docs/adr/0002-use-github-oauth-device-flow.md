@@ -1,0 +1,3 @@
+# Use GitHub OAuth Device Flow
+
+Tabstow will authorize each device through GitHub OAuth Device Flow with only the `gist` scope rather than a browser authorization-code flow. The resulting OAuth access token replaces the manually pasted GitHub token, lives in a background-only credential store, and is never returned with ordinary Settings or exported. After authorization Tabstow verifies the granted scope and current numeric GitHub user ID through `/user`. The maintainer supplies an OAuth App registration with Device Flow enabled and a public build-time `client_id`; Tabstow never requires or ships its `client_secret`, and Device Flow does not require the Chrome `identity` permission.
