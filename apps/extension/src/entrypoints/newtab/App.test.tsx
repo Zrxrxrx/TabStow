@@ -596,6 +596,22 @@ describe('App', () => {
     );
   });
 
+  it('does not open or drag a saved row from its delete action', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
+    await renderApp();
+
+    const removeButton = screen().getByLabelText('Move Saved One to History');
+    await act(async () => {
+      removeButton.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    });
+    const transfer = createDataTransfer();
+    const dragEvent = await dragStart(removeButton, transfer);
+
+    expect(dragEvent.defaultPrevented).toBe(true);
+    expect(transfer.types).toHaveLength(0);
+    expect(sentMessageTypes()).not.toContain('sessions:open-tab');
+  });
+
   it('persists cross-session saved tab drops and session reordering by ID', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB], sessions: SAVED_SESSIONS });
     await renderApp();
@@ -1259,12 +1275,16 @@ describe('App', () => {
     expect(screen().getByRole('heading', { name: '稍后查看' })).not.toBeNull();
     expect(screen().getByText('1 个会话')).not.toBeNull();
     expect(screen().getByText('1 个标签页')).not.toBeNull();
+    expect(screen().getByText('已打开 1 个')).not.toBeNull();
+    expect(screen().getByLabelText('已保存的会话')).not.toBeNull();
     expect(screen().getByLabelText('1 个会话，1 个标签页')).not.toBeNull();
     expect(screen().getByLabelText('搜索打开的标签页、已保存标签页或网页')).not.toBeNull();
     expect(screen().getByLabelText('编辑快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
     expect(() => screen().getByRole('heading', { name: 'Saved for later' })).toThrow();
+    expect(container.textContent).not.toContain(' open');
+    expect(container.textContent).not.toContain(' tabs ·');
 
     await click(screen().getByRole('button', { name: '更多' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
@@ -1434,6 +1454,8 @@ describe('App', () => {
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
     expect(document.activeElement).toBe(screen().getByRole('button', { name: 'Spec draft' }));
     expect(() => screen().getByRole('button', { name: 'Settings' })).toThrow();
+    expect(container.querySelector('.open-tab-choice img.favicon')).not.toBeNull();
+    expect(container.querySelector('.open-tab-choice .favicon-fallback')).toBeNull();
     await click(screen().getByRole('button', { name: 'Add' }));
 
     expect(promptSpy).not.toHaveBeenCalled();
@@ -1583,6 +1605,32 @@ describe('App', () => {
       expect.objectContaining({ id: 'link-b' }),
       expect.objectContaining({ id: 'link-a' }),
     ]);
+  });
+
+  it('reorders quick links with Alt and arrow keys in edit mode', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      { id: 'link-a', url: 'https://a.example/', label: 'A', icon: null, createdAt: '2026-07-07T00:00:00.000Z' },
+      { id: 'link-b', url: 'https://b.example/', label: 'B', icon: null, createdAt: '2026-07-07T00:00:00.000Z' },
+    ]);
+    saveQuickLinks.mockImplementation(async (links: unknown) => links);
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+    const first = screen().getByLabelText('Reorder A with Alt and arrow keys');
+    await act(async () => {
+      first.dispatchEvent(new KeyboardEvent('keydown', {
+        altKey: true,
+        bubbles: true,
+        cancelable: true,
+        key: 'ArrowDown',
+      }));
+    });
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'quick-links:reorder',
+      orderedIds: ['link-b', 'link-a'],
+    });
   });
 
   it('keeps current quick links when manual quick-link input is invalid', async () => {
@@ -1932,7 +1980,17 @@ describe('App', () => {
     await renderApp();
     expect(screen().getByText('1 open')).not.toBeNull();
 
-    await click(screen().getByLabelText('Save Spec draft for later'));
+    const saveButton = screen().getByLabelText('Save Spec draft for later');
+    await act(async () => {
+      saveButton.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
+    });
+    const transfer = createDataTransfer();
+    const dragEvent = await dragStart(saveButton, transfer);
+    expect(dragEvent.defaultPrevented).toBe(true);
+    expect(transfer.types).toHaveLength(0);
+    expect(sentMessageTypes()).not.toContain('active-tabs:focus');
+
+    await click(saveButton);
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'sessions:stow-tab',

@@ -397,6 +397,24 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
     }
   }
 
+  async function reorderWithKeyboard(linkId: string, offset: -1 | 1) {
+    if (!editing || disabledRef.current || dropPendingRef.current) return;
+    const currentIndex = links.findIndex((link) => link.id === linkId);
+    const nextIndex = currentIndex + offset;
+    if (currentIndex < 0 || nextIndex < 0 || nextIndex >= links.length) return;
+    const orderedIds = links.map((link) => link.id);
+    [orderedIds[currentIndex], orderedIds[nextIndex]] = [orderedIds[nextIndex], orderedIds[currentIndex]];
+    dropPendingRef.current = true;
+    try {
+      await persistLinks({ type: 'quick-links:reorder', orderedIds });
+    } catch (error) {
+      setLinks(await getQuickLinks());
+      setErrorMessage(error instanceof Error ? error.message : 'Could not reorder quick links.');
+    } finally {
+      dropPendingRef.current = false;
+    }
+  }
+
   return (
     <section className="panel quick-links-panel" aria-labelledby="quick-links-title" data-od-id="quick-links-section">
       <div className="section-header">
@@ -447,6 +465,7 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
         <div className="quick-link-grid" data-od-id="quick-link-grid">
           {links.map((link) => (
             <div
+              aria-label={editing ? t(locale, 'reorderQuickLink', { label: link.label }) : undefined}
               className="quick-link-card-shell"
               draggable={editing && !disabled}
               key={link.id}
@@ -454,6 +473,18 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
               onDragOver={(event) => { if (editing) event.preventDefault(); }}
               onDragStart={(event) => startDrag(event, link.id)}
               onDrop={(event) => void drop(event, link.id)}
+              onKeyDown={(event) => {
+                if (event.target !== event.currentTarget) return;
+                if (!event.altKey) return;
+                if (event.key === 'ArrowUp' || event.key === 'ArrowLeft') {
+                  event.preventDefault();
+                  void reorderWithKeyboard(link.id, -1);
+                } else if (event.key === 'ArrowDown' || event.key === 'ArrowRight') {
+                  event.preventDefault();
+                  void reorderWithKeyboard(link.id, 1);
+                }
+              }}
+              tabIndex={editing ? 0 : undefined}
             >
               <a
                 href={link.url}
@@ -692,9 +723,12 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
                     void submitOpenTabChoice(choice);
                   }}
                 >
-                  <span className="favicon tone-blue" aria-hidden="true">
-                    {(tabLabel.match(/[A-Za-z0-9]/)?.[0] ?? 'T').slice(0, 2).toUpperCase()}
-                  </span>
+                  <TabFavicon
+                    className="favicon"
+                    favIconUrl={choice.tab.favIconUrl}
+                    pageUrl={choice.tab.url ?? ''}
+                    title={tabLabel}
+                  />
                   <span className="tab-copy">
                     <span className="tab-title">{tabLabel}</span>
                     <span className="tab-url">{choice.tab.url ?? ''}</span>

@@ -71,6 +71,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   const [syncDetailsOpen, setSyncDetailsOpen] = useState(false);
   const [tabQuery, setTabQuery] = useState('');
   const busyActionRef = useRef<string | null>(null);
+  const incidentAckWriteRef = useRef<Promise<void>>(Promise.resolve());
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
 
   async function loadSessions() {
@@ -100,7 +101,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
       connection.phase === 'connected' &&
       ['synced', 'pending', 'syncing', 'retrying'].includes(connection.sync.state)
     ) {
-      void clearAcknowledgement();
+      incidentAckWriteRef.current = incidentAckWriteRef.current.then(clearAcknowledgement, clearAcknowledgement);
     }
     return () => { active = false; };
   }, [connection]);
@@ -336,7 +337,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                     sendExtensionMessage<AppResult<StowResult>>({
                       type: 'sessions:stow-current-window',
                     }),
-                  (result) => `Stowed ${result.savedTabCount} tabs and closed ${result.closedTabCount}.`,
+                  (result) => t(locale, 'stowCompleted', { saved: result.savedTabCount, closed: result.closedTabCount }),
                 )
               }
               refreshKey={stowPreviewRefreshKey}
@@ -370,8 +371,10 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                           type: 'sessions:stow-tab',
                           tabId,
                         }),
-                      (result) =>
-                        `Saved ${result.savedTabCount} tab for later and closed ${result.closedTabCount}.`,
+                      (result) => t(locale, 'stowTabCompleted', {
+                        saved: result.savedTabCount,
+                        closed: result.closedTabCount,
+                      }),
                     );
                   }}
                 />
@@ -437,7 +440,12 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
           locale={locale}
           onClose={() => {
             const incidentKey = derivePausedIncidentKey(connection);
-            if (incidentKey) void acknowledgeIncident(incidentKey);
+            if (incidentKey) {
+              incidentAckWriteRef.current = incidentAckWriteRef.current.then(
+                () => acknowledgeIncident(incidentKey),
+                () => acknowledgeIncident(incidentKey),
+              );
+            }
             setSyncDetailsOpen(false);
           }}
           onOpenSettings={openOptions}

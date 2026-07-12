@@ -38,6 +38,9 @@ describe('RecoveryBinDialog', () => {
 
     expect(container.querySelectorAll('.recovery-entry')).toHaveLength(5);
     expect(container.querySelector('.recovery-entry strong')?.textContent).toBe('Session 5');
+    expect(container.querySelector<HTMLImageElement>('.recovery-entry img.saved-tab-favicon')?.src).toContain(
+      '_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F5',
+    );
     const restore = container.querySelector<HTMLButtonElement>('.recovery-entry button')!;
     await act(async () => restore.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:restore', historyId: 'history-5' });

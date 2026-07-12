@@ -6,6 +6,7 @@ import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import { ModalDialog } from './ModalDialog';
+import { TabFavicon } from '@/components/TabFavicon';
 
 type Props = {
   locale: Locale;
@@ -59,6 +60,11 @@ export function RecoveryBinDialog({ locale, onClose, onRestored }: Props) {
       <div className="recovery-list">
         {visibleEntries.map((entry) => (
           <article className="recovery-entry" key={entry.id}>
+            <TabFavicon
+              className="saved-tab-favicon"
+              pageUrl={entry.tabs[0]?.url ?? ''}
+              title={entry.sourceTitle}
+            />
             <div className="tab-copy">
               <strong>{entry.sourceTitle}</strong>
               <span className="tab-url">{t(locale, 'recoveryEntryMeta', { count: entry.tabs.length, reason: entry.reason, time: new Date(entry.movedAt).toLocaleString() })}</span>

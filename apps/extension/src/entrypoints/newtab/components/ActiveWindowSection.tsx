@@ -220,6 +220,7 @@ export function ActiveWindowSection(props: Props) {
         }}
         onDragStart={(event) => props.onDragStart(event, source)}
         onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
           if ((event.key === 'Enter' || event.key === ' ') && !props.disabled) {
             event.preventDefault();
             props.onFocusTab(tab);
@@ -272,7 +273,7 @@ export function ActiveWindowSection(props: Props) {
           <button
             type="button"
             className="icon-button"
-            aria-label={`Close ${label}`}
+            aria-label={t(props.locale, 'closeTab', { label })}
             onClick={(event) => { stopAction(event); if (typeof tab.id === 'number') props.onCloseTabs([tab.id]); }}
             disabled={props.disabled}
           >
@@ -289,14 +290,14 @@ export function ActiveWindowSection(props: Props) {
       <>
         {firstTab &&
           dropZone(
-            `Drop before ${getTabLabel(firstTab)} in ${laneLabel}`,
+            t(props.locale, 'dropBeforeIn', { label: getTabLabel(firstTab), lane: laneLabel }),
             tabLaneTarget(props.window, lane, firstTab.id as number, 'before'),
           )}
         {tabs.map((tab) => (
           <Fragment key={tab.id ?? tab.url}>
             {tabRow(tab)}
             {dropZone(
-              `Drop after ${getTabLabel(tab)} in ${laneLabel}`,
+              t(props.locale, 'dropAfterIn', { label: getTabLabel(tab), lane: laneLabel }),
               tabLaneTarget(props.window, lane, tab.id as number, 'after'),
             )}
           </Fragment>
@@ -359,7 +360,7 @@ export function ActiveWindowSection(props: Props) {
           }}
         >
           <span
-            aria-label={`Drop into ${label}`}
+            aria-label={t(props.locale, 'dropInto', { label })}
             className={`group-drop-label${props.activeDropTargetKey === target.key ? ' is-active-drop-target' : ''}`}
           />
           <div className="chrome-group-meta">
@@ -380,7 +381,7 @@ export function ActiveWindowSection(props: Props) {
           <button
             type="button"
             className="icon-button"
-            aria-label={`Close ${label} tabs`}
+            aria-label={t(props.locale, 'closeGroupTabs', { label })}
             onClick={(event) => {
               event.stopPropagation();
               props.onCloseTabs(
@@ -410,7 +411,7 @@ export function ActiveWindowSection(props: Props) {
     >
       <header className="active-window-header">
         <h3>{windowLabel}</h3>
-        <span className="meta-pill">{props.window.visibleTabCount} open</span>
+        <span className="meta-pill">{t(props.locale, 'openCount', { count: props.window.visibleTabCount })}</span>
       </header>
       {showPinnedLane && (
         <section className="pinned-lane">
@@ -418,9 +419,9 @@ export function ActiveWindowSection(props: Props) {
             <h4>{t(props.locale, 'pinnedTabs')}</h4>
           </header>
           <div className="active-tab-list">
-            {tabLaneRows(props.window.pinnedTabs, { kind: 'pinned' }, 'pinned tabs')}
+            {tabLaneRows(props.window.pinnedTabs, { kind: 'pinned' }, t(props.locale, 'pinnedTabsDropLabel'))}
             {dropZone(
-              `Drop at end of pinned tabs in ${windowLabel}`,
+              t(props.locale, 'dropAtEndIn', { label: t(props.locale, 'pinnedTabsDropLabel'), container: windowLabel }),
               pinnedEndTarget(props.window),
             )}
           </div>
@@ -429,19 +430,19 @@ export function ActiveWindowSection(props: Props) {
       <div className="active-window-items">
         {firstItem &&
           dropZone(
-            `Drop before ${itemLabel(firstItem, props.locale)}`,
+            t(props.locale, 'dropBefore', { label: itemLabel(firstItem, props.locale) }),
             topLevelTarget(props.window, firstItem, 'before'),
           )}
         {props.window.items.map((item) => (
           <Fragment key={item.key}>
             {item.kind === 'tab' ? tabRow(item.tab) : chromeGroup(item)}
             {dropZone(
-              `Drop after ${itemLabel(item, props.locale)}`,
+              t(props.locale, 'dropAfter', { label: itemLabel(item, props.locale) }),
               topLevelTarget(props.window, item, 'after'),
             )}
           </Fragment>
         ))}
-        {dropZone(`Drop at end of ${windowLabel}`, windowEndTarget(props.window))}
+        {dropZone(t(props.locale, 'dropAtEnd', { label: windowLabel }), windowEndTarget(props.window))}
       </div>
     </article>
   );

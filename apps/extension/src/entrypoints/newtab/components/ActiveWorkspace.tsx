@@ -180,6 +180,10 @@ export function ActiveWorkspace({
 
   function startDrag(event: DragEvent, source: ActiveTabsDragSource) {
     event.stopPropagation();
+    if (event.target instanceof HTMLElement && event.target.closest('button, input, a')) {
+      event.preventDefault();
+      return;
+    }
     if (dragDisabled || movePendingRef.current) {
       event.preventDefault();
       return;
@@ -251,7 +255,7 @@ export function ActiveWorkspace({
           <p className="subtle">{t(locale, 'activeTabsSubtitle')}</p>
         </div>
         <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
-          {filteredSnapshot.tabs.length} open
+          {t(locale, 'openCount', { count: filteredSnapshot.tabs.length })}
         </span>
       </div>
 
@@ -277,8 +281,9 @@ export function ActiveWorkspace({
           disabled={controlsDisabled}
         >
           <Layers size={16} aria-hidden="true" />
-          Close {duplicateGroups.reduce((count, group) => count + group.duplicateTabIds.length, 0)}{' '}
-          duplicates
+          {t(locale, 'closeDuplicates', {
+            count: duplicateGroups.reduce((count, group) => count + group.duplicateTabIds.length, 0),
+          })}
         </button>
       )}
 

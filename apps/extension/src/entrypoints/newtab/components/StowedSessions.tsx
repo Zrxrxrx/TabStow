@@ -128,6 +128,7 @@ function SavedTabRow({
       }}
       onDragStart={(event) => onDragStart(event, { kind: 'tab', sessionId, tabId: tab.id })}
       onKeyDown={(event) => {
+        if (event.target !== event.currentTarget) return;
         if ((event.key === 'Enter' || event.key === ' ') && !busy && isSafeSavedTabUrl(tab.url)) {
           event.preventDefault();
           onOpen(true);
@@ -195,6 +196,10 @@ export function StowedSessions({
 
   function startDrag(event: DragEvent, source: SavedTabsDragSource) {
     event.stopPropagation();
+    if (event.target instanceof HTMLElement && event.target.closest('button, input, a')) {
+      event.preventDefault();
+      return;
+    }
     if (dragDisabled || dropPendingRef.current) {
       event.preventDefault();
       return;
@@ -338,7 +343,7 @@ export function StowedSessions({
         </button>
       </header>
 
-      <section className="session-list" aria-label="Saved sessions">
+      <section className="session-list" aria-label={t(locale, 'savedSessions')}>
         {filteredSessions.length === 0 ? (
           <div className="empty-state">{t(locale, 'noSavedSessions')}</div>
         ) : (
@@ -368,7 +373,7 @@ export function StowedSessions({
                           {session.title}
                         </span>
                         <span className="session-preview">
-                          {session.tabs.length} {session.tabs.length === 1 ? 'tab' : 'tabs'} · {formatDate(session.createdAt)}
+                          {t(locale, session.tabs.length === 1 ? 'savedTabCount' : 'savedTabsCount', { count: session.tabs.length })} · {formatDate(session.createdAt)}
                         </span>
                       </div>
                     </div>
