@@ -1,0 +1,26 @@
+{
+  "kind": "critique-panel",
+  "score": 4,
+  "axes": {
+    "philosophy": {
+      "score": 4,
+      "notes": "Keeps the utilitarian Chrome extension dashboard posture while supporting a white light mode and Agentic dark mode."
+    },
+    "hierarchy": {
+      "score": 4,
+      "notes": "Quick links sit above the two primary columns; active tabs and saved sessions have clear counts and actions."
+    },
+    "execution": {
+      "score": 4,
+      "notes": "Active and saved tab rows expose compact hover-only restore/delete controls, and the toolbar bin opens a temporary recovery record with restore actions."
+    },
+    "specificity": {
+      "score": 4,
+      "notes": "The aggregate search label covers web, active tabs, and saved sessions; the bin copy now specifically describes recoverable saved, clicked, and accidentally affected pages."
+    },
+    "restraint": {
+      "score": 4,
+      "notes": "Accent use is limited to primary action and selected group state; the light mode uses a plain white canvas."
+    }
+  }
+}
