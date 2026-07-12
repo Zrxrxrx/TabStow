@@ -315,6 +315,10 @@ describe('App', () => {
       { ...UNIQUE_TAB, id: 24, windowId: 3, index: 0, groupId: -1, title: 'Other window' },
     ];
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'sessions:stow-current-window-preview') {
+        return { ok: true, data: { eligibleTabCount: tabs.length } };
+      }
+
       if (message.type === 'active-tabs:snapshot') {
         return {
           ok: true,
@@ -1102,6 +1106,10 @@ describe('App', () => {
       { ...UNIQUE_TAB, id: 22, windowId: 8, index: 1, groupId: 31, title: 'Grouped' },
     ];
     sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'sessions:stow-current-window-preview') {
+        return { ok: true, data: { eligibleTabCount: tabs.length } };
+      }
+
       if (message.type === 'active-tabs:snapshot') {
         return {
           ok: true,
@@ -2051,6 +2059,10 @@ describe('App', () => {
   it('refreshes active tabs after stowing from saved sessions', async () => {
     let activeTabs = [UNIQUE_TAB];
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'sessions:stow-current-window-preview') {
+        return { ok: true, data: { eligibleTabCount: activeTabs.length } };
+      }
+
       if (message.type === 'active-tabs:snapshot') {
         return { ok: true, data: activeTabsSnapshot(activeTabs) };
       }
@@ -2083,6 +2095,10 @@ describe('App', () => {
   it('disables active workspace stow while another app action is busy', async () => {
     const pendingStow = deferred<AppResult<StowResult>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'sessions:stow-current-window-preview') {
+        return { ok: true, data: { eligibleTabCount: 1 } };
+      }
+
       if (message.type === 'active-tabs:snapshot') {
         return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
       }
@@ -2120,17 +2136,24 @@ describe('App', () => {
           deviceId: 'device-1',
         },
         savedTabCount: 1,
-        closedTabCount: 1,
+        closedTabCount: 0,
       },
     });
     await act(async () => {
       await pendingStow.promise;
     });
+    expect(screen().getByRole('status').textContent).toContain(
+      'Stowed 1 tabs and closed 0.',
+    );
   });
 
   it('guards same-frame stow reentry and only sends one stow message', async () => {
     const pendingStow = deferred<AppResult<StowResult>>();
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'sessions:stow-current-window-preview') {
+        return { ok: true, data: { eligibleTabCount: 1 } };
+      }
+
       if (message.type === 'active-tabs:snapshot') {
         return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
       }
@@ -2182,6 +2205,10 @@ describe('App', () => {
     let refreshCount = 0;
 
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
+      if (message.type === 'sessions:stow-current-window-preview') {
+        return { ok: true, data: { eligibleTabCount: 1 } };
+      }
+
       if (message.type === 'active-tabs:snapshot') {
         refreshCount += 1;
         return refreshCount === 1 ? firstRefresh.promise : secondRefresh.promise;
@@ -2383,6 +2410,10 @@ function mockMessages({
   sessions?: TabSession[];
 }) {
   sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+    if (message.type === 'sessions:stow-current-window-preview') {
+      return { ok: true, data: { eligibleTabCount: activeTabs.length } };
+    }
+
     if (message.type === 'active-tabs:snapshot') {
       return {
         ok: true,

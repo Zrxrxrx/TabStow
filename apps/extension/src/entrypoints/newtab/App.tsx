@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
-import { Archive, Languages, Moon, Settings, SlidersHorizontal, Sun, X } from 'lucide-react';
+import { Languages, Moon, Settings, SlidersHorizontal, Sun, X } from 'lucide-react';
 import {
   getLanguagePreference,
   resolveLocale,
@@ -22,6 +22,7 @@ import { SearchBox } from './components/SearchBox';
 import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
+import { StowCurrentWindowButton } from './components/StowCurrentWindowButton';
 import { TodosPanel } from './components/TodosPanel';
 import { WorkspaceSearch } from './components/WorkspaceSearch';
 
@@ -49,6 +50,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
       : { tone: 'info', message: null },
   );
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
+  const [stowPreviewRefreshKey, setStowPreviewRefreshKey] = useState(0);
   const [quickLinksRefreshKey, setQuickLinksRefreshKey] = useState(0);
   const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED_SYNC);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
@@ -89,6 +91,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   useEffect(() => {
     function handleFocus() {
       void observeSync('focus');
+      setStowPreviewRefreshKey((value) => value + 1);
     }
 
     function handleVisibility() {
@@ -287,11 +290,13 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
               locale={locale}
               onOpenSettings={openOptions}
             />
-            <button
-              type="button"
-              className="primary-button stow-current-button"
-              onClick={() =>
-                void runAction<StowResult>(
+            <StowCurrentWindowButton
+              busy={busyAction === 'stow'}
+              disabled={busyAction !== null}
+              locale={locale}
+              onStatus={(tone, message) => setStatus({ tone, message })}
+              onStow={() =>
+                runAction<StowResult>(
                   'stow',
                   () =>
                     sendExtensionMessage<AppResult<StowResult>>({
@@ -300,11 +305,8 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                   (result) => `Stowed ${result.savedTabCount} tabs and closed ${result.closedTabCount}.`,
                 )
               }
-              disabled={busyAction !== null}
-            >
-              <Archive size={16} aria-hidden="true" />
-              {t(locale, 'stowCurrentWindow')}
-            </button>
+              refreshKey={stowPreviewRefreshKey}
+            />
           </div>
           </header>
 
@@ -317,6 +319,9 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                 <ActiveWorkspace
                   busy={busyAction !== null}
                   locale={locale}
+                  onAuthoritativeRefresh={() =>
+                    setStowPreviewRefreshKey((value) => value + 1)
+                  }
                   onStatus={(tone, message) => setStatus({ tone, message })}
                   query={tabQuery}
                   refreshKey={activeWorkspaceRefreshKey}

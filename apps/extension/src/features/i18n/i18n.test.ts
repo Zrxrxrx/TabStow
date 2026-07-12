@@ -77,6 +77,8 @@ describe('i18n', () => {
     expect(t('en', 'settings')).toBe('Settings');
     expect(t('en', 'closeExtra')).toBe('Close extra drawer');
     expect(t('en', 'tabstowSubtitle')).toBe('Tab operations');
+    expect(t('en', 'stowTabsReady', { count: 3 })).toBe('3 tabs ready');
+    expect(t('en', 'stowingWindow')).toBe('Stowing window…');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -156,6 +158,8 @@ describe('i18n', () => {
     expect(t('zh-CN', 'settings')).toBe('设置');
     expect(t('zh-CN', 'closeExtra')).toBe('关闭更多工具');
     expect(t('zh-CN', 'tabstowSubtitle')).toBe('标签页操作');
+    expect(t('zh-CN', 'stowTabsReady', { count: 3 })).toBe('3 个标签页待收起');
+    expect(t('zh-CN', 'stowingWindow')).toBe('正在收起窗口…');
   });
 
   it('includes English and Simplified Chinese labels for the History page', async () => {

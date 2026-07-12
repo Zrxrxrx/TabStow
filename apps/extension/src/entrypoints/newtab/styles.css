@@ -1338,12 +1338,38 @@ svg {
 .stow-current-button {
   overflow: hidden;
   clip-path: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px));
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 9px;
+  justify-content: stretch;
+  text-align: left;
+}
+
+.stow-current-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.stow-current-copy strong,
+.stow-current-copy small {
+  overflow: hidden;
   font-family: "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
-  font-size: 11px;
-  font-weight: 900;
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
+}
+
+.stow-current-copy strong {
+  font-size: 10px;
+  font-weight: 900;
+}
+
+.stow-current-copy small {
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  opacity: 0.68;
 }
 
 .v2-workspace {
