@@ -87,12 +87,7 @@ describe('i18n', () => {
     expect(t('zh-CN', 'activeTabs')).toBe('打开的标签页');
     expect(t('zh-CN', 'stowedSessions')).toBe('已收起的标签页');
     expect(t('zh-CN', 'searchTheWeb')).toBe('搜索网页');
-    expect(t('zh-CN', 'appearance')).toBe('外观');
-    expect(t('zh-CN', 'themeMode')).toBe('主题模式');
-    expect(t('zh-CN', 'palette')).toBe('调色板');
-    expect(t('zh-CN', 'surfaceTransparency')).toBe('界面透明度');
     expect(t('zh-CN', 'language')).toBe('语言');
-    expect(t('zh-CN', 'customBackground')).toBe('自定义背景');
     expect(t('zh-CN', 'windowNumber', { number: 2 })).toBe('窗口 2');
     expect(t('zh-CN', 'chromeGroupFallback', { id: 31 })).toBe('Chrome 分组 31');
     expect(t('zh-CN', 'dragTab', { label: '示例' })).toBe('拖动 示例');

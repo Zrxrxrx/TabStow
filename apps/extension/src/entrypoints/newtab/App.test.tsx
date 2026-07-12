@@ -371,6 +371,25 @@ describe('App', () => {
     expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'import'].join(':'));
   });
 
+  it('filters real windows and renders only Chrome-reported audible and discarded states', async () => {
+    mockMessages({
+      activeTabs: [
+        { ...UNIQUE_TAB, id: 31, windowId: 4, index: 0, title: 'Audible tab', audible: true },
+        { ...UNIQUE_TAB, id: 32, windowId: 8, index: 0, title: 'Sleeping tab', discarded: true },
+      ],
+      focusedWindowId: 4,
+    });
+
+    await renderApp();
+
+    expect(screen().getByText('Audible')).not.toBeNull();
+    expect(screen().getByText('Sleeping')).not.toBeNull();
+    await click(screen().getByText('Window 2').closest<HTMLButtonElement>('button')!);
+    expect(container.textContent).not.toContain('Audible tab');
+    expect(container.textContent).toContain('Sleeping tab');
+    expect(sentMessageTypes()).not.toContain('active-tabs:discard');
+  });
+
   it('filters active and saved tabs locally while keeping web search and tab actions available', async () => {
     const sessions: TabSession[] = [
       {
