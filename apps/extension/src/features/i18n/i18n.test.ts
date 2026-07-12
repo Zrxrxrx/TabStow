@@ -73,6 +73,10 @@ describe('i18n', () => {
     expect(t('en', 'savedTabCount', { count: 1 })).toBe('1 tab');
     expect(t('en', 'syncChangesSavedLocally')).toBe('Changes saved locally');
     expect(t('en', 'syncPaused')).toBe('Sync paused');
+    expect(t('en', 'extra')).toBe('Extra');
+    expect(t('en', 'settings')).toBe('Settings');
+    expect(t('en', 'closeExtra')).toBe('Close extra drawer');
+    expect(t('en', 'tabstowSubtitle')).toBe('Tab operations');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -148,6 +152,10 @@ describe('i18n', () => {
     expect(t('zh-CN', 'savedTabCount', { count: 1 })).toBe('1 个标签页');
     expect(t('zh-CN', 'syncChangesSavedLocally')).toBe('更改已保存在本地');
     expect(t('zh-CN', 'syncPaused')).toBe('同步已暂停');
+    expect(t('zh-CN', 'extra')).toBe('更多');
+    expect(t('zh-CN', 'settings')).toBe('设置');
+    expect(t('zh-CN', 'closeExtra')).toBe('关闭更多工具');
+    expect(t('zh-CN', 'tabstowSubtitle')).toBe('标签页操作');
   });
 
   it('includes English and Simplified Chinese labels for the History page', async () => {

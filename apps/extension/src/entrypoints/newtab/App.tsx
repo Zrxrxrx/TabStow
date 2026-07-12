@@ -19,6 +19,7 @@ import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types'
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
 import { SearchBox } from './components/SearchBox';
+import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
 import { TodosPanel } from './components/TodosPanel';
@@ -212,30 +213,56 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
 
   return (
     <>
-      <main className="page-shell" data-od-id="newtab-shell">
-        <header className="topbar" data-od-id="topbar">
-          <div className="brand-lockup" data-od-id="brand-lockup">
-            <div className="mark" aria-hidden="true">
-              T
-            </div>
+      <main className="newtab-shell" data-od-id="newtab-shell">
+        <aside className="quick-links-rail" aria-label={t(locale, 'quickLinks')}>
+          <div className="rail-brand brand-lockup" data-od-id="brand-lockup">
+            <div className="mark" aria-hidden="true">TS</div>
             <div>
-              <h1 id="tabstow-title" data-od-id="page-title">
-                Tabstow
-              </h1>
-              <p className="subtle">Stow, organize, and restore your browser tabs.</p>
+              <h1 id="tabstow-title" data-od-id="page-title">Tabstow</h1>
+              <p>{t(locale, 'tabstowSubtitle')}</p>
             </div>
           </div>
-
-          <SearchBox
-            disabled={busyAction !== null}
-            locale={locale}
-            onStatus={(tone, message) => setStatus({ tone, message })}
-          />
-
-          <div className="header-actions" data-od-id="topbar-actions">
+          <div className="rail-links-scroll">
+            <QuickLinks
+              disabled={busyAction !== null}
+              locale={locale}
+              refreshKey={quickLinksRefreshKey}
+            />
+          </div>
+          <div className="rail-utilities">
             <button
               type="button"
-              className="preference-switch"
+              className="rail-utility-button"
+              onClick={() => setExtraOpen(true)}
+              aria-expanded={extraOpen}
+              aria-controls="extra-drawer"
+            >
+              <SlidersHorizontal size={16} aria-hidden="true" />
+              <span>{t(locale, 'extra')}</span>
+            </button>
+            <button
+              type="button"
+              className="rail-utility-button"
+              onClick={openOptions}
+              aria-label={t(locale, 'openSettings')}
+            >
+              <Settings size={16} aria-hidden="true" />
+              <span>{t(locale, 'settings')}</span>
+            </button>
+          </div>
+        </aside>
+
+        <section className="newtab-stage">
+          <header className="top-strip" data-od-id="top-strip">
+            <SearchBox
+              disabled={busyAction !== null}
+              locale={locale}
+              onStatus={(tone, message) => setStatus({ tone, message })}
+            />
+            <div className="top-strip-controls" data-od-id="topbar-actions">
+            <button
+              type="button"
+              className="preference-switch top-strip-control"
               onClick={() => void toggleLanguage()}
               aria-label={t(locale, 'switchLanguage')}
             >
@@ -244,7 +271,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
             </button>
             <button
               type="button"
-              className="preference-switch"
+              className="preference-switch top-strip-control"
               onClick={() => void toggleTheme()}
               aria-label={t(locale, 'switchTheme')}
             >
@@ -255,28 +282,14 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
               )}
               <span>{currentThemeLabel}</span>
             </button>
+            <NewTabSyncStatus
+              connection={connection}
+              locale={locale}
+              onOpenSettings={openOptions}
+            />
             <button
               type="button"
-              className="secondary-button"
-              onClick={() => setExtraOpen(true)}
-              aria-expanded={extraOpen}
-              aria-controls="extra-drawer"
-            >
-              <SlidersHorizontal size={16} aria-hidden="true" />
-              Extra
-            </button>
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={openOptions}
-              aria-label="Open settings"
-            >
-              <Settings size={16} aria-hidden="true" />
-              Settings
-            </button>
-            <button
-              type="button"
-              className="primary-button"
+              className="primary-button stow-current-button"
               onClick={() =>
                 void runAction<StowResult>(
                   'stow',
@@ -293,50 +306,47 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
               {t(locale, 'stowCurrentWindow')}
             </button>
           </div>
-        </header>
+          </header>
 
-        <NewTabSyncStatus
-          connection={connection}
-          locale={locale}
-          onOpenSettings={openOptions}
-        />
+          <NewTabFeedback message={status.message} tone={status.tone} />
 
-        <QuickLinks disabled={busyAction !== null} locale={locale} refreshKey={quickLinksRefreshKey} />
+          <section className="workspace-container v2-workspace" aria-label="Tab workspace">
+            <WorkspaceSearch locale={locale} value={tabQuery} onChange={setTabQuery} />
+            <div className="v2-workspace-columns" data-od-id="workspace-grid">
+              <div className="active-region">
+                <ActiveWorkspace
+                  busy={busyAction !== null}
+                  locale={locale}
+                  onStatus={(tone, message) => setStatus({ tone, message })}
+                  query={tabQuery}
+                  refreshKey={activeWorkspaceRefreshKey}
+                  onStowTab={(tab) => {
+                    const tabId = tab.id;
+                    if (typeof tabId !== 'number') return Promise.resolve();
 
-        <section className="workspace-container" aria-label="Tab workspace">
-          <WorkspaceSearch locale={locale} value={tabQuery} onChange={setTabQuery} />
-          <section className="workspace-grid" data-od-id="workspace-grid">
-            <ActiveWorkspace
-              busy={busyAction !== null}
-              locale={locale}
-              onStatus={(tone, message) => setStatus({ tone, message })}
-              query={tabQuery}
-              refreshKey={activeWorkspaceRefreshKey}
-              onStowTab={(tab) => {
-                const tabId = tab.id;
-                if (typeof tabId !== 'number') return Promise.resolve();
-
-                return runAction<StowResult>(
-                  `stow-tab-${tabId}`,
-                  () =>
-                    sendExtensionMessage<AppResult<StowResult>>({
-                      type: 'sessions:stow-tab',
-                      tabId,
-                    }),
-                  (result) =>
-                    `Saved ${result.savedTabCount} tab for later and closed ${result.closedTabCount}.`,
-                );
-              }}
-            />
-
-            <StowedSessions
-              busyAction={busyAction}
-              locale={locale}
-              onRunAction={runAction}
-              query={tabQuery}
-              sessions={sessions}
-              status={status}
-            />
+                    return runAction<StowResult>(
+                      `stow-tab-${tabId}`,
+                      () =>
+                        sendExtensionMessage<AppResult<StowResult>>({
+                          type: 'sessions:stow-tab',
+                          tabId,
+                        }),
+                      (result) =>
+                        `Saved ${result.savedTabCount} tab for later and closed ${result.closedTabCount}.`,
+                    );
+                  }}
+                />
+              </div>
+              <div className="saved-region">
+                <StowedSessions
+                  busyAction={busyAction}
+                  locale={locale}
+                  onRunAction={runAction}
+                  query={tabQuery}
+                  sessions={sessions}
+                />
+              </div>
+            </div>
           </section>
         </section>
       </main>
@@ -358,15 +368,13 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
           >
             <header>
               <div>
-                <h2 id="extra-drawer-title">Extra</h2>
-                <p className="subtle">
-                  Secondary tools stay here while the main workspace follows the v1 layout.
-                </p>
+                <h2 id="extra-drawer-title">{t(locale, 'extra')}</h2>
+                <p className="subtle">{t(locale, 'extraDescription')}</p>
               </div>
               <button
                 type="button"
                 className="icon-button"
-                aria-label="Close extra drawer"
+                aria-label={t(locale, 'closeExtra')}
                 onClick={() => setExtraOpen(false)}
               >
                 <X size={16} aria-hidden="true" />

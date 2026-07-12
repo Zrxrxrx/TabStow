@@ -1167,7 +1167,7 @@ describe('App', () => {
     expect(document.documentElement.dataset.themeMode).toBe('dark');
     expect(document.documentElement.lang).toBe('zh-CN');
 
-    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByRole('button', { name: '更多' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: '外观' })).toThrow();
@@ -1203,7 +1203,7 @@ describe('App', () => {
     expect(document.documentElement.dataset.themeMode).toBe('dark');
     expect(screen().getByRole('button', { name: '切换主题' })).toBe(themeSwitch);
 
-    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByRole('button', { name: '更多' }));
     expect(() => screen().getByLabelText('语言')).toThrow();
     expect(() => screen().getByLabelText('主题模式')).toThrow();
     expect(container.textContent).not.toContain('Auto');
@@ -1228,12 +1228,12 @@ describe('App', () => {
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
     expect(() => screen().getByRole('heading', { name: 'Saved for later' })).toThrow();
 
-    await click(screen().getByRole('button', { name: 'Extra' }));
+    await click(screen().getByRole('button', { name: '更多' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: '外观' })).toThrow();
   });
 
-  it('renders the v1 shell and moves secondary utilities into the Extra drawer', async () => {
+  it('renders the V2 desktop shell and moves secondary utilities into the Extra drawer', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([
       {
@@ -1247,9 +1247,15 @@ describe('App', () => {
 
     await renderApp();
 
-    expect(container.querySelector('.page-shell')).not.toBeNull();
-    expect(container.querySelector('.topbar')).not.toBeNull();
-    expect(container.querySelector('.workspace-grid')).not.toBeNull();
+    expect(container.querySelector('.newtab-shell')).not.toBeNull();
+    expect(container.querySelector('.quick-links-rail')).not.toBeNull();
+    expect(container.querySelector('.top-strip')).not.toBeNull();
+    expect(container.querySelector('.v2-workspace')).not.toBeNull();
+    expect(container.querySelector('.active-region')).not.toBeNull();
+    expect(container.querySelector('.saved-region')).not.toBeNull();
+    expect(container.querySelector('.page-shell')).toBeNull();
+    expect(container.querySelector('.topbar')).toBeNull();
+    expect(container.querySelector('.workspace-grid')).toBeNull();
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
     expect(screen().getByRole('button', { name: 'Extra' })).not.toBeNull();
     expect(screen().getByRole('button', { name: 'Open settings' })).not.toBeNull();
@@ -1276,18 +1282,24 @@ describe('App', () => {
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
   });
 
-  it('keeps v1 layout class contract stable for CSS', async () => {
+  it('keeps the V2 layout class contract stable for CSS', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
 
     await renderApp();
 
     const requiredSelectors = [
-      '.page-shell',
-      '.topbar',
+      '.newtab-shell',
+      '.quick-links-rail',
+      '.rail-brand',
+      '.rail-links-scroll',
+      '.rail-utilities',
+      '.newtab-stage',
+      '.top-strip',
       '.brand-lockup',
       '.mark',
-      '.quick-links-panel',
-      '.workspace-grid',
+      '.v2-workspace',
+      '.active-region',
+      '.saved-region',
       '.active-workspace.panel.column',
       '.saved-sessions.panel.column',
     ];

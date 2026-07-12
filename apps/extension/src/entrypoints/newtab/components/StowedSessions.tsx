@@ -8,7 +8,6 @@ import {
   type MouseEvent,
 } from 'react';
 import type { TabSession } from '@tabstow/core';
-import { StatusMessage } from '@/components/StatusMessage';
 import { TabFavicon } from '@/components/TabFavicon';
 import { t, type Locale } from '@/features/i18n/i18n';
 import { filterSavedSessions } from '@/features/tab-search/tab-search';
@@ -23,17 +22,11 @@ import {
   type SavedTabsDropTarget,
 } from './saved-tabs-dnd';
 
-type StatusState = {
-  tone: 'info' | 'success' | 'error';
-  message: string | null;
-};
-
 type Props = {
   busyAction: string | null;
   locale: Locale;
   query: string;
   sessions: TabSession[];
-  status: StatusState;
   onRunAction: <T>(
     actionId: string,
     action: () => Promise<AppResult<T>>,
@@ -170,7 +163,6 @@ export function StowedSessions({
   onRunAction,
   query,
   sessions,
-  status,
 }: Props) {
   const [activeDropTargetKey, setActiveDropTargetKey] = useState<string | null>(null);
   const dragSourceRef = useRef<SavedTabsDragSource | null>(null);
@@ -338,8 +330,6 @@ export function StowedSessions({
           <span className="meta-pill">{tabCount}</span>
         </span>
       </header>
-
-      <StatusMessage message={status.message} tone={status.tone} />
 
       <section className="session-list" aria-label="Saved sessions">
         {filteredSessions.length === 0 ? (
