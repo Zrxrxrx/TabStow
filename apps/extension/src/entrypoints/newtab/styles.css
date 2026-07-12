@@ -872,6 +872,36 @@ h3 {
   background: color-mix(in srgb, var(--surface-color, #fff) 88%, transparent);
   color: var(--muted-text, #596474);
   font-size: 12px;
+  text-align: left;
+}
+
+.sync-detail-list {
+  display: grid;
+  gap: 0;
+  margin: 0;
+  border-top: 1px solid var(--border);
+}
+
+.sync-detail-list > div {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 130px minmax(0, 1fr);
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.sync-detail-list dt {
+  color: var(--muted);
+  font: 800 8px/1.2 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.sync-detail-list dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .newtab-sync-status__summary,

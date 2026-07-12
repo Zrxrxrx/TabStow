@@ -48,10 +48,22 @@ const { getLanguagePreference, saveLanguagePreference } = vi.hoisted(() => ({
   getLanguagePreference: vi.fn(),
   saveLanguagePreference: vi.fn(),
 }));
+const syncIncidentMocks = vi.hoisted(() => ({
+  acknowledgeIncident: vi.fn(),
+  clearAcknowledgement: vi.fn(),
+  getAcknowledgedIncidentKey: vi.fn(),
+}));
 
 vi.mock('@/lib/messages', () => ({
   sendExtensionMessage,
 }));
+
+vi.mock('@/features/sync/sync-incident-acknowledgement', async () => {
+  const actual = await vi.importActual<typeof import('@/features/sync/sync-incident-acknowledgement')>(
+    '@/features/sync/sync-incident-acknowledgement',
+  );
+  return { ...actual, ...syncIncidentMocks };
+});
 
 vi.mock('@/features/quick-links/quick-links-storage', () => ({
   getQuickLinks,
@@ -258,6 +270,10 @@ describe('App', () => {
     saveThemePreferences.mockReset();
     getLanguagePreference.mockReset();
     saveLanguagePreference.mockReset();
+    syncIncidentMocks.acknowledgeIncident.mockReset();
+    syncIncidentMocks.clearAcknowledgement.mockReset();
+    syncIncidentMocks.getAcknowledgedIncidentKey.mockReset();
+    syncIncidentMocks.getAcknowledgedIncidentKey.mockResolvedValue(null);
     getQuickLinks.mockResolvedValue([]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
     updateQuickLinks.mockImplementation(async (update: (currentLinks: unknown[]) => unknown[] | Promise<unknown[]>) => {
@@ -2320,6 +2336,38 @@ describe('App', () => {
     expect(
       container.querySelector<HTMLInputElement>('input[data-quick-link-upload-id="link-1"]')?.disabled,
     ).toBe(false);
+  });
+
+  it('auto-opens a paused sync incident once and acknowledges dismissal', async () => {
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'sessions:stow-current-window-preview') return { ok: true, data: { eligibleTabCount: 1 } };
+      if (message.type === 'active-tabs:snapshot') return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'sync:observe') {
+        return { ok: true, data: { phase: 'connected', sync: { state: 'paused', action: 'reconnect', message: 'Token expired' } } };
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+
+    expect(screen().getByRole('dialog', { name: 'Sync details' })).not.toBeNull();
+    await click(screen().getByRole('button', { name: 'Cancel' }));
+    expect(syncIncidentMocks.acknowledgeIncident).toHaveBeenCalledTimes(1);
+  });
+
+  it('clears incident acknowledgement only for a connected healthy state', async () => {
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'sessions:stow-current-window-preview') return { ok: true, data: { eligibleTabCount: 1 } };
+      if (message.type === 'active-tabs:snapshot') return { ok: true, data: activeTabsSnapshot([UNIQUE_TAB]) };
+      if (message.type === 'sessions:list') return { ok: true, data: SESSIONS };
+      if (message.type === 'sync:observe') return { ok: true, data: { phase: 'connected', sync: { state: 'synced' } } };
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderApp();
+
+    expect(syncIncidentMocks.clearAcknowledgement).toHaveBeenCalled();
   });
 
   it('refreshes Sessions and Quick Links after a background data-changed event', async () => {

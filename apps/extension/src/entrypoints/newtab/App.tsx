@@ -17,6 +17,12 @@ import {
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
+import {
+  acknowledgeIncident,
+  clearAcknowledgement,
+  derivePausedIncidentKey,
+  getAcknowledgedIncidentKey,
+} from '@/features/sync/sync-incident-acknowledgement';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
 import { RecoveryBinDialog } from './components/RecoveryBinDialog';
@@ -24,6 +30,7 @@ import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
 import { StowCurrentWindowButton } from './components/StowCurrentWindowButton';
+import { SyncStatusDialog } from './components/SyncStatusDialog';
 import { TodosPanel } from './components/TodosPanel';
 import { UnifiedSearch } from './components/UnifiedSearch';
 
@@ -61,6 +68,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialThemeMode ?? 'light');
   const [extraOpen, setExtraOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [syncDetailsOpen, setSyncDetailsOpen] = useState(false);
   const [tabQuery, setTabQuery] = useState('');
   const busyActionRef = useRef<string | null>(null);
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
@@ -80,6 +88,22 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
     void loadSessions();
     void observeSync('open');
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    const incidentKey = derivePausedIncidentKey(connection);
+    if (incidentKey) {
+      void getAcknowledgedIncidentKey().then((acknowledgedKey) => {
+        if (active && acknowledgedKey !== incidentKey) setSyncDetailsOpen(true);
+      });
+    } else if (
+      connection.phase === 'connected' &&
+      ['synced', 'pending', 'syncing', 'retrying'].includes(connection.sync.state)
+    ) {
+      void clearAcknowledgement();
+    }
+    return () => { active = false; };
+  }, [connection]);
 
   async function observeSync(reason: 'open' | 'focus') {
     try {
@@ -298,7 +322,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
             <NewTabSyncStatus
               connection={connection}
               locale={locale}
-              onOpenSettings={openOptions}
+              onOpenDetails={() => setSyncDetailsOpen(true)}
             />
             <StowCurrentWindowButton
               busy={busyAction === 'stow'}
@@ -405,6 +429,18 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
           locale={locale}
           onClose={() => setRecoveryOpen(false)}
           onRestored={loadSessions}
+        />
+      ) : null}
+      {syncDetailsOpen ? (
+        <SyncStatusDialog
+          connection={connection}
+          locale={locale}
+          onClose={() => {
+            const incidentKey = derivePausedIncidentKey(connection);
+            if (incidentKey) void acknowledgeIncident(incidentKey);
+            setSyncDetailsOpen(false);
+          }}
+          onOpenSettings={openOptions}
         />
       ) : null}
     </>

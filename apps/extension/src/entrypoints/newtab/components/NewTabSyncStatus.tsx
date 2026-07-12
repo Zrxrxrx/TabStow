@@ -5,7 +5,7 @@ import { t, type Locale } from '@/features/i18n/i18n';
 type Props = {
   connection: ConnectionView;
   locale: Locale;
-  onOpenSettings: () => void;
+  onOpenDetails: () => void;
 };
 
 function effectiveState(connection: ConnectionView): SyncState {
@@ -50,7 +50,7 @@ function pausedDetail(locale: Locale, connection: ConnectionView): string {
   }
 }
 
-export function NewTabSyncStatus({ connection, locale, onOpenSettings }: Props) {
+export function NewTabSyncStatus({ connection, locale, onOpenDetails }: Props) {
   const state = effectiveState(connection);
   const localSafety = state === 'pending' || state === 'retrying';
   const Icon =
@@ -68,11 +68,12 @@ export function NewTabSyncStatus({ connection, locale, onOpenSettings }: Props) 
     : null;
 
   return (
-    <section
+    <button
+      type="button"
       className={`newtab-sync-status newtab-sync-status--${state}`}
       aria-label={t(locale, 'syncStatus')}
       aria-live={state === 'paused' ? 'assertive' : 'polite'}
-      role={state === 'paused' ? 'alert' : undefined}
+      onClick={onOpenDetails}
     >
       <div className="newtab-sync-status__summary">
         <Icon size={15} aria-hidden="true" />
@@ -82,16 +83,7 @@ export function NewTabSyncStatus({ connection, locale, onOpenSettings }: Props) 
           <span>· {t(locale, 'syncRetryScheduled', { time: retryTime })}</span>
         ) : null}
       </div>
-      {state === 'paused' ? (
-        <div className="newtab-sync-status__detail">
-          <span>{pausedDetail(locale, connection)}</span>
-          <button type="button" className="secondary-button" onClick={onOpenSettings}>
-            {connection.sync.action === 'reconnect'
-              ? t(locale, 'syncReconnect')
-              : t(locale, 'openSettings')}
-          </button>
-        </div>
-      ) : null}
-    </section>
+      {state === 'paused' ? <span className="newtab-sync-status__detail">{pausedDetail(locale, connection)}</span> : null}
+    </button>
   );
 }
