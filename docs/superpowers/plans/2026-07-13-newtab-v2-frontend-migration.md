@@ -81,7 +81,7 @@ Cover all of these cases:
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/theme/theme-preferences.test.ts src/features/theme/theme-background-cache.test.ts src/entrypoints/newtab/App.test.tsx
+bun run --cwd apps/extension test -- src/features/theme/theme-preferences.test.ts src/features/theme/theme-background-cache.test.ts src/entrypoints/newtab/App.test.tsx
 ```
 
 Expected: FAIL on the legacy fields, missing cache-wide cleanup, pre-render bootstrap, and removed controls.
@@ -99,8 +99,8 @@ Expected: FAIL on the legacy fields, missing cache-wide cleanup, pre-render boot
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/theme/theme-preferences.test.ts src/features/theme/theme-background-cache.test.ts src/entrypoints/newtab/App.test.tsx
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/features/theme/theme-preferences.test.ts src/features/theme/theme-background-cache.test.ts src/entrypoints/newtab/App.test.tsx
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -142,7 +142,7 @@ git commit -m "refactor(theme): retire new tab personalization"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/active-tabs/active-tabs-service.test.ts src/features/active-tabs/active-tab-windows.test.ts src/components/TabFavicon.test.tsx src/entrypoints/newtab/App.test.tsx
+bun run --cwd apps/extension test -- src/features/active-tabs/active-tabs-service.test.ts src/features/active-tabs/active-tab-windows.test.ts src/components/TabFavicon.test.tsx src/entrypoints/newtab/App.test.tsx
 ```
 
 Expected: FAIL because the snapshot type lacks the fields and fallback still renders initials.
@@ -157,8 +157,8 @@ Expected: FAIL because the snapshot type lacks the fields and fallback still ren
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/active-tabs/active-tabs-service.test.ts src/features/active-tabs/active-tab-windows.test.ts src/components/TabFavicon.test.tsx src/entrypoints/newtab/App.test.tsx
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/features/active-tabs/active-tabs-service.test.ts src/features/active-tabs/active-tab-windows.test.ts src/components/TabFavicon.test.tsx src/entrypoints/newtab/App.test.tsx
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -204,7 +204,7 @@ git commit -m "feat(newtab): expose real tab state and favicon fallback"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/ModalDialog.test.tsx src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/NewTabFeedback.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/ModalDialog.test.tsx src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/NewTabFeedback.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
 ```
 
 Expected: FAIL because the generic modal and V2 shell do not exist.
@@ -221,8 +221,8 @@ Expected: FAIL because the generic modal and V2 shell do not exist.
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/ModalDialog.test.tsx src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/NewTabFeedback.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/ModalDialog.test.tsx src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/NewTabFeedback.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS. Pixel-level verification remains in Task 11.
@@ -269,7 +269,7 @@ git commit -m "feat(newtab): establish v2 shell and dialog system"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/tabs/session-service.test.ts src/lib/messages.test.ts src/tests/background.test.ts src/entrypoints/newtab/components/StowCurrentWindowButton.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension test -- src/features/tabs/session-service.test.ts src/lib/messages.test.ts src/tests/background.test.ts src/entrypoints/newtab/components/StowCurrentWindowButton.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
 ```
 
 Expected: FAIL on the missing preview message/service/component.
@@ -285,8 +285,8 @@ Expected: FAIL on the missing preview message/service/component.
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/tabs/session-service.test.ts src/lib/messages.test.ts src/tests/background.test.ts src/entrypoints/newtab/components/StowCurrentWindowButton.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/features/tabs/session-service.test.ts src/lib/messages.test.ts src/tests/background.test.ts src/entrypoints/newtab/components/StowCurrentWindowButton.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -334,7 +334,7 @@ git commit -m "feat(newtab): add authoritative stow preview"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/tab-search/tab-search.test.ts src/entrypoints/newtab/components/UnifiedSearch.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension test -- src/features/tab-search/tab-search.test.ts src/entrypoints/newtab/components/UnifiedSearch.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
 ```
 
 Expected: FAIL on suggestion ranking, single-input orchestration, and removed old components.
@@ -349,8 +349,8 @@ Expected: FAIL on suggestion ranking, single-input orchestration, and removed ol
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/tab-search/tab-search.test.ts src/entrypoints/newtab/components/UnifiedSearch.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/features/tab-search/tab-search.test.ts src/entrypoints/newtab/components/UnifiedSearch.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -394,7 +394,7 @@ git commit -m "feat(newtab): add unified tab and web search"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/quick-links-dnd.test.ts src/entrypoints/newtab/App.test.tsx
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/quick-links-dnd.test.ts src/entrypoints/newtab/App.test.tsx
 ```
 
 Expected: FAIL because Quick Links still use cards and move buttons.
@@ -409,8 +409,8 @@ Expected: FAIL because Quick Links still use cards and move buttons.
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/quick-links-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/quick-links/quick-links-storage.test.ts src/features/quick-links/quick-links.test.ts src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/quick-links-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/quick-links/quick-links-storage.test.ts src/features/quick-links/quick-links.test.ts src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -457,7 +457,7 @@ git commit -m "feat(newtab): migrate quick links into v2 rail"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/active-tabs-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/active-tabs/active-tab-moves.test.ts src/features/active-tabs/active-tabs-events.test.ts
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/active-tabs-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/active-tabs/active-tab-moves.test.ts src/features/active-tabs/active-tabs-events.test.ts
 ```
 
 Expected: FAIL on window filtering, full-row/header drag, and sleep/audible presentation.
@@ -473,8 +473,8 @@ Expected: FAIL on window filtering, full-row/header drag, and sleep/audible pres
 - [ ] **Step 4: Run focused and service tests**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/active-tabs-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/active-tabs/active-tab-moves.test.ts src/features/active-tabs/active-tabs-events.test.ts src/features/active-tabs/active-tabs-service.test.ts src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/active-tabs-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/active-tabs/active-tab-moves.test.ts src/features/active-tabs/active-tabs-events.test.ts src/features/active-tabs/active-tabs-service.test.ts src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -519,7 +519,7 @@ git commit -m "feat(newtab): migrate active tabs to v2 interactions"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/saved-tabs-dnd.test.ts src/entrypoints/newtab/components/RecoveryBinDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/entrypoints/saved-history/HistoryApp.test.tsx
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/saved-tabs-dnd.test.ts src/entrypoints/newtab/components/RecoveryBinDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/entrypoints/saved-history/HistoryApp.test.tsx
 ```
 
 Expected: FAIL on full-row/header drag and the missing Recovery preview.
@@ -535,8 +535,8 @@ Expected: FAIL on full-row/header drag and the missing Recovery preview.
 - [ ] **Step 4: Run focused and repository/service tests**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/components/saved-tabs-dnd.test.ts src/entrypoints/newtab/components/RecoveryBinDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/entrypoints/saved-history/HistoryApp.test.tsx src/db/db.test.ts src/features/tabs/session-service.test.ts src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/entrypoints/newtab/components/saved-tabs-dnd.test.ts src/entrypoints/newtab/components/RecoveryBinDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/entrypoints/saved-history/HistoryApp.test.tsx src/db/db.test.ts src/features/tabs/session-service.test.ts src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -585,7 +585,7 @@ git commit -m "feat(newtab): add v2 saved vault and recovery preview"
 - [ ] **Step 2: Run focused tests and verify RED**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/sync/sync-incident-acknowledgement.test.ts src/entrypoints/newtab/components/NewTabSyncStatus.test.tsx src/entrypoints/newtab/components/SyncStatusDialog.test.tsx src/entrypoints/newtab/App.test.tsx
+bun run --cwd apps/extension test -- src/features/sync/sync-incident-acknowledgement.test.ts src/entrypoints/newtab/components/NewTabSyncStatus.test.tsx src/entrypoints/newtab/components/SyncStatusDialog.test.tsx src/entrypoints/newtab/App.test.tsx
 ```
 
 Expected: FAIL on the missing acknowledgement store/dialog and current inline-only status.
@@ -600,8 +600,8 @@ Expected: FAIL on the missing acknowledgement store/dialog and current inline-on
 - [ ] **Step 4: Run focused and existing sync tests**
 
 ```bash
-bun --cwd apps/extension run test -- src/features/sync/sync-incident-acknowledgement.test.ts src/entrypoints/newtab/components/NewTabSyncStatus.test.tsx src/entrypoints/newtab/components/SyncStatusDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/features/sync/connection-store.test.ts src/features/sync/sync-coordinator.test.ts src/features/i18n/i18n.test.ts
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/features/sync/sync-incident-acknowledgement.test.ts src/entrypoints/newtab/components/NewTabSyncStatus.test.tsx src/entrypoints/newtab/components/SyncStatusDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/features/sync/connection-store.test.ts src/features/sync/sync-coordinator.test.ts src/features/i18n/i18n.test.ts
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -652,7 +652,7 @@ Cover at least:
 - [ ] **Step 2: Run the final App/i18n tests and verify RED where V1 remains**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/ModalDialog.test.tsx
+bun run --cwd apps/extension test -- src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/ModalDialog.test.tsx
 ```
 
 - [ ] **Step 3: Finish composition and delete only confirmed V1 orphans**
@@ -665,8 +665,8 @@ bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx src/fea
 - [ ] **Step 4: Run focused tests and typecheck**
 
 ```bash
-bun --cwd apps/extension run test -- src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/ModalDialog.test.tsx
-bun --cwd apps/extension run typecheck
+bun run --cwd apps/extension test -- src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/ModalDialog.test.tsx
+bun run --cwd apps/extension typecheck
 ```
 
 Expected: PASS.
@@ -691,7 +691,7 @@ git commit -m "refactor(newtab): complete v2 presentation cutover"
 
 ```bash
 git diff --check
-bun --cwd apps/extension run test -- src/entrypoints/newtab src/components/TabFavicon.test.tsx src/features/theme src/features/tab-search src/features/active-tabs src/features/tabs/session-service.test.ts src/entrypoints/saved-history/HistoryApp.test.tsx
+bun run --cwd apps/extension test -- src/entrypoints/newtab src/components/TabFavicon.test.tsx src/features/theme src/features/tab-search src/features/active-tabs src/features/tabs/session-service.test.ts src/entrypoints/saved-history/HistoryApp.test.tsx
 ```
 
 Expected: PASS.
