@@ -1,6 +1,6 @@
 # Tabstow
 
-Tabstow is a Chrome Manifest V3 extension that replaces the default new tab page with a utilitarian workspace for stowing, restoring, and manually syncing browser tab sessions.
+Tabstow is a Chrome Manifest V3 extension that replaces the default new tab page with a utilitarian workspace for stowing, restoring, and automatically synchronizing browser tab sessions through an existing GitHub Gist.
 
 ## Development
 
@@ -42,7 +42,9 @@ bun run zip
 
 ## Releases
 
-For the first release, open **Actions** in GitHub, select the **Release** workflow, choose **Run workflow**, and leave **Version to publish or increment** set to `current`. The checked-in extension version is `1.0.0`, so this publishes `v1.0.0`. For each later release, run the workflow again and select the desired `patch`, `minor`, or `major` bump.
+Register a GitHub OAuth App, enable Device Flow, and set its public client ID in the repository variable `WXT_GITHUB_OAUTH_CLIENT_ID` before building a release. Tabstow never uses or accepts an OAuth client secret.
+
+Open **Actions** in GitHub, select the **Release** workflow, choose **Run workflow**, and select `current`, `patch`, `minor`, or `major` as appropriate.
 
 If a release run fails after pushing its tag, rerun the workflow with `current`. Recovery is allowed only when the existing tag is annotated and peels to the checked-out default-branch HEAD. The rerun repeats typechecking, tests, the ZIP build, and release verification, but skips commit, tag, and push.
 

@@ -24,5 +24,20 @@
 - Left-click a saved tab and confirm it opens in the background, moves to History, and keeps Tabstow focused; middle-click another and confirm it remains saved.
 - Restore a saved session and delete another, then confirm both move to History and can be restored to Saved for later.
 - Open a History tab without consuming it and permanently delete a History entry.
-- Open the options page and save Gist settings.
-- Push and pull Gist sync and confirm Saved URLs deduplicate while local History remains unchanged.
+- Register a test OAuth App with Device Flow enabled, build with `WXT_GITHUB_OAUTH_CLIENT_ID`, and prepare an existing Gist containing `tabstow.sync.json`.
+- In two separate Chrome profiles, choose **Connect GitHub**, complete Device Flow, and bind both profiles to the same existing Gist.
+- Verify automatic discovery for one unlisted canonical file, explicit selection for multiple candidates, manual Gist ID/filename entry for no candidates, and the warning before a public Gist is confirmed.
+- With local Saved for Later and Quick Link data present, confirm that Tabstow requires target confirmation before the first merge.
+- Open a New Tab in profile A and confirm it reads remote changes immediately. Refocus repeatedly within 60 seconds and confirm it does not poll on every focus.
+- Make a burst of Saved for Later and Quick Link changes. Confirm local UI updates immediately and one delayed Gist update occurs roughly 60 seconds after the final change.
+- Close the New Tab before the quiet deadline and confirm the background alarm still updates the Gist. Repeat across browser restart and sleep/wake.
+- Concurrently add, move, reorder, consume, restore, and delete Saved tabs and sessions in both profiles. Reopen/focus each profile and confirm they converge, including deletion and empty-session removal.
+- Restore a History entry and confirm the restored session and tabs synchronize with fresh identities. Confirm remote deletions do not create local History entries.
+- Concurrently add, edit, reorder, and delete Quick Links. Upload an image icon and confirm the image remains local while synchronized label/order/deletion changes still converge.
+- Change **Save pinned tabs when stowing** and **Close pinned tabs after saving** independently on different profiles and confirm revision-based convergence.
+- Disconnect from the network, make local changes, and confirm the New Tab says changes are saved locally. Reconnect and confirm bounded retry completes.
+- Use Settings **Pull** and **Push** and confirm Saved URLs deduplicate while local History remains unchanged. Verify those buttons do not appear on the New Tab.
+- Corrupt the non-empty sync file and confirm Tabstow pauses, displays an unable-to-sync message, and offers Open Gist/Retry/Choose another without overwriting it.
+- Rename or remove the bound file and confirm Tabstow pauses instead of silently switching Gists.
+- Disconnect and confirm local Saved for Later, Quick Links, and History remain, the remote Gist is unchanged, and Settings links to GitHub for full OAuth revocation.
+- Upgrade a valid version-one file and confirm only version two is written afterward.
