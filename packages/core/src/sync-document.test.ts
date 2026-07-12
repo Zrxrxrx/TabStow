@@ -9,9 +9,6 @@ import {
 
 const settings: ExtensionSettings = {
   deviceId: 'device-1',
-  githubToken: 'secret-token',
-  gistId: 'gist-1',
-  gistFileName: 'tabstow.sync.json',
   includePinnedTabs: true,
   closePinnedTabs: false,
   theme: 'dark',
@@ -28,20 +25,16 @@ const session: TabSession = {
 };
 
 describe('sync documents', () => {
-  it('exports safe settings without githubToken', () => {
+  it('exports only synchronized behavior settings and the legacy device id', () => {
     expect(toSafeSyncSettings(settings)).toEqual({
       deviceId: 'device-1',
-      gistId: 'gist-1',
-      gistFileName: 'tabstow.sync.json',
       includePinnedTabs: true,
       closePinnedTabs: false,
     });
   });
 
-  it('imports remote settings without githubToken or deviceId', () => {
+  it('imports remote settings without deviceId', () => {
     expect(toImportableSettings(toSafeSyncSettings(settings))).toEqual({
-      gistId: 'gist-1',
-      gistFileName: 'tabstow.sync.json',
       includePinnedTabs: true,
       closePinnedTabs: false,
     });

@@ -78,7 +78,6 @@ describe('core schemas', () => {
 
   it('keeps default settings aligned with the MVP', () => {
     expect(DEFAULT_SETTINGS).toEqual({
-      gistFileName: 'tabstow.sync.json',
       includePinnedTabs: false,
       closePinnedTabs: false,
       theme: 'system',
@@ -90,6 +89,23 @@ describe('core schemas', () => {
         deviceId: 'device-1',
       }),
     ).toMatchObject(DEFAULT_SETTINGS);
+  });
+
+  it('rejects legacy token and Gist binding fields from ordinary settings', () => {
+    expect(
+      extensionSettingsSchema.safeParse({
+        ...DEFAULT_SETTINGS,
+        deviceId: 'device-1',
+        githubToken: 'secret',
+      }).success,
+    ).toBe(false);
+    expect(
+      extensionSettingsSchema.safeParse({
+        ...DEFAULT_SETTINGS,
+        deviceId: 'device-1',
+        gistId: 'gist-1',
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects sync documents that contain githubToken in settings', () => {

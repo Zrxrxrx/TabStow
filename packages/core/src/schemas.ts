@@ -38,26 +38,32 @@ export const tabSessionSchema = z
 export const themeSchema = z.enum(['system', 'light', 'dark']);
 
 export const defaultSettingsSchema = z.object({
-  gistFileName: z.string().min(1),
   includePinnedTabs: z.boolean(),
   closePinnedTabs: z.boolean(),
   theme: themeSchema,
 });
 
-export const extensionSettingsSchema = defaultSettingsSchema.extend({
-  deviceId: z.string().min(1),
-  githubToken: z.string().min(1).optional(),
-  gistId: z.string().min(1).optional(),
-});
+export const extensionSettingsSchema = defaultSettingsSchema
+  .extend({
+    deviceId: z.string().min(1),
+  })
+  .strict();
 
 export const safeSyncSettingsSchema = extensionSettingsSchema
-  .omit({ githubToken: true, theme: true })
+  .omit({ theme: true })
   .strict();
 
 const syncDocumentSettingsSchema = safeSyncSettingsSchema
-  .extend({ theme: themeSchema.optional() })
+  .extend({
+    gistId: z.string().min(1).optional(),
+    gistFileName: z.string().min(1).optional(),
+    theme: themeSchema.optional(),
+  })
   .strict()
-  .transform(({ theme: _theme, ...settings }) => settings);
+  .transform(
+    ({ gistId: _gistId, gistFileName: _gistFileName, theme: _theme, ...settings }) =>
+      settings,
+  );
 
 const syncedQuickLinkIconSchema = z.preprocess(
   (value) => {
@@ -126,7 +132,6 @@ export const syncDocumentSchema = z.object({
 });
 
 export const DEFAULT_SETTINGS = {
-  gistFileName: 'tabstow.sync.json',
   includePinnedTabs: false,
   closePinnedTabs: false,
   theme: 'system',
