@@ -8,6 +8,11 @@ import {
   t,
   type LanguagePreference,
 } from '@/features/i18n/i18n';
+import {
+  getThemePreferences,
+  saveThemePreferences,
+  type ThemeMode,
+} from '@/features/theme/theme-preferences';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
@@ -16,7 +21,6 @@ import { QuickLinks } from './components/QuickLinks';
 import { SearchBox } from './components/SearchBox';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
-import { ThemeControls, useThemePreferencesController } from './components/ThemeControls';
 import { TodosPanel } from './components/TodosPanel';
 import { WorkspaceSearch } from './components/WorkspaceSearch';
 
@@ -30,19 +34,28 @@ const DISCONNECTED_SYNC: ConnectionView = {
   sync: { state: 'disconnected' },
 };
 
-export function App() {
+type AppProps = {
+  initialThemeError?: string | null;
+  initialThemeMode?: ThemeMode;
+};
+
+export function App({ initialThemeError = null, initialThemeMode }: AppProps = {}) {
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
-  const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
+  const [status, setStatus] = useState<StatusState>(
+    initialThemeError
+      ? { tone: 'error', message: initialThemeError }
+      : { tone: 'info', message: null },
+  );
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
   const [quickLinksRefreshKey, setQuickLinksRefreshKey] = useState(0);
   const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED_SYNC);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(initialThemeMode ?? 'light');
   const [extraOpen, setExtraOpen] = useState(false);
   const [tabQuery, setTabQuery] = useState('');
   const busyActionRef = useRef<string | null>(null);
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
-  const themeControls = useThemePreferencesController();
 
   async function loadSessions() {
     const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
@@ -109,8 +122,24 @@ export function App() {
   }, []);
 
   useEffect(() => {
+    if (initialThemeMode) return;
+    void getThemePreferences().then(
+      (theme) => setThemeMode(theme.mode),
+      (error) =>
+        setStatus({
+          tone: 'error',
+          message: error instanceof Error ? error.message : 'Could not load theme preferences.',
+        }),
+    );
+  }, [initialThemeMode]);
+
+  useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
+
+  useEffect(() => {
+    document.documentElement.dataset.themeMode = themeMode;
+  }, [themeMode]);
 
   useEffect(() => {
     if (!extraOpen) return;
@@ -173,11 +202,11 @@ export function App() {
   }
 
   async function toggleTheme() {
-    const currentMode = themeControls.theme?.mode ?? 'light';
-    await themeControls.updateTheme({ mode: currentMode === 'dark' ? 'light' : 'dark' });
+    const saved = await saveThemePreferences({ mode: themeMode === 'dark' ? 'light' : 'dark' });
+    setThemeMode(saved.mode);
   }
 
-  const currentThemeMode = themeControls.theme?.mode ?? 'light';
+  const currentThemeMode = themeMode;
   const currentLanguageLabel = locale === 'zh-CN' ? '简体中文' : 'English';
   const currentThemeLabel = currentThemeMode === 'dark' ? t(locale, 'dark') : t(locale, 'light');
 
@@ -218,7 +247,6 @@ export function App() {
               className="preference-switch"
               onClick={() => void toggleTheme()}
               aria-label={t(locale, 'switchTheme')}
-              disabled={!themeControls.theme}
             >
               {currentThemeMode === 'dark' ? (
                 <Moon size={16} aria-hidden="true" />
@@ -345,12 +373,6 @@ export function App() {
               </button>
             </header>
             <TodosPanel locale={locale} />
-            <ThemeControls
-              controls={themeControls}
-              language={language}
-              locale={locale}
-              onLanguageChange={setLanguage}
-            />
           </section>
         </aside>
       ) : null}

@@ -48,11 +48,6 @@ const { getLanguagePreference, saveLanguagePreference } = vi.hoisted(() => ({
   getLanguagePreference: vi.fn(),
   saveLanguagePreference: vi.fn(),
 }));
-const { saveCustomBackgroundFile, resolveCustomBackgroundUrl, deleteCustomBackground } = vi.hoisted(() => ({
-  saveCustomBackgroundFile: vi.fn(),
-  resolveCustomBackgroundUrl: vi.fn(),
-  deleteCustomBackground: vi.fn(),
-}));
 
 vi.mock('@/lib/messages', () => ({
   sendExtensionMessage,
@@ -95,12 +90,6 @@ vi.mock('@/features/i18n/i18n', async () => {
     saveLanguagePreference,
   };
 });
-
-vi.mock('@/features/theme/theme-background-cache', () => ({
-  saveCustomBackgroundFile,
-  resolveCustomBackgroundUrl,
-  deleteCustomBackground,
-}));
 
 const SESSIONS: TabSession[] = [];
 const SAVED_SESSIONS: TabSession[] = [
@@ -269,9 +258,6 @@ describe('App', () => {
     saveThemePreferences.mockReset();
     getLanguagePreference.mockReset();
     saveLanguagePreference.mockReset();
-    saveCustomBackgroundFile.mockReset();
-    resolveCustomBackgroundUrl.mockReset();
-    deleteCustomBackground.mockReset();
     getQuickLinks.mockResolvedValue([]);
     saveQuickLinks.mockImplementation(async (links: unknown) => links);
     updateQuickLinks.mockImplementation(async (update: (currentLinks: unknown[]) => unknown[] | Promise<unknown[]>) => {
@@ -285,24 +271,13 @@ describe('App', () => {
     deleteQuickLinkIcon.mockResolvedValue(undefined);
     getTodos.mockResolvedValue([]);
     saveTodos.mockImplementation(async (todos: unknown) => todos);
-    getThemePreferences.mockResolvedValue({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: null,
-    });
+    getThemePreferences.mockResolvedValue({ mode: 'light' });
     saveThemePreferences.mockImplementation(async (preferences: unknown) => preferences);
     getLanguagePreference.mockResolvedValue('auto');
     saveLanguagePreference.mockImplementation(async (language: unknown) => language);
-    saveCustomBackgroundFile.mockResolvedValue('theme-bg:token-1');
-    resolveCustomBackgroundUrl.mockResolvedValue('blob:theme-bg-token-1');
-    deleteCustomBackground.mockResolvedValue(undefined);
     promptSpy = vi.spyOn(window, 'prompt').mockReturnValue(null);
     document.documentElement.removeAttribute('data-theme-mode');
-    document.documentElement.removeAttribute('data-theme-palette');
     document.documentElement.removeAttribute('lang');
-    document.documentElement.style.removeProperty('--surface-opacity');
-    document.documentElement.style.removeProperty('--dashboard-background-image');
     chromeRuntimeMocks.getURL.mockClear();
     chromeRuntimeMocks.openOptionsPage.mockClear();
     chromeRuntimeMocks.onMessage.addListener.mockClear();
@@ -1157,7 +1132,7 @@ describe('App', () => {
     expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
   });
 
-  it('renders utility panels from stored quick links, todos, and theme preferences', async () => {
+  it('renders stored quick links and todos with the fixed persisted theme mode', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([
       {
@@ -1179,14 +1154,8 @@ describe('App', () => {
         dismissed: false,
       },
     ]);
-    getThemePreferences.mockResolvedValue({
-      mode: 'dark',
-      paletteId: 'sage',
-      surfaceOpacity: 84,
-      customBackground: 'theme-bg:stored',
-    });
+    getThemePreferences.mockResolvedValue({ mode: 'dark' });
     getLanguagePreference.mockResolvedValue('zh-CN');
-    resolveCustomBackgroundUrl.mockResolvedValue('blob:stored-background');
 
     await renderApp();
 
@@ -1196,34 +1165,21 @@ describe('App', () => {
     expect(container.querySelector('.quick-link-card')).not.toBeNull();
     expect(container.querySelector('.quick-link-card-actions')).toBeNull();
     expect(document.documentElement.dataset.themeMode).toBe('dark');
-    expect(document.documentElement.dataset.themePalette).toBe('sage');
-    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
-      'url("blob:stored-background")',
-    );
     expect(document.documentElement.lang).toBe('zh-CN');
-    expect(resolveCustomBackgroundUrl).toHaveBeenCalledWith('theme-bg:stored');
 
     await click(screen().getByRole('button', { name: 'Extra' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
-    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+    expect(() => screen().getByRole('heading', { name: '外观' })).toThrow();
   });
 
   it('renders top-bar language and light-dark switches without auto or system choices', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getLanguagePreference.mockResolvedValue('en');
-    getThemePreferences.mockResolvedValue({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: null,
-    });
+    getThemePreferences.mockResolvedValue({ mode: 'light' });
     saveLanguagePreference.mockImplementation(async (language: unknown) => language);
     saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
       mode: (preferences as { mode: 'light' | 'dark' }).mode,
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: null,
     }));
 
     await renderApp();
@@ -1248,16 +1204,8 @@ describe('App', () => {
     expect(screen().getByRole('button', { name: '切换主题' })).toBe(themeSwitch);
 
     await click(screen().getByRole('button', { name: 'Extra' }));
-    const languageSelect = screen().getByLabelText('语言');
-    const themeSelect = screen().getByLabelText('主题模式');
-    expect(Array.from(languageSelect.querySelectorAll('option')).map((option) => option.value)).toEqual([
-      'en',
-      'zh-CN',
-    ]);
-    expect(Array.from(themeSelect.querySelectorAll('option')).map((option) => option.value)).toEqual([
-      'light',
-      'dark',
-    ]);
+    expect(() => screen().getByLabelText('语言')).toThrow();
+    expect(() => screen().getByLabelText('主题模式')).toThrow();
     expect(container.textContent).not.toContain('Auto');
     expect(container.textContent).not.toContain('System');
   });
@@ -1282,7 +1230,7 @@ describe('App', () => {
 
     await click(screen().getByRole('button', { name: 'Extra' }));
     expect(screen().getByRole('heading', { name: '待办' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: '外观' })).not.toBeNull();
+    expect(() => screen().getByRole('heading', { name: '外观' })).toThrow();
   });
 
   it('renders the v1 shell and moves secondary utilities into the Extra drawer', async () => {
@@ -1321,7 +1269,7 @@ describe('App', () => {
     expect(container.querySelector('.extra-drawer-backdrop.is-open')).not.toBeNull();
     expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: 'Todos' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: 'Appearance' })).not.toBeNull();
+    expect(() => screen().getByRole('heading', { name: 'Appearance' })).toThrow();
 
     await click(screen().getByRole('button', { name: 'Close extra drawer' }));
 
@@ -1698,7 +1646,7 @@ describe('App', () => {
     expect(screen().getByText('E')).not.toBeNull();
   });
 
-  it('updates theme controls and todo actions from the utility panels', async () => {
+  it('updates todo actions from the Extra panel without appearance controls', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getTodos.mockResolvedValue([
       {
@@ -1720,25 +1668,12 @@ describe('App', () => {
         dismissed: false,
       },
     ]);
-    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
-      mode: 'dark',
-      paletteId: 'blush',
-      surfaceOpacity: 70,
-      customBackground: null,
-      ...(preferences as object),
-    }));
     saveTodos.mockImplementation(async (todos: unknown) => todos);
 
     await renderApp();
     await click(screen().getByRole('button', { name: 'Extra' }));
 
-    await change(screen().getByLabelText('Palette'), 'blush');
-    expect(saveThemePreferences).toHaveBeenCalledWith(
-      expect.objectContaining({
-        paletteId: 'blush',
-      }),
-    );
-    expect(document.documentElement.dataset.themePalette).toBe('blush');
+    expect(() => screen().getByLabelText('Palette')).toThrow();
 
     await change(screen().getByLabelText('Search todos'), 'launch');
     expect((screen().getByLabelText('Search todos') as HTMLInputElement).value).toBe('launch');
@@ -1787,150 +1722,6 @@ describe('App', () => {
 
     expect(() => screen().getByRole('dialog', { name: 'Add todo' })).toThrow();
     expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
-  });
-
-  it('saves only a lightweight custom background token in theme preferences', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    await renderApp();
-    await click(screen().getByRole('button', { name: 'Extra' }));
-    const backgroundInput = screen().getByLabelText('Custom background');
-    const upload = new File(['small-background'], 'wallpaper.png', { type: 'image/png' });
-
-    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: (preferences as { customBackground: string }).customBackground,
-    }));
-    saveCustomBackgroundFile.mockResolvedValue('theme-bg:upload-1');
-    resolveCustomBackgroundUrl.mockResolvedValue('blob:upload-1');
-
-    await uploadFile(backgroundInput, upload);
-
-    expect(saveCustomBackgroundFile).toHaveBeenCalledWith(upload);
-    expect(saveThemePreferences).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customBackground: 'theme-bg:upload-1',
-      }),
-    );
-    expect(
-      saveThemePreferences.mock.calls.some((call) =>
-        String((call[0] as { customBackground?: string }).customBackground ?? '').startsWith('data:'),
-      ),
-    ).toBe(false);
-  });
-
-  it('keeps the applied custom background after closing the Extra drawer', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    getThemePreferences.mockResolvedValue({
-      mode: 'dark',
-      paletteId: 'mist',
-      surfaceOpacity: 88,
-      customBackground: 'theme-bg:stored',
-    });
-    resolveCustomBackgroundUrl.mockResolvedValue('blob:stored-background');
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-
-    await renderApp();
-
-    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
-      'url("blob:stored-background")',
-    );
-
-    await click(screen().getByRole('button', { name: 'Extra' }));
-    await click(screen().getByRole('button', { name: 'Close extra drawer' }));
-
-    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
-      'url("blob:stored-background")',
-    );
-    expect(revokeObjectURL).not.toHaveBeenCalled();
-  });
-
-  it('keeps a stored custom background applied when changing palette', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    getThemePreferences.mockResolvedValue({
-      mode: 'dark',
-      paletteId: 'mist',
-      surfaceOpacity: 88,
-      customBackground: 'theme-bg:stored',
-    });
-    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
-      mode: 'dark',
-      paletteId: (preferences as { paletteId: 'mist' | 'blush' }).paletteId,
-      surfaceOpacity: 88,
-      customBackground: 'theme-bg:stored',
-    }));
-    resolveCustomBackgroundUrl.mockResolvedValue('blob:stored-background');
-    const revokeObjectURL = vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
-
-    await renderApp();
-    await click(screen().getByRole('button', { name: 'Extra' }));
-    await change(screen().getByLabelText('Palette'), 'blush');
-
-    expect(saveThemePreferences).toHaveBeenCalledWith(
-      expect.objectContaining({
-        paletteId: 'blush',
-      }),
-    );
-    expect(resolveCustomBackgroundUrl).toHaveBeenCalledTimes(1);
-    expect(revokeObjectURL).not.toHaveBeenCalled();
-    expect(document.documentElement.dataset.themePalette).toBe('blush');
-    expect(document.documentElement.style.getPropertyValue('--dashboard-background-image')).toBe(
-      'url("blob:stored-background")',
-    );
-  });
-
-  it('rejects oversized custom background uploads before saving theme preferences', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    await renderApp();
-    await click(screen().getByRole('button', { name: 'Extra' }));
-    const backgroundInput = screen().getByLabelText('Custom background');
-    const oversizedFile = new File(['a'.repeat(129 * 1024)], 'wallpaper.png', { type: 'image/png' });
-
-    await uploadFile(backgroundInput, oversizedFile);
-
-    expect(saveThemePreferences).not.toHaveBeenCalled();
-    expect(saveCustomBackgroundFile).not.toHaveBeenCalled();
-    expect(screen().getByRole('alert').textContent).toBe('Custom background image is too large to save.');
-  });
-
-  it('keeps a successful new background upload when old background cleanup fails', async () => {
-    mockMessages({ activeTabs: [UNIQUE_TAB] });
-    getThemePreferences.mockResolvedValue({
-      mode: 'system' as never,
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: 'theme-bg:old-token',
-    });
-    resolveCustomBackgroundUrl
-      .mockResolvedValueOnce('blob:old-token')
-      .mockResolvedValueOnce('blob:new-token');
-    saveCustomBackgroundFile.mockResolvedValue('theme-bg:new-token');
-    saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: (preferences as { customBackground: string }).customBackground,
-    }));
-    deleteCustomBackground.mockImplementation(async (token: string | null | undefined) => {
-      if (token === 'theme-bg:old-token') throw new Error('cache delete failed');
-    });
-
-    await renderApp();
-    await click(screen().getByRole('button', { name: 'Extra' }));
-    const backgroundInput = screen().getByLabelText('Custom background');
-    const upload = new File(['replacement-background'], 'replacement.png', { type: 'image/png' });
-
-    await uploadFile(backgroundInput, upload);
-
-    expect(saveThemePreferences).toHaveBeenCalledWith(
-      expect.objectContaining({
-        customBackground: 'theme-bg:new-token',
-      }),
-    );
-    expect(deleteCustomBackground).toHaveBeenCalledWith('theme-bg:old-token');
-    expect(deleteCustomBackground).not.toHaveBeenCalledWith('theme-bg:new-token');
-    expect(() => screen().getByRole('alert')).toThrow();
   });
 
   it('closes duplicate tabs from the active workspace action', async () => {

@@ -4,102 +4,79 @@ const storageMocks = vi.hoisted(() => ({
   getItem: vi.fn(),
   setItem: vi.fn(),
 }));
-
-vi.mock('#imports', () => ({
-  storage: storageMocks,
+const cacheMocks = vi.hoisted(() => ({
+  clearThemeBackgroundCache: vi.fn(),
 }));
+
+vi.mock('#imports', () => ({ storage: storageMocks }));
+vi.mock('./theme-background-cache', () => cacheMocks);
 
 beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
+  cacheMocks.clearThemeBackgroundCache.mockResolvedValue(undefined);
 });
 
 describe('theme preferences', () => {
-  it('normalizes theme preferences', async () => {
-    const { normalizeThemePreferences } = await import('./theme-preferences');
-
-    expect(
-      normalizeThemePreferences({
-        mode: 'dark',
-        paletteId: 'sage',
-        surfaceOpacity: 84,
-        customBackground: 'theme-bg:123',
-      }),
-    ).toEqual({
+  it('migrates legacy personalization to its fixed dark mode', async () => {
+    storageMocks.getItem.mockResolvedValue({
       mode: 'dark',
       paletteId: 'sage',
       surfaceOpacity: 84,
       customBackground: 'theme-bg:123',
     });
-  });
-
-  it('clamps surface opacity', async () => {
-    const { normalizeThemePreferences } = await import('./theme-preferences');
-
-    expect(normalizeThemePreferences({ surfaceOpacity: 1 }).surfaceOpacity).toBe(35);
-    expect(normalizeThemePreferences({ surfaceOpacity: 101 }).surfaceOpacity).toBe(100);
-  });
-
-  it('loads normalized theme preferences from storage', async () => {
-    storageMocks.getItem.mockResolvedValue({
-      mode: 'twilight',
-      paletteId: 'dawn',
-      surfaceOpacity: '12',
-      customBackground: 'data:image/png;base64,abc',
-    });
-
     const { getThemePreferences } = await import('./theme-preferences');
 
-    await expect(getThemePreferences()).resolves.toEqual({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 35,
-      customBackground: null,
-    });
+    await expect(getThemePreferences()).resolves.toEqual({ mode: 'dark' });
+    expect(cacheMocks.clearThemeBackgroundCache).toHaveBeenCalledTimes(1);
+    expect(storageMocks.setItem).toHaveBeenCalledWith(
+      'local:tabstow-theme-preferences',
+      { mode: 'dark' },
+    );
   });
 
-  it('normalizes legacy system theme mode to light', async () => {
+  it('keeps a current fixed mode without repeating migration', async () => {
+    storageMocks.getItem.mockResolvedValue({ mode: 'light' });
+    const { getThemePreferences } = await import('./theme-preferences');
+
+    await expect(getThemePreferences()).resolves.toEqual({ mode: 'light' });
+    expect(cacheMocks.clearThemeBackgroundCache).not.toHaveBeenCalled();
+    expect(storageMocks.setItem).not.toHaveBeenCalled();
+  });
+
+  it('normalizes invalid and legacy system modes to light', async () => {
     const { normalizeThemePreferences } = await import('./theme-preferences');
 
-    expect(normalizeThemePreferences({ mode: 'system' as never }).mode).toBe('light');
+    expect(normalizeThemePreferences({ mode: 'system' })).toEqual({ mode: 'light' });
+    expect(normalizeThemePreferences({ mode: 'twilight' })).toEqual({ mode: 'light' });
   });
 
-  it('normalizes before saving and returns normalized theme preferences', async () => {
-    const preferences = {
-      mode: 'light',
-      paletteId: 'dawn',
-      surfaceOpacity: 99,
-      customBackground: 'theme-bg:wallpaper-1',
-    } as unknown as Parameters<typeof import('./theme-preferences').saveThemePreferences>[0];
+  it('does not erase legacy storage when cache cleanup fails', async () => {
+    storageMocks.getItem.mockResolvedValue({
+      mode: 'dark',
+      customBackground: 'theme-bg:123',
+    });
+    cacheMocks.clearThemeBackgroundCache.mockRejectedValue(new Error('cache unavailable'));
+    const { getThemePreferences } = await import('./theme-preferences');
 
+    await expect(getThemePreferences()).rejects.toThrow('cache unavailable');
+    expect(storageMocks.setItem).not.toHaveBeenCalled();
+  });
+
+  it('saves only the normalized fixed mode', async () => {
     const { saveThemePreferences } = await import('./theme-preferences');
 
-    await expect(saveThemePreferences(preferences)).resolves.toEqual({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 99,
-      customBackground: 'theme-bg:wallpaper-1',
-    });
-    expect(storageMocks.setItem).toHaveBeenCalledWith('local:tabstow-theme-preferences', {
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 99,
-      customBackground: 'theme-bg:wallpaper-1',
-    });
-  });
-
-  it('rejects persisted raw data urls for custom backgrounds', async () => {
-    const { normalizeThemePreferences } = await import('./theme-preferences');
-
-    expect(
-      normalizeThemePreferences({
-        customBackground: 'data:image/png;base64,abc',
+    await expect(
+      saveThemePreferences({
+        mode: 'dark',
+        paletteId: 'blush',
+        surfaceOpacity: 70,
+        customBackground: 'theme-bg:old',
       }),
-    ).toEqual({
-      mode: 'light',
-      paletteId: 'paper',
-      surfaceOpacity: 92,
-      customBackground: null,
-    });
+    ).resolves.toEqual({ mode: 'dark' });
+    expect(storageMocks.setItem).toHaveBeenCalledWith(
+      'local:tabstow-theme-preferences',
+      { mode: 'dark' },
+    );
   });
 });
