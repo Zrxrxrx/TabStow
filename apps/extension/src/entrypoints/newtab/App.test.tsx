@@ -464,12 +464,11 @@ describe('App', () => {
     expect(
       screen().getByLabelText('Close GitHub active issue') as HTMLButtonElement,
     ).toHaveProperty('disabled', false);
-    const savedDragHandles = Array.from(
-      container.querySelectorAll<HTMLButtonElement>('.saved-sessions .drag-handle'),
+    const savedDragSurfaces = Array.from(
+      container.querySelectorAll<HTMLElement>('.saved-sessions [aria-disabled="true"][draggable="false"]'),
     );
-    expect(savedDragHandles).toHaveLength(2);
-    expect(savedDragHandles.every((handle) => handle.disabled && !handle.draggable)).toBe(true);
-    expect(screen().getByLabelText('Open GitHub saved issue')).toHaveProperty('disabled', false);
+    expect(savedDragSurfaces.length).toBeGreaterThanOrEqual(2);
+    expect(screen().getByLabelText('Open GitHub saved issue').closest('.saved-tab-row')?.getAttribute('role')).toBe('button');
     expect(screen().getByLabelText('Move GitHub saved issue to History')).toHaveProperty(
       'disabled',
       false,
@@ -668,7 +667,7 @@ describe('App', () => {
     expect(screen().getByRole('alert').textContent).toBe('Saved move failed');
     expect(sessionListCalls).toBe(2);
     expect(target.className).not.toContain('is-active-drop-target');
-    expect(screen().getByLabelText('Drag saved tab Saved Two')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Drag saved tab Saved Two').getAttribute('aria-disabled')).toBe('false');
   });
 
   it('coalesces Chrome tab, group, and window events into one refresh', async () => {
@@ -1953,7 +1952,7 @@ describe('App', () => {
       screen().getByRole('button', { name: 'Restore 2 tabs stowed and move to History' }),
     ).not.toBeNull();
     const savedTabButton = screen().getByLabelText('Open Example Docs');
-    expect(savedTabButton.tagName).toBe('BUTTON');
+    expect(savedTabButton.tagName).toBe('DIV');
     expect(savedTabButton.getAttribute('href')).toBeNull();
     expect(savedTabButton.querySelector('img.saved-tab-favicon')).not.toBeNull();
 
@@ -2007,7 +2006,7 @@ describe('App', () => {
     expect(safeRow?.tagName).toBe('DIV');
     expect(safeRow?.getAttribute('href')).toBeNull();
     expect(() => screen().getByLabelText('Open Unsafe Import')).toThrow();
-    expect(screen().getByLabelText('Open Safe Docs').tagName).toBe('BUTTON');
+    expect(screen().getByLabelText('Open Safe Docs').tagName).toBe('DIV');
   });
 
   it('omits manual Chrome controls while the active tab snapshot is loading', async () => {

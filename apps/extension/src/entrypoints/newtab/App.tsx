@@ -19,6 +19,7 @@ import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
+import { RecoveryBinDialog } from './components/RecoveryBinDialog';
 import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
@@ -59,6 +60,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialThemeMode ?? 'light');
   const [extraOpen, setExtraOpen] = useState(false);
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [tabQuery, setTabQuery] = useState('');
   const busyActionRef = useRef<string | null>(null);
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
@@ -355,6 +357,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                   busyAction={busyAction}
                   locale={locale}
                   onRunAction={runAction}
+                  onOpenRecovery={() => setRecoveryOpen(true)}
                   query={tabQuery}
                   sessions={sessions}
                 />
@@ -396,6 +399,13 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
             <TodosPanel locale={locale} />
           </section>
         </aside>
+      ) : null}
+      {recoveryOpen ? (
+        <RecoveryBinDialog
+          locale={locale}
+          onClose={() => setRecoveryOpen(false)}
+          onRestored={loadSessions}
+        />
       ) : null}
     </>
   );

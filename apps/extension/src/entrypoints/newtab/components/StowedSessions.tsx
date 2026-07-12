@@ -1,4 +1,4 @@
-import { GripVertical, RotateCcw, Trash2 } from 'lucide-react';
+import { RotateCcw, Trash2 } from 'lucide-react';
 import {
   Fragment,
   useMemo,
@@ -33,6 +33,7 @@ type Props = {
     success: (data: T) => string,
     options?: { reloadOnFailure?: boolean },
   ) => Promise<void>;
+  onOpenRecovery: () => void;
 };
 
 type SavedTab = TabSession['tabs'][number];
@@ -92,6 +93,7 @@ function SavedTabRow({
   sessionId,
   tab,
 }: SavedTabRowProps) {
+  const suppressClickRef = useRef(false);
   const label = tab.title || tab.url;
   const content = (
     <>
@@ -104,52 +106,53 @@ function SavedTabRow({
   );
 
   return (
-    <div className="saved-tab-row">
-      <button
-        type="button"
-        className="icon-button drag-handle"
-        aria-label={t(locale, 'dragSavedTab', { label })}
-        disabled={dragDisabled}
-        draggable={!dragDisabled}
-        onDragEnd={onDragEnd}
-        onDragStart={(event) =>
-          onDragStart(event, { kind: 'tab', sessionId, tabId: tab.id })
+    <div
+      aria-disabled={dragDisabled}
+      className="saved-tab-row"
+      draggable={!dragDisabled}
+      onAuxClick={(event) => {
+        if (event.button !== 1 || !isSafeSavedTabUrl(tab.url)) return;
+        event.preventDefault();
+        onOpen(false);
+      }}
+      onClick={(event) => {
+        if (suppressClickRef.current || busy || !isSafeSavedTabUrl(tab.url)) return;
+        if (event.button !== 0 || isModifiedClick(event)) return;
+        event.preventDefault();
+        onOpen(true);
+      }}
+      onDragEnd={(event) => {
+        onDragEnd(event);
+        suppressClickRef.current = true;
+        window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+      }}
+      onDragStart={(event) => onDragStart(event, { kind: 'tab', sessionId, tabId: tab.id })}
+      onKeyDown={(event) => {
+        if ((event.key === 'Enter' || event.key === ' ') && !busy && isSafeSavedTabUrl(tab.url)) {
+          event.preventDefault();
+          onOpen(true);
         }
-      >
-        <GripVertical size={16} aria-hidden="true" />
-      </button>
-
-      {isSafeSavedTabUrl(tab.url) ? (
-        <button
-          type="button"
-          className="saved-tab-open"
-          aria-label={t(locale, 'openSavedTab', { label })}
-          disabled={busy}
-          onClick={(event) => {
-            if (event.button !== 0 || isModifiedClick(event)) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onOpen(true);
-          }}
-          onAuxClick={(event) => {
-            if (event.button !== 1) return;
-            event.preventDefault();
-            event.stopPropagation();
-            onOpen(false);
-          }}
-        >
-          {content}
-        </button>
-      ) : (
-        <div className="saved-tab-open">{content}</div>
-      )}
+      }}
+      role={isSafeSavedTabUrl(tab.url) ? 'button' : undefined}
+      tabIndex={isSafeSavedTabUrl(tab.url) ? 0 : undefined}
+    >
+      <span
+        aria-disabled={dragDisabled}
+        aria-label={t(locale, 'dragSavedTab', { label })}
+        draggable={!dragDisabled}
+        className="drag-surface-label"
+      />
+      <div
+        aria-label={isSafeSavedTabUrl(tab.url) ? t(locale, 'openSavedTab', { label }) : undefined}
+        className="saved-tab-open"
+      >{content}</div>
 
       <button
         type="button"
         className="icon-button danger-button saved-tab-delete"
         aria-label={t(locale, 'removeSavedTab', { label })}
         disabled={busy}
-        onClick={onDelete}
+        onClick={(event) => { event.stopPropagation(); onDelete(); }}
       >
         <Trash2 size={16} aria-hidden="true" />
       </button>
@@ -160,6 +163,7 @@ function SavedTabRow({
 export function StowedSessions({
   busyAction,
   locale,
+  onOpenRecovery,
   onRunAction,
   query,
   sessions,
@@ -329,6 +333,9 @@ export function StowedSessions({
           <span className="meta-pill">{sessionCount}</span>
           <span className="meta-pill">{tabCount}</span>
         </span>
+        <button className="icon-button" aria-label={t(locale, 'recoveryBin')} onClick={onOpenRecovery} type="button">
+          <Trash2 aria-hidden="true" size={15} />
+        </button>
       </header>
 
       <section className="session-list" aria-label="Saved sessions">
@@ -348,26 +355,21 @@ export function StowedSessions({
                   },
                 )}
                 <article className="session-card">
-                  <header>
+                  <header
+                    aria-disabled={dragDisabled}
+                    aria-label={t(locale, 'dragSavedSession', { label: session.title })}
+                    draggable={!dragDisabled}
+                    onDragEnd={endDrag}
+                    onDragStart={(event) => startDrag(event, { kind: 'session', sessionId: session.id })}
+                  >
                     <div className="session-heading">
-                      <button
-                        type="button"
-                        className="icon-button drag-handle"
-                        aria-label={t(locale, 'dragSavedSession', { label: session.title })}
-                        disabled={dragDisabled}
-                        draggable={!dragDisabled}
-                        onDragEnd={endDrag}
-                        onDragStart={(event) =>
-                          startDrag(event, { kind: 'session', sessionId: session.id })
-                        }
-                      >
-                        <GripVertical size={16} aria-hidden="true" />
-                      </button>
                       <div className="tab-copy">
                         <span className="session-title">
-                          {session.tabs.length} {session.tabs.length === 1 ? 'tab' : 'tabs'}
+                          {session.title}
                         </span>
-                        <span className="session-preview">{formatDate(session.createdAt)}</span>
+                        <span className="session-preview">
+                          {session.tabs.length} {session.tabs.length === 1 ? 'tab' : 'tabs'} · {formatDate(session.createdAt)}
+                        </span>
                       </div>
                     </div>
                     <div className="row-actions">

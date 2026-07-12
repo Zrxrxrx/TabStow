@@ -748,11 +748,21 @@ h3 {
   min-width: 0;
   min-height: 34px;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   border-radius: var(--radius-sm);
   padding: 4px;
+}
+
+.saved-tab-row[draggable="true"],
+.session-card > header[draggable="true"] {
+  cursor: grab;
+}
+
+.saved-tab-row[draggable="true"]:active,
+.session-card > header[draggable="true"]:active {
+  cursor: grabbing;
 }
 
 .saved-tab-row:hover {
@@ -772,6 +782,26 @@ h3 {
   background: transparent;
   border: 0;
   border-radius: var(--radius-sm);
+}
+
+.recovery-list {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.recovery-entry {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.recovery-history-link {
+  width: fit-content;
+  text-decoration: none;
 }
 
 .saved-tab-open:disabled {
