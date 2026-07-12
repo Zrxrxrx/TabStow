@@ -1,17 +1,39 @@
 import { storage } from '#imports';
+import {
+  importLegacyQuickLinks,
+  listStoredQuickLinks,
+  replaceStoredQuickLinks,
+} from '@/db/db';
 import { normalizeQuickLinks, type QuickLink } from './quick-links';
 
 const QUICK_LINKS_KEY = 'local:tabstow-quick-links';
 let quickLinksWriteQueue: Promise<void> = Promise.resolve();
+let migrationPromise: Promise<void> | null = null;
+
+async function ensureLegacyMigration(): Promise<void> {
+  migrationPromise ??= (async () => {
+    const legacy = normalizeQuickLinks(
+      await storage.getItem<QuickLink[]>(QUICK_LINKS_KEY),
+    );
+    await importLegacyQuickLinks(legacy);
+    await storage.removeItem(QUICK_LINKS_KEY);
+  })();
+  try {
+    await migrationPromise;
+  } catch (error) {
+    migrationPromise = null;
+    throw error;
+  }
+}
 
 export async function getQuickLinks(): Promise<QuickLink[]> {
-  return normalizeQuickLinks(await storage.getItem<QuickLink[]>(QUICK_LINKS_KEY));
+  await ensureLegacyMigration();
+  return listStoredQuickLinks();
 }
 
 async function writeQuickLinks(links: QuickLink[]): Promise<QuickLink[]> {
   const normalized = normalizeQuickLinks(links);
-  await storage.setItem(QUICK_LINKS_KEY, normalized);
-  return normalized;
+  return replaceStoredQuickLinks(normalized);
 }
 
 export async function saveQuickLinks(links: QuickLink[]): Promise<QuickLink[]> {

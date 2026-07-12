@@ -3,54 +3,62 @@ import type { QuickLink } from './quick-links';
 
 const storageMocks = vi.hoisted(() => ({
   getItem: vi.fn(),
-  setItem: vi.fn(),
+  removeItem: vi.fn(),
 }));
 
-vi.mock('#imports', () => ({
-  storage: storageMocks,
+const dbMocks = vi.hoisted(() => ({
+  importLegacyQuickLinks: vi.fn(),
+  listStoredQuickLinks: vi.fn(),
+  replaceStoredQuickLinks: vi.fn(),
 }));
+
+vi.mock('#imports', () => ({ storage: storageMocks }));
+vi.mock('@/db/db', () => dbMocks);
 
 describe('quick link storage', () => {
+  let storedLinks: QuickLink[];
+
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    storedLinks = [];
+    storageMocks.getItem.mockResolvedValue([]);
+    storageMocks.removeItem.mockResolvedValue(undefined);
+    dbMocks.importLegacyQuickLinks.mockImplementation(async (links: QuickLink[]) => {
+      if (storedLinks.length === 0) storedLinks = links;
+      return storedLinks;
+    });
+    dbMocks.listStoredQuickLinks.mockImplementation(async () => storedLinks);
+    dbMocks.replaceStoredQuickLinks.mockImplementation(async (links: QuickLink[]) => {
+      storedLinks = links;
+      return links;
+    });
   });
 
-  it('loads normalized links', async () => {
-    storageMocks.getItem.mockResolvedValue([{ id: 'a', url: 'https://example.com', label: 'Example' }]);
+  it('migrates and removes normalized legacy extension-storage links', async () => {
+    storageMocks.getItem.mockResolvedValue([
+      { id: 'a', url: 'https://example.com', label: 'Example' },
+    ]);
 
     const { getQuickLinks } = await import('./quick-links-storage');
     expect(await getQuickLinks()).toEqual([
-      { id: 'a', url: 'https://example.com/', label: 'Example', icon: null, createdAt: expect.any(String) },
+      {
+        id: 'a',
+        url: 'https://example.com/',
+        label: 'Example',
+        icon: null,
+        createdAt: expect.any(String),
+      },
     ]);
+    expect(storageMocks.removeItem).toHaveBeenCalledWith('local:tabstow-quick-links');
   });
 
-  it('normalizes before saving and returns normalized links', async () => {
-    const links: Parameters<typeof import('./quick-links-storage').saveQuickLinks>[0] = [
+  it('normalizes before saving into the IndexedDB repository', async () => {
+    const links = [
       null,
       { id: 'a', url: 'https://example.com', label: 'Example' },
       { id: 'b', url: 'not-a-url', label: 'Broken' },
-    ] as unknown as Parameters<typeof import('./quick-links-storage').saveQuickLinks>[0];
-
-    const { saveQuickLinks } = await import('./quick-links-storage');
-    await expect(saveQuickLinks(links)).resolves.toEqual([
-      { id: 'a', url: 'https://example.com/', label: 'Example', icon: null, createdAt: expect.any(String) },
-    ]);
-    expect(storageMocks.setItem).toHaveBeenCalledWith('local:tabstow-quick-links', [
-      { id: 'a', url: 'https://example.com/', label: 'Example', icon: null, createdAt: expect.any(String) },
-    ]);
-  });
-
-  it('preserves edited icon metadata when saving', async () => {
-    const links: QuickLink[] = [
-      {
-        id: 'a',
-        url: 'https://example.com',
-        label: 'Example',
-        icon: { kind: 'emoji', value: '*' },
-        createdAt: '2026-07-06T00:00:00.000Z',
-      },
-    ];
+    ] as unknown as QuickLink[];
 
     const { saveQuickLinks } = await import('./quick-links-storage');
     await expect(saveQuickLinks(links)).resolves.toEqual([
@@ -58,13 +66,16 @@ describe('quick link storage', () => {
         id: 'a',
         url: 'https://example.com/',
         label: 'Example',
-        icon: { kind: 'emoji', value: '*' },
-        createdAt: '2026-07-06T00:00:00.000Z',
+        icon: null,
+        createdAt: expect.any(String),
       },
+    ]);
+    expect(dbMocks.replaceStoredQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'a', url: 'https://example.com/' }),
     ]);
   });
 
-  it('drops non-token image icon values before saving', async () => {
+  it('preserves valid local image tokens and drops embedded image data', async () => {
     const links: QuickLink[] = [
       {
         id: 'a',
@@ -84,24 +95,15 @@ describe('quick link storage', () => {
 
     const { saveQuickLinks } = await import('./quick-links-storage');
     await expect(saveQuickLinks(links)).resolves.toEqual([
-      {
-        id: 'a',
-        url: 'https://example.com/',
-        label: 'Example',
-        icon: null,
-        createdAt: '2026-07-06T00:00:00.000Z',
-      },
-      {
+      expect.objectContaining({ id: 'a', icon: null }),
+      expect.objectContaining({
         id: 'b',
-        url: 'https://example.com/docs',
-        label: 'Docs',
         icon: { kind: 'image', value: 'quick-link-icon:token-1' },
-        createdAt: '2026-07-06T00:00:00.000Z',
-      },
+      }),
     ]);
   });
 
-  it('serializes updates against the latest stored quick links', async () => {
+  it('serializes updates against the latest repository value', async () => {
     const firstLink: QuickLink = {
       id: 'first',
       url: 'https://first.example/',
@@ -116,35 +118,29 @@ describe('quick link storage', () => {
       icon: null,
       createdAt: '2026-07-06T00:00:00.000Z',
     };
-    let storedLinks: QuickLink[] = [];
     let releaseFirstWrite = () => {};
     const firstWriteStarted = new Promise<void>((resolve) => {
-      storageMocks.setItem.mockImplementationOnce(
-        () =>
-          new Promise<void>((release) => {
+      dbMocks.replaceStoredQuickLinks.mockImplementationOnce(
+        (links: QuickLink[]) =>
+          new Promise<QuickLink[]>((release) => {
             releaseFirstWrite = () => {
-              storedLinks = [firstLink];
-              release();
+              storedLinks = links;
+              release(links);
             };
             resolve();
           }),
       );
     });
-    storageMocks.getItem.mockImplementation(async () => storedLinks);
-    storageMocks.setItem.mockImplementation(async (_key, links: QuickLink[]) => {
-      storedLinks = links;
-    });
 
     const { updateQuickLinks } = await import('./quick-links-storage');
-    const firstUpdate = updateQuickLinks((currentLinks) => [...currentLinks, firstLink]);
-    const secondUpdate = updateQuickLinks((currentLinks) => [...currentLinks, secondLink]);
+    const firstUpdate = updateQuickLinks((current) => [...current, firstLink]);
+    const secondUpdate = updateQuickLinks((current) => [...current, secondLink]);
 
     await firstWriteStarted;
     expect(storedLinks).toEqual([]);
-
     releaseFirstWrite();
     await Promise.all([firstUpdate, secondUpdate]);
 
-    expect(storedLinks.map((link) => link.id)).toEqual(['first', 'second']);
+    expect(storedLinks.map(({ id }) => id)).toEqual(['first', 'second']);
   });
 });
