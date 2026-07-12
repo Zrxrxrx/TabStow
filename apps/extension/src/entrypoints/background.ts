@@ -26,12 +26,36 @@ import {
 import { collapseChromeTabGroups } from '@/features/chrome-tab-groups/chrome-tab-groups';
 import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
-import { pullFromGist, pushToGist } from '@/features/sync/sync-service';
+import {
+  cancelGitHubOAuth,
+  chooseAnotherGist,
+  rescanGists,
+  selectGistTarget,
+  startGitHubOAuth,
+} from '@/features/sync/connection-service';
+import { getConnectionView } from '@/features/sync/connection-store';
+import {
+  bootstrapSyncCoordinator,
+  confirmAndSync,
+  disconnectSync,
+  handleOAuthAlarm,
+  handleSyncAlarm,
+  manualPull,
+  manualPush,
+  noteSynchronizedMutation,
+  observeSync,
+  OAUTH_ALARM_NAME,
+  pollOAuthNow,
+  retrySync,
+  scheduleOAuthAlarm,
+  SYNC_ALARM_NAME,
+} from '@/features/sync/sync-coordinator';
 import {
   reorderQuickLinks,
   updateQuickLink,
 } from '@/features/quick-links/quick-links';
 import { updateQuickLinks } from '@/features/quick-links/quick-links-storage';
+import { getQuickLinks } from '@/features/quick-links/quick-links-storage';
 import {
   openHistoryTab,
   openSavedTab,
@@ -58,6 +82,18 @@ function invalidMessage(type: string): AppResult<never> {
   return err('unknown-error', `Invalid ${type} message.`);
 }
 
+async function runBestEffort(operation: () => Promise<unknown>): Promise<void> {
+  try {
+    await operation();
+  } catch {
+    // Durable connection and mutation state lets later background triggers recover.
+  }
+}
+
+function noteSynchronizedMutationBestEffort(): void {
+  void runBestEffort(() => Promise.resolve(noteSynchronizedMutation()));
+}
+
 function hasId(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
@@ -74,7 +110,7 @@ function isValidSavedMoveRequest(request: unknown): request is MoveSavedTabReque
     && candidate.destinationIndex >= 0;
 }
 
-async function handleMessage(
+async function routeMessage(
   rawMessage: unknown,
   sender?: chrome.runtime.MessageSender,
 ): Promise<AppResult<unknown>> {
@@ -175,6 +211,8 @@ async function handleMessage(
         return runDefaultSearch(message.query);
       case 'quick-links:add':
         return ok(await updateQuickLinks((links) => [...links, message.link]));
+      case 'quick-links:list':
+        return ok(await getQuickLinks());
       case 'quick-links:update':
         return ok(
           await updateQuickLinks((links) =>
@@ -193,10 +231,49 @@ async function handleMessage(
         return ok(await getSettings());
       case 'settings:update':
         return ok(await updateSettings(message.settings));
+      case 'connection:get':
+        return ok(await getConnectionView());
+      case 'oauth:start': {
+        const started = await startGitHubOAuth();
+        await runBestEffort(scheduleOAuthAlarm);
+        return ok(started.view);
+      }
+      case 'oauth:poll':
+        return ok(await pollOAuthNow());
+      case 'oauth:cancel': {
+        const view = await cancelGitHubOAuth();
+        await runBestEffort(() => browser.alarms.clear(OAUTH_ALARM_NAME));
+        return ok(view);
+      }
+      case 'gist:rescan':
+        return ok(await rescanGists());
+      case 'gist:select':
+        if (!hasId(message.gistId)) return invalidMessage(message.type);
+        return ok(
+          await selectGistTarget({
+            gistId: message.gistId,
+            ...(message.fileName ? { fileName: message.fileName } : {}),
+          }),
+        );
+      case 'gist:confirm':
+        if (!hasId(message.targetKey)) return invalidMessage(message.type);
+        return ok(await confirmAndSync(message.targetKey));
+      case 'gist:choose-another':
+        return ok(await chooseAnotherGist());
+      case 'sync:observe':
+        if (message.reason !== 'open' && message.reason !== 'focus') {
+          return invalidMessage(message.type);
+        }
+        return ok(await observeSync(message.reason));
+      case 'sync:retry':
+        return retrySync();
+      case 'sync:disconnect': {
+        return ok(await disconnectSync());
+      }
       case 'sync:push':
-        return pushToGist();
+        return manualPush();
       case 'sync:pull':
-        return pullFromGist();
+        return manualPull();
       default:
         return unsupportedMessage(message);
     }
@@ -205,19 +282,69 @@ async function handleMessage(
   }
 }
 
+const SYNC_MUTATION_MESSAGES = new Set<ExtensionMessage['type']>([
+  'sessions:stow-current-window',
+  'sessions:stow-tab',
+  'sessions:restore',
+  'sessions:delete-tab',
+  'sessions:delete',
+  'sessions:reorder',
+  'sessions:move-tab',
+  'history:restore',
+  'quick-links:add',
+  'quick-links:update',
+  'quick-links:remove',
+  'quick-links:reorder',
+  'settings:update',
+]);
+
+async function handleMessage(
+  rawMessage: unknown,
+  sender?: chrome.runtime.MessageSender,
+): Promise<AppResult<unknown>> {
+  const response = await routeMessage(rawMessage, sender);
+  if (
+    response.ok &&
+    rawMessage &&
+    typeof rawMessage === 'object' &&
+    'type' in rawMessage &&
+    typeof rawMessage.type === 'string' &&
+    (SYNC_MUTATION_MESSAGES.has(rawMessage.type as ExtensionMessage['type']) ||
+      (rawMessage.type === 'sessions:open-tab' &&
+        'consume' in rawMessage &&
+        rawMessage.consume === true))
+  ) {
+    noteSynchronizedMutationBestEffort();
+  }
+  return response;
+}
+
 export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(() => {
     void registerContextMenu();
+    void bootstrapSyncCoordinator();
   });
 
   browser.runtime.onStartup.addListener(() => {
     void registerContextMenu();
+    void bootstrapSyncCoordinator();
   });
 
   registerContextMenuClickHandler();
+  void bootstrapSyncCoordinator();
 
-  browser.action.onClicked.addListener((tab) => {
-    void saveCurrentWindowAsSession(tab.windowId).then(showActionFeedback);
+  browser.alarms.onAlarm.addListener(async (alarm) => {
+    if (alarm.name === SYNC_ALARM_NAME) {
+      await handleSyncAlarm();
+    } else if (alarm.name === OAUTH_ALARM_NAME) {
+      await handleOAuthAlarm();
+    }
+  });
+
+  browser.action.onClicked.addListener(async (tab) => {
+    const result = await saveCurrentWindowAsSession(tab.windowId);
+    showActionFeedback(result);
+    if (result.ok) noteSynchronizedMutationBestEffort();
   });
 
   browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {

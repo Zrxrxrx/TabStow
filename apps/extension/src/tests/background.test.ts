@@ -1,6 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const browserMocks = vi.hoisted(() => ({
+  alarms: {
+    clear: vi.fn(),
+    onAlarm: {
+      addListener: vi.fn(),
+    },
+  },
   action: {
     onClicked: {
       addListener: vi.fn(),
@@ -43,9 +49,33 @@ const settingsMocks = vi.hoisted(() => ({
   updateSettings: vi.fn(),
 }));
 
-const syncMocks = vi.hoisted(() => ({
-  pullFromGist: vi.fn(),
-  pushToGist: vi.fn(),
+const connectionServiceMocks = vi.hoisted(() => ({
+  cancelGitHubOAuth: vi.fn(),
+  chooseAnotherGist: vi.fn(),
+  disconnectGitHub: vi.fn(),
+  rescanGists: vi.fn(),
+  selectGistTarget: vi.fn(),
+  startGitHubOAuth: vi.fn(),
+}));
+
+const connectionStoreMocks = vi.hoisted(() => ({
+  getConnectionView: vi.fn(),
+}));
+
+const coordinatorMocks = vi.hoisted(() => ({
+  bootstrapSyncCoordinator: vi.fn(),
+  clearSyncAlarms: vi.fn(),
+  confirmAndSync: vi.fn(),
+  disconnectSync: vi.fn(),
+  handleOAuthAlarm: vi.fn(),
+  handleSyncAlarm: vi.fn(),
+  manualPull: vi.fn(),
+  manualPush: vi.fn(),
+  noteSynchronizedMutation: vi.fn(),
+  observeSync: vi.fn(),
+  pollOAuthNow: vi.fn(),
+  retrySync: vi.fn(),
+  scheduleOAuthAlarm: vi.fn(),
 }));
 
 const actionFeedbackMocks = vi.hoisted(() => ({
@@ -75,6 +105,7 @@ const chromeTabGroupMocks = vi.hoisted(() => ({
 }));
 
 const quickLinkMocks = vi.hoisted(() => ({
+  getQuickLinks: vi.fn(),
   reorderQuickLinks: vi.fn(),
   updateQuickLink: vi.fn(),
   updateQuickLinks: vi.fn(),
@@ -88,7 +119,13 @@ vi.mock('@/features/action-feedback/action-feedback', () => actionFeedbackMocks)
 vi.mock('@/features/context-menu/context-menu', () => contextMenuMocks);
 vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
-vi.mock('@/features/sync/sync-service', () => syncMocks);
+vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
+vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
+vi.mock('@/features/sync/sync-coordinator', () => ({
+  ...coordinatorMocks,
+  OAUTH_ALARM_NAME: 'tabstow-oauth-device-flow-v2',
+  SYNC_ALARM_NAME: 'tabstow-sync-v2',
+}));
 vi.mock('@/features/tabs/session-service', () => sessionServiceMocks);
 vi.mock('@/features/active-tabs/active-tabs-service', () => activeTabsMocks);
 vi.mock('@/features/active-tabs/active-tab-moves', () => ({
@@ -101,6 +138,7 @@ vi.mock('@/features/quick-links/quick-links', () => ({
   updateQuickLink: quickLinkMocks.updateQuickLink,
 }));
 vi.mock('@/features/quick-links/quick-links-storage', () => ({
+  getQuickLinks: quickLinkMocks.getQuickLinks,
   updateQuickLinks: quickLinkMocks.updateQuickLinks,
 }));
 
@@ -153,6 +191,70 @@ describe('background message routing', () => {
     await import('../entrypoints/background');
 
     expect(browserMocks.action.onClicked.addListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('routes named OAuth and sync alarms to the coordinator', async () => {
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.alarms.onAlarm.addListener.mock.calls[0]?.[0];
+    listener?.({ name: 'tabstow-oauth-device-flow-v2' });
+    listener?.({ name: 'tabstow-sync-v2' });
+    await Promise.resolve();
+
+    expect(coordinatorMocks.handleOAuthAlarm).toHaveBeenCalledTimes(1);
+    expect(coordinatorMocks.handleSyncAlarm).toHaveBeenCalledTimes(1);
+  });
+
+  it('starts OAuth Device Flow and schedules background polling', async () => {
+    const view = {
+      phase: 'authorizing',
+      sync: { state: 'authorizing' },
+      deviceFlow: {
+        userCode: 'ABCD-EFGH',
+        verificationUri: 'https://github.com/login/device',
+        expiresAt: 1,
+        intervalSeconds: 5,
+      },
+    };
+    connectionServiceMocks.startGitHubOAuth.mockResolvedValue({
+      view,
+      shouldReconcile: false,
+      allowInitialize: false,
+    });
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'oauth:start' });
+
+    expect(response).toEqual({ ok: true, data: view });
+    expect(coordinatorMocks.scheduleOAuthAlarm).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(response)).not.toContain('deviceCode');
+    expect(JSON.stringify(response)).not.toContain('token');
+  });
+
+  it('returns a started OAuth attempt when alarm scheduling fails', async () => {
+    const view = {
+      phase: 'authorizing',
+      sync: { state: 'authorizing' },
+      deviceFlow: {
+        userCode: 'ABCD-EFGH',
+        verificationUri: 'https://github.com/login/device',
+        expiresAt: 1,
+        intervalSeconds: 5,
+      },
+    };
+    connectionServiceMocks.startGitHubOAuth.mockResolvedValue({
+      view,
+      shouldReconcile: false,
+      allowInitialize: false,
+    });
+    coordinatorMocks.scheduleOAuthAlarm.mockRejectedValueOnce(
+      new Error('alarms unavailable'),
+    );
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'oauth:start' });
+
+    expect(response).toEqual({ ok: true, data: view });
   });
 
   it('stows the clicked tab window from the toolbar action', async () => {
@@ -286,6 +388,25 @@ describe('background message routing', () => {
     await dispatchRuntimeMessage({ type: 'sessions:stow-tab', tabId: 42 });
 
     expect(sessionServiceMocks.saveTabsAsSession).toHaveBeenCalledWith([42]);
+  });
+
+  it('returns a successful local mutation when sync bookkeeping fails', async () => {
+    const result = {
+      ok: true,
+      data: { session: null, savedTabCount: 1, closedTabCount: 1 },
+    };
+    sessionServiceMocks.saveTabsAsSession.mockResolvedValue(result);
+    coordinatorMocks.noteSynchronizedMutation.mockRejectedValueOnce(
+      new Error('alarms unavailable'),
+    );
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:stow-tab',
+      tabId: 42,
+    });
+
+    expect(response).toBe(result);
   });
 
   it('routes saved tab open messages with exact IDs and consume intent', async () => {

@@ -8,6 +8,11 @@ import type {
 } from '@/features/active-tabs/types';
 import type { QuickLink, QuickLinkIcon } from '@/features/quick-links/quick-links';
 import type { HistoryEntry, MoveSavedTabRequest } from '@/features/history/types';
+import type {
+  ConnectionView,
+  SyncResult,
+  SyncStatusView,
+} from '@/features/sync/sync-types';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
 
@@ -17,12 +22,7 @@ export type StowResult = {
   closedTabCount: number;
 };
 
-export type SyncResult = {
-  sessionCount: number;
-  quickLinkCount: number;
-  exportedAt?: string;
-  importedAt?: string;
-};
+export type { SyncResult } from '@/features/sync/sync-types';
 
 export type ExtensionMessage =
   | { type: 'sessions:list' }
@@ -46,14 +46,31 @@ export type ExtensionMessage =
   | { type: 'active-tabs:close'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
   | { type: 'quick-links:add'; link: QuickLink }
+  | { type: 'quick-links:list' }
   | { type: 'quick-links:update'; linkId: string; patch: { label?: string; icon?: QuickLinkIcon | null } }
   | { type: 'quick-links:remove'; linkId: string }
   | { type: 'quick-links:reorder'; orderedIds: string[] }
   | { type: 'chrome-tab-groups:collapse-window'; windowId: number }
   | { type: 'settings:get' }
   | { type: 'settings:update'; settings: Partial<ExtensionSettings> }
+  | { type: 'connection:get' }
+  | { type: 'oauth:start' }
+  | { type: 'oauth:poll' }
+  | { type: 'oauth:cancel' }
+  | { type: 'gist:rescan' }
+  | { type: 'gist:select'; gistId: string; fileName?: string }
+  | { type: 'gist:confirm'; targetKey: string }
+  | { type: 'gist:choose-another' }
+  | { type: 'sync:observe'; reason: 'open' | 'focus' }
+  | { type: 'sync:retry' }
+  | { type: 'sync:disconnect' }
   | { type: 'sync:push' }
   | { type: 'sync:pull' };
+
+export type ExtensionEvent =
+  | { type: 'sync:data-changed' }
+  | { type: 'sync:status-changed'; status: SyncStatusView }
+  | { type: 'connection:state-changed' };
 
 export type ExtensionMessageResponse =
   | AppResult<TabSession[]>
@@ -65,6 +82,7 @@ export type ExtensionMessageResponse =
   | AppResult<ActiveTabsSnapshot>
   | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>
+  | AppResult<ConnectionView>
   | AppResult<SyncResult>
   | AppResult<{ deleted: true }>
   | AppResult<{ opened: true }>

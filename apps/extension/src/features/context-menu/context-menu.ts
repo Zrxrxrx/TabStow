@@ -1,4 +1,5 @@
 import { saveCurrentWindowAsSession } from '@/features/tabs/session-service';
+import { noteSynchronizedMutation } from '@/features/sync/sync-coordinator';
 import { browser } from '@/lib/browser';
 
 const STOW_CURRENT_WINDOW_MENU_ID = 'tabstow-stow-current-window';
@@ -13,8 +14,9 @@ export async function registerContextMenu(): Promise<void> {
 }
 
 export function registerContextMenuClickHandler(): void {
-  browser.contextMenus.onClicked.addListener((info, tab) => {
+  browser.contextMenus.onClicked.addListener(async (info, tab) => {
     if (info.menuItemId !== STOW_CURRENT_WINDOW_MENU_ID) return;
-    void saveCurrentWindowAsSession(tab?.windowId);
+    const result = await saveCurrentWindowAsSession(tab?.windowId);
+    if (result.ok) await noteSynchronizedMutation().catch(() => undefined);
   });
 }
