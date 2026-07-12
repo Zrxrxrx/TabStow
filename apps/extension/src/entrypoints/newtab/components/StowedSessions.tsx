@@ -1,4 +1,4 @@
-import { GripVertical, RefreshCcw, RotateCcw, Trash2, UploadCloud } from 'lucide-react';
+import { GripVertical, RotateCcw, Trash2 } from 'lucide-react';
 import {
   Fragment,
   useMemo,
@@ -13,7 +13,7 @@ import { TabFavicon } from '@/components/TabFavicon';
 import { t, type Locale } from '@/features/i18n/i18n';
 import { filterSavedSessions } from '@/features/tab-search/tab-search';
 import type { AppResult } from '@/lib/errors';
-import { sendExtensionMessage, type SyncResult } from '@/lib/messages';
+import { sendExtensionMessage } from '@/lib/messages';
 import {
   SAVED_TABS_DRAG_MIME,
   readSavedTabsDragSource,
@@ -338,39 +338,6 @@ export function StowedSessions({
           <span className="meta-pill">{tabCount}</span>
         </span>
       </header>
-
-      <section className="session-toolbar" aria-label="Session controls" data-od-id="saved-actions">
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() =>
-            void onRunAction<SyncResult>(
-              'sync-pull',
-              () => sendExtensionMessage<AppResult<SyncResult>>({ type: 'sync:pull' }),
-              (result) => `Pulled ${result.sessionCount} sessions and ${result.quickLinkCount} quick links from Gist.`,
-            )
-          }
-          disabled={busyAction !== null}
-        >
-          <RefreshCcw size={16} aria-hidden="true" />
-          {t(locale, 'pull')}
-        </button>
-        <button
-          type="button"
-          className="secondary-button"
-          onClick={() =>
-            void onRunAction<SyncResult>(
-              'sync-push',
-              () => sendExtensionMessage<AppResult<SyncResult>>({ type: 'sync:push' }),
-              (result) => `Pushed ${result.sessionCount} sessions and ${result.quickLinkCount} quick links to Gist.`,
-            )
-          }
-          disabled={busyAction !== null}
-        >
-          <UploadCloud size={16} aria-hidden="true" />
-          {t(locale, 'push')}
-        </button>
-      </section>
 
       <StatusMessage message={status.message} tone={status.tone} />
 

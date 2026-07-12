@@ -24,6 +24,10 @@ const { chromeRuntimeMocks } = vi.hoisted(() => ({
   chromeRuntimeMocks: {
     getURL: vi.fn((path: string) => `chrome-extension://tabstow-test${path}`),
     openOptionsPage: vi.fn(),
+    onMessage: {
+      addListener: vi.fn(),
+      removeListener: vi.fn(),
+    },
   },
 }));
 const { saveQuickLinkIcon, resolveQuickLinkIconUrl, deleteQuickLinkIcon, isQuickLinkIconToken } = vi.hoisted(() => ({
@@ -301,6 +305,8 @@ describe('App', () => {
     document.documentElement.style.removeProperty('--dashboard-background-image');
     chromeRuntimeMocks.getURL.mockClear();
     chromeRuntimeMocks.openOptionsPage.mockClear();
+    chromeRuntimeMocks.onMessage.addListener.mockClear();
+    chromeRuntimeMocks.onMessage.removeListener.mockClear();
     chromeChangeEvents = installAppChromeEvents();
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
@@ -2385,11 +2391,7 @@ describe('App', () => {
     expect(container.textContent).not.toContain('1 open');
   });
 
-  it('disables quick-link writes while a sync pull is running', async () => {
-    const pendingPull = deferred<
-      AppResult<{ sessionCount: number; quickLinkCount: number; importedAt: string }>
-    >();
-
+  it('keeps local Quick Link actions enabled while background sync is running', async () => {
     getQuickLinks.mockResolvedValue([
       {
         id: 'link-1',
@@ -2422,8 +2424,22 @@ describe('App', () => {
         return { ok: true, data: SESSIONS };
       }
 
-      if (message.type === 'sync:pull') {
-        return pendingPull.promise;
+      if (message.type === 'sync:observe') {
+        return {
+          ok: true,
+          data: {
+            phase: 'connected',
+            sync: { state: 'syncing' },
+            account: { id: 1, login: 'octocat' },
+            binding: {
+              gistId: 'gist-1',
+              fileName: 'tabstow.sync.json',
+              public: false,
+              htmlUrl: 'https://gist.github.com/octocat/gist-1',
+              ownerId: 1,
+            },
+          },
+        };
       }
 
       throw new Error(`Unexpected message: ${message.type}`);
@@ -2436,38 +2452,22 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Fetch' }));
     await change(screen().getByLabelText('Quick link label'), 'Example');
 
-    await click(screen().getByRole('button', { name: 'Pull' }));
-
-    expect(screen().getByRole('button', { name: 'Show quick links' })).toHaveProperty('disabled', true);
-    expect(screen().getByLabelText('Add quick link')).toHaveProperty('disabled', true);
-    expect(screen().getByRole('button', { name: 'Add open tab' })).toHaveProperty('disabled', true);
-    expect(screen().getByLabelText('Move One down')).toHaveProperty('disabled', true);
-    expect(screen().getByLabelText('Upload icon for One')).toHaveProperty('disabled', true);
-    expect(screen().getByLabelText('Edit One')).toHaveProperty('disabled', true);
-    expect(screen().getByLabelText('Remove One')).toHaveProperty('disabled', true);
-    expect(screen().getByRole('button', { name: 'Add' })).toHaveProperty('disabled', true);
+    expect(container.textContent).not.toContain('Pull');
+    expect(container.textContent).not.toContain('Push');
+    expect(screen().getByRole('button', { name: 'Show quick links' })).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Add quick link')).toHaveProperty('disabled', false);
+    expect(screen().getByRole('button', { name: 'Add open tab' })).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Move One down')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Upload icon for One')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Edit One')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Remove One')).toHaveProperty('disabled', false);
+    expect(screen().getByRole('button', { name: 'Add' })).toHaveProperty('disabled', false);
     expect(
       container.querySelector<HTMLInputElement>('input[data-quick-link-upload-id="link-1"]')?.disabled,
-    ).toBe(true);
-
-    const dialog = container.querySelector('form.form-dialog');
-    expect(dialog).not.toBeNull();
-    await act(async () => {
-      dialog?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
-    });
-
-    expect(saveQuickLinks).not.toHaveBeenCalled();
-
-    pendingPull.resolve({
-      ok: true,
-      data: { sessionCount: 0, quickLinkCount: 0, importedAt: '2026-07-08T00:00:00.000Z' },
-    });
-    await act(async () => {
-      await pendingPull.promise;
-    });
+    ).toBe(false);
   });
 
-  it('preserves pulled quick links when adding a new link from stale new-tab state', async () => {
+  it('refreshes Sessions and Quick Links after a background data-changed event', async () => {
     let storedQuickLinks = [] as Awaited<ReturnType<typeof getQuickLinks>>;
     getQuickLinks.mockImplementation(async () => storedQuickLinks);
     saveQuickLinks.mockImplementation(async (links: typeof storedQuickLinks) => {
@@ -2490,46 +2490,34 @@ describe('App', () => {
         return { ok: true, data: SESSIONS };
       }
 
-      if (message.type === 'sync:pull') {
-        storedQuickLinks = [
-          {
-            id: 'remote-1',
-            url: 'https://remote.example/',
-            label: 'Remote',
-            icon: null,
-            createdAt: '2026-07-07T00:00:00.000Z',
-          },
-        ];
+      if (message.type === 'sync:observe') {
         return {
           ok: true,
-          data: { sessionCount: 0, quickLinkCount: 1, importedAt: '2026-07-08T00:00:00.000Z' },
+          data: { phase: 'disconnected', sync: { state: 'disconnected' } },
         };
-      }
-
-      if (message.type === 'quick-links:add') {
-        const saved = await saveQuickLinks([...(await getQuickLinks()), message.link]);
-        return { ok: true, data: saved };
       }
 
       throw new Error(`Unexpected message: ${message.type}`);
     });
 
     await renderApp();
-    await click(screen().getByRole('button', { name: 'Pull' }));
-    expect(screen().getByRole('status').textContent).toBe('Pulled 0 sessions and 1 quick links from Gist.');
+    storedQuickLinks = [
+      {
+        id: 'remote-1',
+        url: 'https://remote.example/',
+        label: 'Remote',
+        icon: null,
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ];
+    const listener = chromeRuntimeMocks.onMessage.addListener.mock.calls[0]?.[0];
+    await act(async () => {
+      listener?.({ type: 'sync:data-changed' });
+      await Promise.resolve();
+    });
+
     expect(screen().getByText('Remote')).not.toBeNull();
-
-    await click(screen().getByRole('button', { name: 'Edit quick links' }));
-    await click(screen().getByLabelText('Add quick link'));
-    await change(screen().getByLabelText('Quick link URL'), 'https://example.com');
-    await click(screen().getByRole('button', { name: 'Fetch' }));
-    await change(screen().getByLabelText('Quick link label'), 'Example');
-    await click(screen().getByRole('button', { name: 'Add' }));
-
-    expect(saveQuickLinks).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: 'remote-1', label: 'Remote' }),
-      expect.objectContaining({ url: 'https://example.com/', label: 'Example' }),
-    ]);
+    expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'sessions:list' });
   });
 });
 

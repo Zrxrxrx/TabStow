@@ -10,9 +10,11 @@ import {
 } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
+import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
 import { SearchBox } from './components/SearchBox';
+import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
 import { ThemeControls, useThemePreferencesController } from './components/ThemeControls';
 import { TodosPanel } from './components/TodosPanel';
@@ -23,11 +25,18 @@ type StatusState = {
   message: string | null;
 };
 
+const DISCONNECTED_SYNC: ConnectionView = {
+  phase: 'disconnected',
+  sync: { state: 'disconnected' },
+};
+
 export function App() {
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
+  const [quickLinksRefreshKey, setQuickLinksRefreshKey] = useState(0);
+  const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED_SYNC);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const [extraOpen, setExtraOpen] = useState(false);
   const [tabQuery, setTabQuery] = useState('');
@@ -48,6 +57,51 @@ export function App() {
 
   useEffect(() => {
     void loadSessions();
+    void observeSync('open');
+  }, []);
+
+  async function observeSync(reason: 'open' | 'focus') {
+    try {
+      const response = await sendExtensionMessage<AppResult<ConnectionView>>({
+        type: 'sync:observe',
+        reason,
+      });
+      if (response.ok) setConnection(response.data);
+    } catch {
+      // Local features remain available when the background worker is restarting.
+    }
+  }
+
+  useEffect(() => {
+    function handleFocus() {
+      void observeSync('focus');
+    }
+
+    function handleVisibility() {
+      if (document.visibilityState === 'visible') void observeSync('focus');
+    }
+
+    function handleRuntimeMessage(message: unknown) {
+      if (!message || typeof message !== 'object' || !('type' in message)) return;
+      const event = message as { type?: unknown; status?: SyncStatusView };
+      if (event.type === 'sync:data-changed') {
+        void loadSessions();
+        setQuickLinksRefreshKey((value) => value + 1);
+      } else if (event.type === 'sync:status-changed' && event.status) {
+        setConnection((current) => ({ ...current, sync: event.status! }));
+      } else if (event.type === 'connection:state-changed') {
+        void observeSync('focus');
+      }
+    }
+
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleVisibility);
+    chrome.runtime.onMessage?.addListener(handleRuntimeMessage);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleVisibility);
+      chrome.runtime.onMessage?.removeListener(handleRuntimeMessage);
+    };
   }, []);
 
   useEffect(() => {
@@ -213,7 +267,13 @@ export function App() {
           </div>
         </header>
 
-        <QuickLinks disabled={busyAction !== null} locale={locale} refreshKey={activeWorkspaceRefreshKey} />
+        <NewTabSyncStatus
+          connection={connection}
+          locale={locale}
+          onOpenSettings={openOptions}
+        />
+
+        <QuickLinks disabled={busyAction !== null} locale={locale} refreshKey={quickLinksRefreshKey} />
 
         <section className="workspace-container" aria-label="Tab workspace">
           <WorkspaceSearch locale={locale} value={tabQuery} onChange={setTabQuery} />
