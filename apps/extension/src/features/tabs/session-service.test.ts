@@ -35,6 +35,7 @@ vi.mock('../../db/db', () => dbMocks);
 vi.mock('../settings/settings-storage', () => settingsMocks);
 
 import {
+  getCurrentWindowStowPreview,
   openHistoryTab,
   openSavedTab,
   restoreSession,
@@ -85,6 +86,37 @@ beforeEach(() => {
 });
 
 describe('session service', () => {
+  it('previews eligible tabs in the initiating window without mutating tabs or storage', async () => {
+    settingsMocks.getSettings.mockResolvedValue({
+      ...DEFAULT_SETTINGS,
+      includePinnedTabs: false,
+    });
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 1, windowId: 55, url: 'https://example.com/', pinned: false },
+      { id: 2, windowId: 55, url: 'https://pinned.example/', pinned: true },
+      { id: 3, windowId: 55, url: 'chrome://settings', pinned: false },
+    ]);
+
+    await expect(getCurrentWindowStowPreview(55)).resolves.toEqual({
+      ok: true,
+      data: { eligibleTabCount: 1 },
+    });
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowId: 55 });
+    expect(dbMocks.createSession).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.create).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it('falls back to the last-focused window for stow preview without a sender window', async () => {
+    browserMocks.tabs.query.mockResolvedValue([]);
+
+    await expect(getCurrentWindowStowPreview()).resolves.toEqual({
+      ok: true,
+      data: { eligibleTabCount: 0 },
+    });
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ lastFocusedWindow: true });
+  });
+
   it('opens a saved tab in the background before consuming it', async () => {
     dbMocks.getSession.mockResolvedValue(sessionWithTwoTabs);
     browserMocks.tabs.create.mockResolvedValue({ id: 91 });

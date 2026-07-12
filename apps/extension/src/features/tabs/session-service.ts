@@ -1,4 +1,4 @@
-import type { SavedTab, TabSession } from '@tabstow/core';
+import type { ExtensionSettings, SavedTab, TabSession } from '@tabstow/core';
 import {
   createSession,
   getHistoryEntry,
@@ -15,7 +15,7 @@ import {
   toKnownStorageError,
   type AppResult,
 } from '../../lib/errors';
-import type { StowResult } from '../../lib/messages';
+import type { StowPreview, StowResult } from '../../lib/messages';
 import {
   isOpenableTabUrl,
   isStowableTab,
@@ -121,11 +121,36 @@ async function getCurrentWindowTabs(windowId?: number): Promise<StowableBrowserT
   return browser.tabs.query({ lastFocusedWindow: true });
 }
 
+async function getCurrentWindowStowSelection(windowId?: number): Promise<{
+  eligibleTabs: StowableBrowserTab[];
+  settings: ExtensionSettings;
+  tabs: StowableBrowserTab[];
+}> {
+  const settings = await getSettings();
+  const tabs = await getCurrentWindowTabs(windowId);
+  return {
+    eligibleTabs: tabs.filter((tab) => isStowableTab(tab, settings)),
+    settings,
+    tabs,
+  };
+}
+
+export async function getCurrentWindowStowPreview(
+  windowId?: number,
+): Promise<AppResult<StowPreview>> {
+  try {
+    const { eligibleTabs } = await getCurrentWindowStowSelection(windowId);
+    return ok({
+      eligibleTabCount: eligibleTabs.length,
+    });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
 export async function saveCurrentWindowAsSession(windowId?: number): Promise<AppResult<StowResult>> {
   try {
-    const settings = await getSettings();
-    const tabs = await getCurrentWindowTabs(windowId);
-    const eligibleTabs = tabs.filter((tab) => isStowableTab(tab, settings));
+    const { eligibleTabs, settings, tabs } = await getCurrentWindowStowSelection(windowId);
 
     if (eligibleTabs.length === 0) {
       return err('no-eligible-tabs', 'No eligible tabs were found in the current window.');

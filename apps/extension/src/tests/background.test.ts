@@ -83,6 +83,7 @@ const actionFeedbackMocks = vi.hoisted(() => ({
 }));
 
 const sessionServiceMocks = vi.hoisted(() => ({
+  getCurrentWindowStowPreview: vi.fn(),
   openHistoryTab: vi.fn(),
   openSavedTab: vi.fn(),
   restoreSession: vi.fn(),
@@ -185,6 +186,24 @@ describe('background message routing', () => {
 
     expect(keepAlive).toBe(true);
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(91);
+  });
+
+  it('passes sender window id to the stow-current-window preview handler', async () => {
+    sessionServiceMocks.getCurrentWindowStowPreview.mockResolvedValue({
+      ok: true,
+      data: { eligibleTabCount: 3 },
+    });
+
+    await import('../entrypoints/background');
+
+    const { keepAlive, response } = await dispatchRuntimeMessage(
+      { type: 'sessions:stow-current-window-preview' },
+      { tab: { windowId: 91 } } as chrome.runtime.MessageSender,
+    );
+
+    expect(keepAlive).toBe(true);
+    expect(sessionServiceMocks.getCurrentWindowStowPreview).toHaveBeenCalledWith(91);
+    expect(response).toEqual({ ok: true, data: { eligibleTabCount: 3 } });
   });
 
   it('registers toolbar action click handling', async () => {

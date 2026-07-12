@@ -57,6 +57,7 @@ import {
 import { updateQuickLinks } from '@/features/quick-links/quick-links-storage';
 import { getQuickLinks } from '@/features/quick-links/quick-links-storage';
 import {
+  getCurrentWindowStowPreview,
   openHistoryTab,
   openSavedTab,
   restoreSession,
@@ -128,6 +129,8 @@ async function routeMessage(
     switch (message.type) {
       case 'sessions:list':
         return ok(await listSessions());
+      case 'sessions:stow-current-window-preview':
+        return getCurrentWindowStowPreview(sender?.tab?.windowId);
       case 'sessions:stow-current-window':
         return saveCurrentWindowAsSession(sender?.tab?.windowId);
       case 'sessions:stow-tab':

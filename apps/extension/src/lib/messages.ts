@@ -22,10 +22,15 @@ export type StowResult = {
   closedTabCount: number;
 };
 
+export type StowPreview = {
+  eligibleTabCount: number;
+};
+
 export type { SyncResult } from '@/features/sync/sync-types';
 
 export type ExtensionMessage =
   | { type: 'sessions:list' }
+  | { type: 'sessions:stow-current-window-preview' }
   | { type: 'sessions:stow-current-window' }
   | { type: 'sessions:stow-tab'; tabId: number }
   | { type: 'sessions:open-tab'; sessionId: string; tabId: string; consume: boolean }
@@ -76,6 +81,7 @@ export type ExtensionMessageResponse =
   | AppResult<TabSession[]>
   | AppResult<TabSession>
   | AppResult<StowResult>
+  | AppResult<StowPreview>
   | AppResult<HistoryEntry[]>
   | AppResult<ActiveBrowserTab[]>
   | AppResult<ActiveTabsMoveResult>

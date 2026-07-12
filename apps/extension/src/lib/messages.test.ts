@@ -58,6 +58,15 @@ describe('sendExtensionMessage', () => {
     ).resolves.toBe(response);
   });
 
+  it('returns stow preview responses unchanged', async () => {
+    const response = { ok: true as const, data: { eligibleTabCount: 4 } };
+    browserMocks.runtime.sendMessage.mockResolvedValue(response);
+
+    await expect(
+      sendExtensionMessage({ type: 'sessions:stow-current-window-preview' }),
+    ).resolves.toBe(response);
+  });
+
   it('returns saved tab move responses unchanged', async () => {
     const request = {
       sourceSessionId: 'session-1',
