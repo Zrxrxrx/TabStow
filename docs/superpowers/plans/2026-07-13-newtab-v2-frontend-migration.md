@@ -1,6 +1,6 @@
 # New Tab V2 Frontend Migration Implementation Plan
 
-Status: ready for `plan-eng-review`; implementation not started
+Status: implemented and verified
 
 > **For agentic workers:** Execute this plan task by task with the available `implement` workflow and collaboration subagents. If `superpowers:subagent-driven-development` is available in the execution session, prefer it; otherwise use the available subagent tools directly. Every implementation and review subagent must use `gpt5.5` with medium reasoning; fast models are not allowed. Track progress with the checkboxes in this document.
 
@@ -66,7 +66,7 @@ Tasks 1 and 2 establish independent low-level contracts and may be investigated 
 - Add `clearThemeBackgroundCache(): Promise<void>` for the named `tabstow-theme-backgrounds` cache.
 - Make the first theme read perform the approved destructive migration before React mounts.
 
-- [ ] **Step 1: Write failing migration and bootstrap tests**
+- [x] **Step 1: Write failing migration and bootstrap tests**
 
 Cover all of these cases:
 
@@ -78,7 +78,7 @@ Cover all of these cases:
 - New Tab sets `data-theme-mode` before rendering the React tree, and toggling persists only the mode.
 - Extra no longer renders Appearance controls.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/theme/theme-preferences.test.ts src/features/theme/theme-background-cache.test.ts src/entrypoints/newtab/App.test.tsx
@@ -86,7 +86,7 @@ bun run --cwd apps/extension test -- src/features/theme/theme-preferences.test.t
 
 Expected: FAIL on the legacy fields, missing cache-wide cleanup, pre-render bootstrap, and removed controls.
 
-- [ ] **Step 3: Implement the minimum destructive migration**
+- [x] **Step 3: Implement the minimum destructive migration**
 
 - Keep the existing `local:tabstow-theme-preferences` key.
 - Read and normalize the legacy mode, clear the full named cache, then overwrite storage with `{ mode }`.
@@ -96,7 +96,7 @@ Expected: FAIL on the legacy fields, missing cache-wide cleanup, pre-render boot
 - Move the small runtime toggle state into `App.tsx` or a New-Tab-specific hook; do not preserve palette/background controller code.
 - Leave the Options surface and its separate legacy settings schema untouched; the approved destructive migration applies only to New Tab visual personalization.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/theme/theme-preferences.test.ts src/features/theme/theme-background-cache.test.ts src/entrypoints/newtab/App.test.tsx
@@ -105,7 +105,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/features/theme apps/extension/src/entrypoints/newtab
@@ -131,7 +131,7 @@ git commit -m "refactor(theme): retire new tab personalization"
 - Extend `ActiveBrowserTab` with Chrome's `audible` and `discarded` fields.
 - Export or reuse one neutral page/browser glyph fallback for Active, Saved, History preview, search suggestions, and Quick Links.
 
-- [ ] **Step 1: Write failing contract and fallback tests**
+- [x] **Step 1: Write failing contract and fallback tests**
 
 - Prove `active-tabs:snapshot` preserves `audible` and `discarded` returned by `browser.tabs.query`.
 - Prove the Active window projection does not drop those fields.
@@ -139,7 +139,7 @@ git commit -m "refactor(theme): retire new tab personalization"
 - Cover supplied favicon failure, Chrome favicon failure, missing URL, failed custom Quick Link image, and Quick Link site-icon failure.
 - Preserve explicit Quick Link emoji and successfully resolved uploaded images.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/active-tabs/active-tabs-service.test.ts src/features/active-tabs/active-tab-windows.test.ts src/components/TabFavicon.test.tsx src/entrypoints/newtab/App.test.tsx
@@ -147,14 +147,14 @@ bun run --cwd apps/extension test -- src/features/active-tabs/active-tabs-servic
 
 Expected: FAIL because the snapshot type lacks the fields and fallback still renders initials.
 
-- [ ] **Step 3: Implement the contract without new messages or permissions**
+- [x] **Step 3: Implement the contract without new messages or permissions**
 
 - Add the two Chrome fields to the existing snapshot type. The service already passes Chrome tab objects through, so do not add a mapper or background message.
 - Keep the existing safe URL and data-image validation cascade.
 - Replace generated initials with one `aria-hidden` neutral glyph in the existing favicon frame.
 - Reuse that fallback in Quick Links rather than creating a second visual rule.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/active-tabs/active-tabs-service.test.ts src/features/active-tabs/active-tab-windows.test.ts src/components/TabFavicon.test.tsx src/entrypoints/newtab/App.test.tsx
@@ -163,7 +163,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/features/active-tabs apps/extension/src/components/TabFavicon.tsx apps/extension/src/components/TabFavicon.test.tsx apps/extension/src/entrypoints/newtab
@@ -193,7 +193,7 @@ git commit -m "feat(newtab): expose real tab state and favicon fallback"
 - Add one reusable modal shell for Recovery, Sync, Sleep Policy, and existing form dialogs.
 - Establish the V2 shell slots: Quick Links rail, sticky top strip, independently scrolling Active column, and independently scrolling Saved column.
 
-- [ ] **Step 1: Write failing modal and shell contract tests**
+- [x] **Step 1: Write failing modal and shell contract tests**
 
 - Modal initial focus, Tab/Shift+Tab focus wrap, Escape close, backdrop close, busy close suppression, and focus restoration.
 - `FormDialog` retains submit/cancel behavior while using the shared modal semantics.
@@ -201,7 +201,7 @@ git commit -m "feat(newtab): expose real tab state and favicon fallback"
 - App renders V2 shell/rail/top-strip/workspace landmarks and no V1 `page-shell`, `topbar`, or full-width Quick Links panel contract.
 - All icon-only controls have localized accessible names.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/ModalDialog.test.tsx src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/NewTabFeedback.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
@@ -209,7 +209,7 @@ bun run --cwd apps/extension test -- src/entrypoints/newtab/components/ModalDial
 
 Expected: FAIL because the generic modal and V2 shell do not exist.
 
-- [ ] **Step 3: Implement the shared primitives and structural CSS**
+- [x] **Step 3: Implement the shared primitives and structural CSS**
 
 - Keep `ModalDialog` narrowly focused on semantics, focus, header/body/actions, and close policy.
 - Make `FormDialog` compose it rather than duplicating dialog behavior.
@@ -218,7 +218,7 @@ Expected: FAIL because the generic modal and V2 shell do not exist.
 - Give Quick Links, Active, and Saved their own scroll containers. Do not add mobile drawers or stacked panels.
 - Add `prefers-reduced-motion` handling with no decorative long transitions.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/ModalDialog.test.tsx src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/NewTabFeedback.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
@@ -227,7 +227,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS. Pixel-level verification remains in Task 11.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/entrypoints/newtab apps/extension/src/features/i18n
@@ -258,7 +258,7 @@ git commit -m "feat(newtab): establish v2 shell and dialog system"
 - Add `StowPreview = { eligibleTabCount: number }`.
 - Add `sessions:stow-current-window-preview` routed to the existing session service eligibility rules.
 
-- [ ] **Step 1: Write failing preview and button tests**
+- [x] **Step 1: Write failing preview and button tests**
 
 - Preview and real stow both use `sender.tab.windowId` when available and fall back to the last-focused normal window only when the sender window is unavailable. Both apply the same `includePinnedTabs` and URL eligibility rules.
 - Preview returns zero without creating or closing anything.
@@ -266,7 +266,7 @@ git commit -m "feat(newtab): establish v2 shell and dialog system"
 - Button disables at zero, shows the real count, blocks duplicate submission, shows indeterminate busy copy, and reports returned saved/closed counts including saved-but-not-closed partial success.
 - No fabricated `0 / N` progress appears.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/tabs/session-service.test.ts src/lib/messages.test.ts src/tests/background.test.ts src/entrypoints/newtab/components/StowCurrentWindowButton.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
@@ -274,7 +274,7 @@ bun run --cwd apps/extension test -- src/features/tabs/session-service.test.ts s
 
 Expected: FAIL on the missing preview message/service/component.
 
-- [ ] **Step 3: Implement using one eligibility source**
+- [x] **Step 3: Implement using one eligibility source**
 
 - Extract or reuse the session service's existing eligibility calculation; do not duplicate it in React.
 - Implement preview as `getCurrentWindowStowPreview(windowId?: number)` and have the background route pass `sender?.tab?.windowId` for both preview and real stow. Test sender-window selection and the missing-sender fallback separately.
@@ -282,7 +282,7 @@ Expected: FAIL on the missing preview message/service/component.
 - Keep the existing persistence-before-close behavior unchanged.
 - Scope button busy state to the stow mutation while continuing to prevent conflicting session mutations.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/tabs/session-service.test.ts src/lib/messages.test.ts src/tests/background.test.ts src/entrypoints/newtab/components/StowCurrentWindowButton.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
@@ -291,7 +291,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/features/tabs apps/extension/src/lib/messages.ts apps/extension/src/lib/messages.test.ts apps/extension/src/entrypoints/background.ts apps/extension/src/tests/background.test.ts apps/extension/src/entrypoints/newtab apps/extension/src/features/i18n
@@ -321,7 +321,7 @@ git commit -m "feat(newtab): add authoritative stow preview"
 - Add a pure suggestion model containing source kind and stable Active/Saved identifiers.
 - Let `ActiveWorkspace` report its latest authoritative snapshot to App without moving Chrome ownership into App.
 
-- [ ] **Step 1: Write failing pure and component tests**
+- [x] **Step 1: Write failing pure and component tests**
 
 - Non-empty queries rank title prefix, title contains, then URL contains; preserve source order for ties; cap at five.
 - Blank query renders no suggestions.
@@ -331,7 +331,7 @@ git commit -m "feat(newtab): add authoritative stow preview"
 - Active suggestion click sends focus with exact tab/window IDs.
 - Saved suggestion click sends consuming background-open with exact session/tab IDs and refreshes Saved/results after success.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/tab-search/tab-search.test.ts src/entrypoints/newtab/components/UnifiedSearch.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
@@ -339,14 +339,14 @@ bun run --cwd apps/extension test -- src/features/tab-search/tab-search.test.ts 
 
 Expected: FAIL on suggestion ranking, single-input orchestration, and removed old components.
 
-- [ ] **Step 3: Implement the single source of query state**
+- [x] **Step 3: Implement the single source of query state**
 
 - Keep query in App and continue passing it to the existing pure Active/Saved filters.
 - Receive the latest unfiltered Active snapshot through a callback from `ActiveWorkspace` for suggestions and stow-preview refresh only.
 - Keep suggestions as focusable buttons; Enter behavior is scoped to the input as approved.
 - Remove the old web-search and workspace-search components after all consumers move.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/tab-search/tab-search.test.ts src/entrypoints/newtab/components/UnifiedSearch.test.tsx src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts
@@ -355,7 +355,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/features/tab-search apps/extension/src/entrypoints/newtab apps/extension/src/features/i18n
@@ -380,7 +380,7 @@ git commit -m "feat(newtab): add unified tab and web search"
 - Add a Quick-Link-specific drag payload carrying a stable link ID.
 - Reuse `quick-links:reorder`; do not change storage or synchronization schemas.
 
-- [ ] **Step 1: Write failing rail and DnD tests**
+- [x] **Step 1: Write failing rail and DnD tests**
 
 - Normal mode renders all links, opens on row click, and cannot drag.
 - Pencil toggles Edit mode.
@@ -391,7 +391,7 @@ git commit -m "feat(newtab): add unified tab and web search"
 - Upload icon, edit, remove, add-by-URL, add-from-open-tab, emoji, custom image, and neutral fallback remain functional.
 - An arbitrary-count list scrolls inside the rail while brand/utility controls remain fixed.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/quick-links-dnd.test.ts src/entrypoints/newtab/App.test.tsx
@@ -399,14 +399,14 @@ bun run --cwd apps/extension test -- src/entrypoints/newtab/components/quick-lin
 
 Expected: FAIL because Quick Links still use cards and move buttons.
 
-- [ ] **Step 3: Implement the rail manager**
+- [x] **Step 3: Implement the rail manager**
 
 - Keep existing dialogs and icon cache behavior.
 - Convert only the presentation and reorder gesture; do not rewrite Quick Link persistence.
 - Exclude row action buttons and hidden file input from drag initiation.
 - Reload authoritative links after success and failure, matching existing mutation safety.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/quick-links-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/quick-links/quick-links-storage.test.ts src/features/quick-links/quick-links.test.ts src/features/i18n/i18n.test.ts
@@ -415,7 +415,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/entrypoints/newtab/components/QuickLinks.tsx apps/extension/src/entrypoints/newtab/components/quick-links-dnd.ts apps/extension/src/entrypoints/newtab/components/quick-links-dnd.test.ts apps/extension/src/entrypoints/newtab/App.test.tsx apps/extension/src/entrypoints/newtab/styles.css apps/extension/src/features/i18n/i18n.ts
@@ -441,7 +441,7 @@ git commit -m "feat(newtab): migrate quick links into v2 rail"
 - Preserve `active-tabs-dnd.ts` semantic request resolution and all background move services.
 - Add a local window-filter state: All plus one button per real visible Chrome window.
 
-- [ ] **Step 1: Write failing Active interaction tests**
+- [x] **Step 1: Write failing Active interaction tests**
 
 - All/focused/other window filters show real counts and hide nonselected windows; many filters scroll horizontally.
 - Pinned lane, native group title/color/collapse state, physical tab order, and Close Group remain.
@@ -454,7 +454,7 @@ git commit -m "feat(newtab): migrate quick links into v2 rail"
 - Sleep control, bulk sleep, and policy UI never send a discard/wake mutation. Clicking Sleeping focuses the existing tab.
 - Filtered search disables Active reorder.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/active-tabs-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/active-tabs/active-tab-moves.test.ts src/features/active-tabs/active-tabs-events.test.ts
@@ -462,7 +462,7 @@ bun run --cwd apps/extension test -- src/entrypoints/newtab/components/active-ta
 
 Expected: FAIL on window filtering, full-row/header drag, and sleep/audible presentation.
 
-- [ ] **Step 3: Rebuild presentation around existing authoritative movement**
+- [x] **Step 3: Rebuild presentation around existing authoritative movement**
 
 - Remove visual drag handles but keep the current payloads, compatible targets, in-flight lock, post-mutation refresh, and Chrome-event debounce.
 - Use native `draggable` threshold behavior and explicit post-drag click suppression.
@@ -470,7 +470,7 @@ Expected: FAIL on window filtering, full-row/header drag, and sleep/audible pres
 - Render disabled Sleep and bulk controls with localized reasons; render the Policy modal as informational content through `ModalDialog`.
 - Do not add Chrome mutation code outside the background worker.
 
-- [ ] **Step 4: Run focused and service tests**
+- [x] **Step 4: Run focused and service tests**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/active-tabs-dnd.test.ts src/entrypoints/newtab/App.test.tsx src/features/active-tabs/active-tab-moves.test.ts src/features/active-tabs/active-tabs-events.test.ts src/features/active-tabs/active-tabs-service.test.ts src/features/i18n/i18n.test.ts
@@ -479,7 +479,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/entrypoints/newtab/components/ActiveWorkspace.tsx apps/extension/src/entrypoints/newtab/components/ActiveWindowSection.tsx apps/extension/src/entrypoints/newtab/components/WindowFilter.tsx apps/extension/src/entrypoints/newtab/App.test.tsx apps/extension/src/entrypoints/newtab/styles.css apps/extension/src/features/i18n/i18n.ts
@@ -506,7 +506,7 @@ git commit -m "feat(newtab): migrate active tabs to v2 interactions"
 - Reuse `history:list` and `history:restore`; select `entries.slice(0, 5)` in New Tab.
 - Preserve the existing Saved DnD semantic resolver, session messages, and History transactions.
 
-- [ ] **Step 1: Write failing Saved and Recovery tests**
+- [x] **Step 1: Write failing Saved and Recovery tests**
 
 - Saved row click opens in the background and consumes to History; middle click opens without consuming; modified/right click behavior remains unchanged.
 - Saved row exposes only Move to Recovery Bin, not duplicate Restore/Open.
@@ -516,7 +516,7 @@ git commit -m "feat(newtab): migrate active tabs to v2 interactions"
 - Restore All opens into the current focused window and retains the existing keep-session-on-failure behavior without adding rollback semantics.
 - Recovery modal loads History, sorts potentially unordered input by `movedAt` descending with a stable ID tie-break, then takes five. It renders reason/source/time/count, covers loading/empty/error, restores the complete entry with per-entry busy state, refreshes Saved/History, and links to `/saved-history.html`.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/saved-tabs-dnd.test.ts src/entrypoints/newtab/components/RecoveryBinDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/entrypoints/saved-history/HistoryApp.test.tsx
@@ -524,7 +524,7 @@ bun run --cwd apps/extension test -- src/entrypoints/newtab/components/saved-tab
 
 Expected: FAIL on full-row/header drag and the missing Recovery preview.
 
-- [ ] **Step 3: Implement by reusing existing messages**
+- [x] **Step 3: Implement by reusing existing messages**
 
 - Remove Saved drag handles and make the full row/header container draggable; reject drag initiation only when the event starts from an interactive descendant.
 - Keep primary/middle click message payloads unchanged.
@@ -532,7 +532,7 @@ Expected: FAIL on full-row/header drag and the missing Recovery preview.
 - Let App refresh sessions after Recovery restore; let the dialog reload History after success.
 - Do not add a recent-History database query or message unless profiling proves the existing list is unsuitable.
 
-- [ ] **Step 4: Run focused and repository/service tests**
+- [x] **Step 4: Run focused and repository/service tests**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/components/saved-tabs-dnd.test.ts src/entrypoints/newtab/components/RecoveryBinDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/entrypoints/saved-history/HistoryApp.test.tsx src/db/db.test.ts src/features/tabs/session-service.test.ts src/features/i18n/i18n.test.ts
@@ -541,7 +541,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/entrypoints/newtab apps/extension/src/features/i18n/i18n.ts
@@ -570,7 +570,7 @@ git commit -m "feat(newtab): add v2 saved vault and recovery preview"
 - Add `derivePausedIncidentKey`, `getAcknowledgedIncidentKey`, `acknowledgeIncident`, and `clearAcknowledgement` using a dedicated local WXT storage key.
 - Do not add sync background messages or write acknowledgement into the connection record.
 
-- [ ] **Step 1: Write failing storage and UI tests**
+- [x] **Step 1: Write failing storage and UI tests**
 
 - Incident key is derived from normalized paused state, action, and diagnostic reason/message.
 - Dismissing stores the key; the same paused incident does not auto-open on a later mount.
@@ -582,7 +582,7 @@ git commit -m "feat(newtab): add v2 saved vault and recovery preview"
 - Dialog shows only real account, binding, state, message, last success, retry time, and derived pending/local-safe information; missing fields say Unavailable.
 - Reconnect/Rebind/Inspect controls call the existing Settings opener and never duplicate OAuth/Gist operations.
 
-- [ ] **Step 2: Run focused tests and verify RED**
+- [x] **Step 2: Run focused tests and verify RED**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/sync/sync-incident-acknowledgement.test.ts src/entrypoints/newtab/components/NewTabSyncStatus.test.tsx src/entrypoints/newtab/components/SyncStatusDialog.test.tsx src/entrypoints/newtab/App.test.tsx
@@ -590,14 +590,14 @@ bun run --cwd apps/extension test -- src/features/sync/sync-incident-acknowledge
 
 Expected: FAIL on the missing acknowledgement store/dialog and current inline-only status.
 
-- [ ] **Step 3: Implement the local acknowledgement boundary**
+- [x] **Step 3: Implement the local acknowledgement boundary**
 
 - Keep two simultaneously opened first-observer New Tabs as an accepted race; do not add a background lock or alter synchronization records.
 - Auto-open only on `paused` after acknowledgement lookup.
 - Preserve the top-bar error state after dismissing and allow manual reopen.
 - Use `chrome.runtime.openOptionsPage()` for recovery/setup because Sync is already the primary Options workflow.
 
-- [ ] **Step 4: Run focused and existing sync tests**
+- [x] **Step 4: Run focused and existing sync tests**
 
 ```bash
 bun run --cwd apps/extension test -- src/features/sync/sync-incident-acknowledgement.test.ts src/entrypoints/newtab/components/NewTabSyncStatus.test.tsx src/entrypoints/newtab/components/SyncStatusDialog.test.tsx src/entrypoints/newtab/App.test.tsx src/features/sync/connection-store.test.ts src/features/sync/sync-coordinator.test.ts src/features/i18n/i18n.test.ts
@@ -606,7 +606,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/features/sync apps/extension/src/entrypoints/newtab apps/extension/src/features/i18n/i18n.ts
@@ -636,7 +636,7 @@ git commit -m "feat(sync): add new tab incident guidance"
 - Saved column: title/readouts, Recovery Bin, Saved Session vault.
 - Extra modal/drawer: Todos only.
 
-- [ ] **Step 1: Write the final App regression matrix before cleanup**
+- [x] **Step 1: Write the final App regression matrix before cleanup**
 
 Cover at least:
 
@@ -649,20 +649,20 @@ Cover at least:
 - No prototype sample account/date/count/progress/storage text is present.
 - No keyboard reorder controls are introduced.
 
-- [ ] **Step 2: Run the final App/i18n tests and verify RED where V1 remains**
+- [x] **Step 2: Run the final App/i18n tests and verify RED where V1 remains**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/ModalDialog.test.tsx
 ```
 
-- [ ] **Step 3: Finish composition and delete only confirmed V1 orphans**
+- [x] **Step 3: Finish composition and delete only confirmed V1 orphans**
 
 - Remove obsolete imports, components, selectors, test fixtures, and i18n keys created obsolete by this migration.
 - Do not refactor unrelated Options, History, background, or sync code.
 - Keep system/bundled fonts and Lucide; do not copy embedded prototype data images or load remote fonts.
 - Ensure the source tree contains one New Tab implementation and no runtime V1/V2 switch.
 
-- [ ] **Step 4: Run focused tests and typecheck**
+- [x] **Step 4: Run focused tests and typecheck**
 
 ```bash
 bun run --cwd apps/extension test -- src/entrypoints/newtab/App.test.tsx src/features/i18n/i18n.test.ts src/entrypoints/newtab/components/FormDialog.test.tsx src/entrypoints/newtab/components/ModalDialog.test.tsx
@@ -671,7 +671,7 @@ bun run --cwd apps/extension typecheck
 
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add apps/extension/src/entrypoints/newtab apps/extension/src/features/i18n
@@ -687,7 +687,7 @@ git commit -m "refactor(newtab): complete v2 presentation cutover"
 - Modify: `docs/manual-qa.md`
 - Modify only directly relevant tests or V2 code when verification exposes a real migration defect.
 
-- [ ] **Step 1: Run whitespace and focused New Tab suites**
+- [x] **Step 1: Run whitespace and focused New Tab suites**
 
 ```bash
 git diff --check
@@ -696,7 +696,7 @@ bun run --cwd apps/extension test -- src/entrypoints/newtab src/components/TabFa
 
 Expected: PASS.
 
-- [ ] **Step 2: Run the complete repository gates**
+- [x] **Step 2: Run the complete repository gates**
 
 ```bash
 bun run test
@@ -706,7 +706,7 @@ bun run build
 
 Expected: PASS, including built-extension verification and unchanged Manifest V3 permission policy.
 
-- [ ] **Step 3: Verify packaged extension safety**
+- [x] **Step 3: Verify packaged extension safety**
 
 Inspect the built Chrome manifest and output:
 
@@ -715,7 +715,7 @@ Inspect the built Chrome manifest and output:
 - New Tab, History, Options, and background entries are packaged locally.
 - No remote scripts, styles, fonts, or executable assets.
 
-- [ ] **Step 4: Run the desktop visual matrix**
+- [x] **Step 4: Run the desktop visual matrix**
 
 Load the built extension and capture/compare the New Tab at:
 
@@ -727,7 +727,7 @@ Load the built extension and capture/compare the New Tab at:
 
 Verify all three regions remain visible, Active banks collapse internally when necessary, independent scrolling works, and no primary action is clipped.
 
-- [ ] **Step 5: Run the interaction matrix in Chrome**
+- [x] **Step 5: Run the interaction matrix in Chrome**
 
 - Quick Links: Normal open; Edit add/edit/upload/remove/full-row reorder; long-list scroll.
 - Active: row focus; Save for Later; Close; Close Group; Close Duplicates; tab/group cross-window drag; pinned/incognito rejection; filter disables drag; audible/discarded presentation; sleep UI never mutates.
@@ -738,7 +738,7 @@ Verify all three regions remain visible, Active banks collapse internally when n
 - Sync: paused auto-prompt once, manual reopen, healthy reset, setup-state Settings link.
 - Todos/dialogs: focus containment, Escape, focus return, localized accessible names.
 
-- [ ] **Step 6: Update manual QA and commit verification fixes/docs**
+- [x] **Step 6: Update manual QA and commit verification fixes/docs**
 
 Record the V2 matrix in `docs/manual-qa.md`. If verification required code changes, rerun the smallest failing suite and all three repository gates before committing.
 
