@@ -1,3 +1,4 @@
+import { File } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Props = {
@@ -50,7 +51,18 @@ function chromeFaviconUrl(pageUrl: string): string | null {
   );
 }
 
-export function TabFavicon({ className, favIconUrl, pageUrl, title }: Props) {
+export function NeutralFaviconFallback({ className }: { className?: string }) {
+  return (
+    <span
+      className={`favicon favicon-fallback${className ? ` ${className}` : ''}`}
+      aria-hidden="true"
+    >
+      <File size={14} strokeWidth={1.75} />
+    </span>
+  );
+}
+
+export function TabFavicon({ className, favIconUrl, pageUrl }: Props) {
   const candidateIdentity = `${favIconUrl ?? ''}\u0000${pageUrl}`;
   const [candidateState, setCandidateState] = useState({
     identity: candidateIdentity,
@@ -67,14 +79,7 @@ export function TabFavicon({ className, favIconUrl, pageUrl, title }: Props) {
     candidateState.identity === candidateIdentity ? candidateState.index : 0;
   const src = candidates[candidateIndex];
   if (!src) {
-    return (
-      <span
-        className={`favicon tone-blue${className ? ` ${className}` : ''}`}
-        aria-hidden="true"
-      >
-        {(title.match(/[A-Za-z0-9]/)?.[0] ?? 'T').toUpperCase()}
-      </span>
-    );
+    return <NeutralFaviconFallback className={className} />;
   }
 
   return (

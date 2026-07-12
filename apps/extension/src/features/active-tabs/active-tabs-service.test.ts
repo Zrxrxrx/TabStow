@@ -66,7 +66,15 @@ describe('active tabs service', () => {
 
   it('lists active tabs with Chrome tab-group metadata', async () => {
     browserMocks.tabs.query.mockResolvedValue([
-      { id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' },
+      {
+        id: 1,
+        windowId: 2,
+        groupId: 31,
+        index: 0,
+        url: 'https://example.com',
+        audible: true,
+        discarded: true,
+      },
     ]);
     browserMocks.tabGroups.query.mockResolvedValue([
       { id: 31, windowId: 2, title: 'Reading', color: 'blue', collapsed: false },
@@ -81,7 +89,17 @@ describe('active tabs service', () => {
       ok: true,
       data: {
         windows: [{ id: 2, focused: true, incognito: false, type: 'normal' }],
-        tabs: [{ id: 1, windowId: 2, groupId: 31, index: 0, url: 'https://example.com' }],
+        tabs: [
+          {
+            id: 1,
+            windowId: 2,
+            groupId: 31,
+            index: 0,
+            url: 'https://example.com',
+            audible: true,
+            discarded: true,
+          },
+        ],
         chromeGroups: [{ id: 31, windowId: 2, title: 'Reading', color: 'blue', collapsed: false }],
       },
     });

@@ -62,10 +62,11 @@ describe('TabFavicon', () => {
     });
 
     expect(container.querySelector('img')).toBeNull();
-    expect(container.textContent).toBe('R');
+    expect(container.querySelector('.favicon-fallback')).not.toBeNull();
+    expect(container.textContent).toBe('');
   });
 
-  it('falls back from the supplied favicon to Chrome and then the title initial', async () => {
+  it('falls back from the supplied favicon to Chrome and then a neutral glyph', async () => {
     await renderFavicon({
       favIconUrl: 'https://example.com/favicon.ico',
       pageUrl: 'https://example.com/a',
@@ -82,8 +83,15 @@ describe('TabFavicon', () => {
 
     await failImage();
 
-    expect(container.textContent).toBe('E');
+    expect(container.querySelector('.favicon-fallback')).not.toBeNull();
+    expect(container.textContent).toBe('');
     expect(container.querySelector('img')).toBeNull();
+  });
+
+  it('uses the neutral glyph when the page URL is missing', async () => {
+    await renderFavicon({ pageUrl: '', title: 'Missing' });
+
+    expect(container.querySelector('.favicon-fallback')).not.toBeNull();
   });
 
   it('restarts the candidate cascade when its URLs change', async () => {

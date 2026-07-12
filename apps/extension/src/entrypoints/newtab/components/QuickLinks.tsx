@@ -1,5 +1,6 @@
 import { ChevronDown, ChevronUp, ImageUp, Pencil, PencilLine, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
+import { TabFavicon } from '@/components/TabFavicon';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
@@ -76,20 +77,7 @@ function isImageIconToken(value: string | null): value is string {
   return Boolean(value);
 }
 
-function hostnameInitial(url: string): string {
-  try {
-    return new URL(url).hostname.replace(/^www\./, '').slice(0, 1).toUpperCase() || 'T';
-  } catch {
-    return 'T';
-  }
-}
-
-function renderTextIcon(link: QuickLink) {
-  if (link.icon?.kind === 'emoji') return link.icon.value;
-  return hostnameInitial(link.url);
-}
-
-function QuickLinkImageIcon({ token, label }: { token: string; label: string }) {
+function QuickLinkImageIcon({ token, link }: { token: string; link: QuickLink }) {
   const [src, setSrc] = useState<string | null>(null);
   const srcRef = useRef<string | null>(null);
 
@@ -121,46 +109,25 @@ function QuickLinkImageIcon({ token, label }: { token: string; label: string }) 
     };
   }, [token]);
 
-  if (!src) return null;
-
-  return <img alt="" aria-hidden="true" className="quick-link-image-icon" src={src} title={label} />;
-}
-
-function getFaviconUrl(url: string): string | null {
-  try {
-    const pageUrl = new URL(url);
-    if (pageUrl.protocol !== 'http:' && pageUrl.protocol !== 'https:') return null;
-    if (typeof chrome === 'undefined' || typeof chrome.runtime?.getURL !== 'function') return null;
-
-    return chrome.runtime.getURL(`/_favicon/?pageUrl=${encodeURIComponent(pageUrl.toString())}&size=32`);
-  } catch {
-    return null;
-  }
-}
-
-function QuickLinkSiteIcon({ link }: { link: QuickLink }) {
-  const [failed, setFailed] = useState(false);
-  const faviconUrl = failed ? null : getFaviconUrl(link.url);
-
-  useEffect(() => {
-    setFailed(false);
-  }, [link.url]);
-
-  if (!faviconUrl) {
-    return (
-      <span className="favicon tone-blue" aria-hidden="true">
-        {renderTextIcon(link)}
-      </span>
-    );
-  }
+  if (!src) return <QuickLinkSiteIcon link={link} />;
 
   return (
     <img
       alt=""
       aria-hidden="true"
+      className="quick-link-image-icon"
+      onError={() => replaceSrc(null)}
+      src={src}
+      title={link.label}
+    />
+  );
+}
+
+function QuickLinkSiteIcon({ link }: { link: QuickLink }) {
+  return (
+    <TabFavicon
       className="quick-link-site-icon"
-      onError={() => setFailed(true)}
-      src={faviconUrl}
+      pageUrl={link.url}
       title={link.label}
     />
   );
@@ -448,10 +415,10 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
             <div className="quick-link-card-shell" key={link.id}>
               <a href={link.url} target="_blank" rel="noreferrer" className="quick-link-card">
                 {link.icon?.kind === 'image' ? (
-                  <QuickLinkImageIcon token={link.icon.value} label={link.label} />
+                  <QuickLinkImageIcon token={link.icon.value} link={link} />
                 ) : link.icon?.kind === 'emoji' ? (
                   <span className="favicon tone-blue" aria-hidden="true">
-                    {renderTextIcon(link)}
+                    {link.icon.value}
                   </span>
                 ) : (
                   <QuickLinkSiteIcon link={link} />

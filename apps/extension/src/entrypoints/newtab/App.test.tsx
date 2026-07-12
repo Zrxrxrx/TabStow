@@ -1618,7 +1618,7 @@ describe('App', () => {
     expect(image?.getAttribute('src')).toBe('blob:quick-link-icon-upload-1');
   });
 
-  it('renders Chrome default favicons for site quick links and falls back to initials on image error', async () => {
+  it('renders Chrome default favicons for site quick links and falls back to a neutral glyph', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getQuickLinks.mockResolvedValue([
       {
@@ -1643,7 +1643,32 @@ describe('App', () => {
     });
 
     expect(container.querySelector('img.quick-link-site-icon')).toBeNull();
-    expect(screen().getByText('E')).not.toBeNull();
+    expect(container.querySelector('.quick-link-card .favicon-fallback')).not.toBeNull();
+  });
+
+  it('falls back to a neutral glyph when a custom quick-link image cannot resolve', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    getQuickLinks.mockResolvedValue([
+      {
+        id: 'link-1',
+        url: 'https://example.com/docs',
+        label: 'Example',
+        icon: { kind: 'image', value: 'quick-link-icon:missing' },
+        createdAt: '2026-07-07T00:00:00.000Z',
+      },
+    ]);
+    resolveQuickLinkIconUrl.mockResolvedValue(null);
+
+    await renderApp();
+
+    const favicon = container.querySelector<HTMLImageElement>('img.quick-link-site-icon');
+    expect(favicon).not.toBeNull();
+
+    await act(async () => {
+      favicon?.dispatchEvent(new Event('error', { bubbles: true }));
+    });
+
+    expect(container.querySelector('.quick-link-card .favicon-fallback')).not.toBeNull();
   });
 
   it('updates todo actions from the Extra panel without appearance controls', async () => {
@@ -1918,7 +1943,7 @@ describe('App', () => {
     });
 
     expect(savedTabButton.querySelector('img.saved-tab-favicon')).toBeNull();
-    expect(screen().getByText('E')).not.toBeNull();
+    expect(savedTabButton.querySelector('.favicon-fallback')).not.toBeNull();
   });
 
   it('renders imported non-http saved tabs as inert rows without hrefs', async () => {

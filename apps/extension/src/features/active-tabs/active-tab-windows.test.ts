@@ -30,7 +30,7 @@ describe('buildActiveTabWindows', () => {
       ],
       tabs: [
         tab(1, 3, 0, { pinned: true, url: 'https://same.example/' }),
-        tab(2, 3, 1, { url: 'https://same.example/' }),
+        tab(2, 3, 1, { audible: true, discarded: true, url: 'https://same.example/' }),
         tab(3, 3, 2, { groupId: 31 }),
         tab(4, 3, 3, { groupId: 31 }),
         tab(5, 3, 4, { url: 'https://different.example/' }),
@@ -50,7 +50,11 @@ describe('buildActiveTabWindows', () => {
         visibleTabCount: 5,
         pinnedTabs: [expect.objectContaining({ id: 1 })],
         items: [
-          { kind: 'tab', key: 'tab:2', tab: expect.objectContaining({ id: 2 }) },
+          {
+            kind: 'tab',
+            key: 'tab:2',
+            tab: expect.objectContaining({ id: 2, audible: true, discarded: true }),
+          },
           {
             kind: 'group',
             key: 'chrome:3:31',

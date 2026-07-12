@@ -1,7 +1,18 @@
 export type ActiveBrowserTab = Pick<
   chrome.tabs.Tab,
-  'active' | 'favIconUrl' | 'groupId' | 'id' | 'index' | 'pinned' | 'title' | 'url' | 'windowId'
->;
+  | 'active'
+  | 'audible'
+  | 'favIconUrl'
+  | 'groupId'
+  | 'id'
+  | 'index'
+  | 'pinned'
+  | 'title'
+  | 'url'
+  | 'windowId'
+> & {
+  discarded?: boolean;
+};
 
 export type ChromeTabGroupInfo = Pick<
   chrome.tabGroups.TabGroup,
