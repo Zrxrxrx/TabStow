@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
-import { filterActiveTabsSnapshot, filterSavedSessions } from './tab-search';
+import {
+  buildUnifiedSearchSuggestions,
+  filterActiveTabsSnapshot,
+  filterSavedSessions,
+} from './tab-search';
 
 const snapshot: ActiveTabsSnapshot = {
   windows: [
@@ -107,5 +111,19 @@ describe('tab search', () => {
 
     expect(filterActiveTabsSnapshot(snapshot, '  ')).toBe(snapshot);
     expect(filterSavedSessions(sessions, '\t')).toBe(sessions);
+  });
+
+  it('ranks title prefixes before title and URL matches while preserving source order', () => {
+    const suggestions = buildUnifiedSearchSuggestions(snapshot, [reading, work], 'api', 5);
+
+    expect(suggestions.map(({ source, title }) => `${source}:${title}`)).toEqual([
+      'active:API reference',
+      'saved:API reference',
+    ]);
+    expect(buildUnifiedSearchSuggestions(snapshot, [reading, work], 'example', 2)).toHaveLength(2);
+  });
+
+  it('returns no unified suggestions for blank queries', () => {
+    expect(buildUnifiedSearchSuggestions(snapshot, [reading, work], '   ')).toEqual([]);
   });
 });
