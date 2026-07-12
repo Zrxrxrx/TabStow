@@ -1,4 +1,4 @@
-import { Layers } from 'lucide-react';
+import { Layers, MoonStar } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState, type DragEvent } from 'react';
 import { findDuplicateTabGroups } from '@/features/active-tabs/active-tab-groups';
 import { buildActiveTabWindows } from '@/features/active-tabs/active-tab-windows';
@@ -20,7 +20,8 @@ import {
   type ActiveTabsDropTarget,
 } from './active-tabs-dnd';
 import { ActiveWindowSection } from './ActiveWindowSection';
-import { GroupNav } from './GroupNav';
+import { ModalDialog } from './ModalDialog';
+import { WindowFilter } from './WindowFilter';
 
 type Props = {
   busy: boolean;
@@ -49,6 +50,8 @@ export function ActiveWorkspace({
   const [dragSource, setDragSource] = useState<ActiveTabsDragSource | null>(null);
   const [activeDropTargetKey, setActiveDropTargetKey] = useState<string | null>(null);
   const [movePending, setMovePending] = useState(false);
+  const [selectedWindowId, setSelectedWindowId] = useState<number | null>(null);
+  const [policyOpen, setPolicyOpen] = useState(false);
   const targetRefs = useRef(new Map<string, HTMLElement>());
   const closePendingRef = useRef(false);
   const dragSourceRef = useRef<ActiveTabsDragSource | null>(null);
@@ -124,6 +127,9 @@ export function ActiveWorkspace({
     [query, snapshot],
   );
   const windows = useMemo(() => buildActiveTabWindows(filteredSnapshot), [filteredSnapshot]);
+  const visibleWindows = selectedWindowId === null
+    ? windows
+    : windows.filter((window) => window.windowId === selectedWindowId);
   const duplicateGroups = useMemo(
     () => findDuplicateTabGroups(filteredSnapshot.tabs),
     [filteredSnapshot.tabs],
@@ -249,13 +255,17 @@ export function ActiveWorkspace({
         </span>
       </div>
 
-      <GroupNav
-        locale={locale}
-        windows={windows}
-        onJump={(key) =>
-          targetRefs.current.get(key)?.scrollIntoView({ block: 'start', behavior: 'smooth' })
-        }
-      />
+      <div className="active-tools">
+        <button className="secondary-button" disabled title={t(locale, 'sleepUnavailableReason')} type="button">
+          <MoonStar aria-hidden="true" size={15} />
+          {t(locale, 'sleepEligibleTabs')}
+        </button>
+        <button className="secondary-button" onClick={() => setPolicyOpen(true)} type="button">
+          {t(locale, 'sleepPolicy')}
+        </button>
+      </div>
+
+      <WindowFilter locale={locale} onChange={setSelectedWindowId} value={selectedWindowId} windows={windows} />
 
       {duplicateGroups.length > 0 && (
         <button
@@ -273,7 +283,7 @@ export function ActiveWorkspace({
       )}
 
       <div className="active-window-list">
-        {windows.map((window, displayIndex) => (
+        {visibleWindows.map((window, displayIndex) => (
           <ActiveWindowSection
             activeDropTargetKey={activeDropTargetKey}
             disabled={controlsDisabled}
@@ -294,6 +304,12 @@ export function ActiveWorkspace({
           />
         ))}
       </div>
+      {policyOpen ? (
+        <ModalDialog closeLabel={t(locale, 'cancel')} onClose={() => setPolicyOpen(false)} title={t(locale, 'sleepPolicy')}>
+          <p>{t(locale, 'sleepPolicyDescription')}</p>
+          <p className="subtle">{t(locale, 'sleepUnavailableReason')}</p>
+        </ModalDialog>
+      ) : null}
     </section>
   );
 }

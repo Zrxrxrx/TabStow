@@ -453,7 +453,7 @@ describe('App', () => {
     expect(screen().getByLabelText('1 session, 1 tab')).not.toBeNull();
 
     const dragHandle = screen().getByLabelText('Drag GitHub active issue') as HTMLButtonElement;
-    expect(dragHandle.disabled).toBe(true);
+    expect(dragHandle.getAttribute('aria-disabled')).toBe('true');
     expect(dragHandle.draggable).toBe(false);
     expect(
       screen().getByText('GitHub active issue').closest('button') as HTMLButtonElement,
@@ -909,7 +909,7 @@ describe('App', () => {
     await dragStart(screen().getByLabelText('Drag Before'), transfer);
     await drop(screen().getByLabelText('Drop into Reading'), transfer);
 
-    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Drag Before').getAttribute('aria-disabled')).toBe('true');
     expectChromeControlsAbsent();
 
     pendingMove.resolve({ ok: true, data: { moved: false } });
@@ -919,7 +919,7 @@ describe('App', () => {
     });
 
     expect(snapshotCalls).toBe(2);
-    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Drag Before').getAttribute('aria-disabled')).toBe('true');
     expectChromeControlsAbsent();
 
     pendingRefresh.resolve({ ok: true, data: snapshot });
@@ -928,7 +928,7 @@ describe('App', () => {
       await Promise.resolve();
     });
 
-    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Drag Before').getAttribute('aria-disabled')).toBe('false');
     expectChromeControlsAbsent();
   });
 
@@ -1010,7 +1010,7 @@ describe('App', () => {
     });
 
     const dragHandle = screen().getByLabelText('Drag Before');
-    expect(dragHandle).toHaveProperty('disabled', true);
+    expect(dragHandle.getAttribute('aria-disabled')).toBe('true');
     expectChromeControlsAbsent();
     expect(() => screen().getByText('Stale Chrome state')).toThrow();
 
@@ -1026,7 +1026,7 @@ describe('App', () => {
     });
 
     expect(screen().getByText('Newest Chrome state')).not.toBeNull();
-    expect(screen().getByLabelText('Drag Newest Chrome state')).toHaveProperty('disabled', false);
+    expect(screen().getByLabelText('Drag Newest Chrome state').getAttribute('aria-disabled')).toBe('false');
     expectChromeControlsAbsent();
   });
 
@@ -1076,7 +1076,7 @@ describe('App', () => {
     });
 
     expect(snapshotCalls).toBe(2);
-    expect(screen().getByLabelText('Drag Before')).toHaveProperty('disabled', true);
+    expect(screen().getByLabelText('Drag Before').getAttribute('aria-disabled')).toBe('true');
 
     await act(async () => {
       root.unmount();
@@ -1843,10 +1843,8 @@ describe('App', () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
-    const focusButton = screen().getByRole('button', {
-      name: 'Inbox - Gmailhttps://mail.google.com/mail/u/0/#inbox',
-    });
-    expect(focusButton).toHaveProperty('className', expect.stringContaining('tab-open-button'));
+    const focusButton = screen().getByText('Inbox - Gmail').closest<HTMLElement>('.tab-row')!;
+    expect(focusButton.getAttribute('role')).toBe('button');
 
     await click(focusButton);
 

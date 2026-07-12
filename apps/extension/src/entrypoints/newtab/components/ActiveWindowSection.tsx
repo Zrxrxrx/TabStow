@@ -1,5 +1,5 @@
-import { Archive, Trash2, X } from 'lucide-react';
-import { Fragment, type DragEvent } from 'react';
+import { Archive, MoonStar, Trash2, Volume2, X } from 'lucide-react';
+import { Fragment, useRef, type DragEvent, type MouseEvent } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type {
@@ -168,6 +168,7 @@ function itemLabel(item: ActiveWindowItem, locale: Locale): string {
 }
 
 export function ActiveWindowSection(props: Props) {
+  const suppressClickRef = useRef(false);
   const windowLabel = props.window.focused
     ? t(props.locale, 'currentWindow')
     : t(props.locale, 'windowNumber', { number: props.displayIndex + 1 });
@@ -191,32 +192,49 @@ export function ActiveWindowSection(props: Props) {
 
   function tabRow(tab: ActiveBrowserTab) {
     const label = getTabLabel(tab);
+    const source: ActiveTabsDragSource = {
+      kind: 'tab',
+      tabId: tab.id as number,
+      windowId: props.window.windowId,
+      pinned: Boolean(tab.pinned),
+      incognito: props.window.incognito,
+    };
+
+    function stopAction(event: MouseEvent) {
+      event.stopPropagation();
+    }
+
     return (
-      <div className="tab-row">
-        <button
-          type="button"
-          className="drag-handle"
-          draggable={!props.dragDisabled}
-          disabled={props.dragDisabled}
-          aria-label={t(props.locale, 'dragTab', { label })}
-          onDragStart={(event) =>
-            props.onDragStart(event, {
-              kind: 'tab',
-              tabId: tab.id as number,
-              windowId: props.window.windowId,
-              pinned: Boolean(tab.pinned),
-              incognito: props.window.incognito,
-            })
+      <div
+        aria-disabled={props.dragDisabled}
+        className={`tab-row${tab.discarded === true ? ' sleeping' : ''}${tab.audible === true ? ' audible' : ''}`}
+        draggable={!props.dragDisabled}
+        onClick={() => {
+          if (suppressClickRef.current || props.disabled) return;
+          props.onFocusTab(tab);
+        }}
+        onDragEnd={(event) => {
+          props.onDragEnd(event);
+          suppressClickRef.current = true;
+          window.setTimeout(() => { suppressClickRef.current = false; }, 0);
+        }}
+        onDragStart={(event) => props.onDragStart(event, source)}
+        onKeyDown={(event) => {
+          if ((event.key === 'Enter' || event.key === ' ') && !props.disabled) {
+            event.preventDefault();
+            props.onFocusTab(tab);
           }
-          onDragEnd={props.onDragEnd}
-        >
-          ⋮⋮
-        </button>
-        <button
-          className="tab-open-button"
-          type="button"
-          onClick={() => props.onFocusTab(tab)}
-          disabled={props.disabled}
+        }}
+        role="button"
+        tabIndex={0}
+      >
+        <span
+          aria-disabled={props.dragDisabled}
+          aria-label={t(props.locale, 'dragTab', { label })}
+          className="drag-surface-label"
+          draggable={!props.dragDisabled}
+        />
+        <div className="tab-open-button"
         >
           <TabFavicon
             className="active-tab-favicon"
@@ -227,23 +245,35 @@ export function ActiveWindowSection(props: Props) {
           <span className="tab-copy">
             <span className="tab-title">{label}</span>
             <span className="tab-url">{tab.url ?? ''}</span>
+            {tab.audible === true ? <span className="state-tag"><Volume2 aria-hidden="true" size={11} /> {t(props.locale, 'audible')}</span> : null}
+            {tab.discarded === true ? <span className="state-tag sleep">{t(props.locale, 'sleeping')}</span> : null}
           </span>
-        </button>
+        </div>
         <div className="row-actions">
           <button
             type="button"
             className="icon-button"
             aria-label={t(props.locale, 'saveTabForLater', { label })}
-            onClick={() => props.onStowTab(tab)}
+            onClick={(event) => { stopAction(event); props.onStowTab(tab); }}
             disabled={props.disabled}
           >
             <Archive size={14} aria-hidden="true" />
           </button>
           <button
+            aria-label={t(props.locale, 'sleepTab', { label })}
+            className="icon-button"
+            disabled
+            onClick={stopAction}
+            title={t(props.locale, 'sleepUnavailableReason')}
+            type="button"
+          >
+            <MoonStar aria-hidden="true" size={14} />
+          </button>
+          <button
             type="button"
             className="icon-button"
             aria-label={`Close ${label}`}
-            onClick={() => typeof tab.id === 'number' && props.onCloseTabs([tab.id])}
+            onClick={(event) => { stopAction(event); if (typeof tab.id === 'number') props.onCloseTabs([tab.id]); }}
             disabled={props.disabled}
           >
             <Trash2 size={14} aria-hidden="true" />
@@ -290,10 +320,21 @@ export function ActiveWindowSection(props: Props) {
         ref={(node) => props.onRegisterTarget(item.key, node)}
       >
         <header
+          aria-disabled={props.dragDisabled}
+          aria-label={t(props.locale, 'dragGroup', { label })}
           className={`drop-target${
             props.activeDropTargetKey === target.key ? ' is-active-drop-target' : ''
           }`}
-          aria-label={`Drop into ${label}`}
+          draggable={!props.dragDisabled}
+          onDragStart={(event) =>
+            props.onDragStart(event, {
+              kind: 'group',
+              groupId: item.groupId,
+              windowId: props.window.windowId,
+              incognito: props.window.incognito,
+            })
+          }
+          onDragEnd={props.onDragEnd}
           onDragEnter={(event) => {
             if (!accepts) return;
             event.preventDefault();
@@ -317,25 +358,11 @@ export function ActiveWindowSection(props: Props) {
             props.onDrop(event, target);
           }}
         >
+          <span
+            aria-label={`Drop into ${label}`}
+            className={`group-drop-label${props.activeDropTargetKey === target.key ? ' is-active-drop-target' : ''}`}
+          />
           <div className="chrome-group-meta">
-            <button
-              type="button"
-              className="drag-handle"
-              draggable={!props.dragDisabled}
-              disabled={props.dragDisabled}
-              aria-label={t(props.locale, 'dragGroup', { label })}
-              onDragStart={(event) =>
-                props.onDragStart(event, {
-                  kind: 'group',
-                  groupId: item.groupId,
-                  windowId: props.window.windowId,
-                  incognito: props.window.incognito,
-                })
-              }
-              onDragEnd={props.onDragEnd}
-            >
-              ⋮⋮
-            </button>
             <span
               className={`chrome-group-color chrome-group-color--${item.color ?? 'grey'}`}
               aria-hidden="true"
@@ -354,13 +381,14 @@ export function ActiveWindowSection(props: Props) {
             type="button"
             className="icon-button"
             aria-label={`Close ${label} tabs`}
-            onClick={() =>
+            onClick={(event) => {
+              event.stopPropagation();
               props.onCloseTabs(
                 item.tabs
                   .map((tab) => tab.id)
                   .filter((id): id is number => typeof id === 'number'),
-              )
-            }
+              );
+            }}
             disabled={props.disabled}
           >
             <X size={16} aria-hidden="true" />
