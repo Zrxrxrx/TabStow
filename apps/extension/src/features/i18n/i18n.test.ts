@@ -71,6 +71,8 @@ describe('i18n', () => {
     expect(t('en', 'savedTabsCount', { count: 3 })).toBe('3 tabs');
     expect(t('en', 'savedSessionCount', { count: 1 })).toBe('1 session');
     expect(t('en', 'savedTabCount', { count: 1 })).toBe('1 tab');
+    expect(t('en', 'syncChangesSavedLocally')).toBe('Changes saved locally');
+    expect(t('en', 'syncPaused')).toBe('Sync paused');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -144,6 +146,8 @@ describe('i18n', () => {
     expect(t('zh-CN', 'savedTabsCount', { count: 3 })).toBe('3 个标签页');
     expect(t('zh-CN', 'savedSessionCount', { count: 1 })).toBe('1 个会话');
     expect(t('zh-CN', 'savedTabCount', { count: 1 })).toBe('1 个标签页');
+    expect(t('zh-CN', 'syncChangesSavedLocally')).toBe('更改已保存在本地');
+    expect(t('zh-CN', 'syncPaused')).toBe('同步已暂停');
   });
 
   it('includes English and Simplified Chinese labels for the History page', async () => {

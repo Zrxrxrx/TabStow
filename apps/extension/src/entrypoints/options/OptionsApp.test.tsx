@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ExtensionSettings } from '@tabstow/core';
+import type { ConnectionView } from '@/features/sync/sync-types';
 import { OptionsApp } from './OptionsApp';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -11,23 +12,42 @@ const { sendExtensionMessage } = vi.hoisted(() => ({
   sendExtensionMessage: vi.fn(),
 }));
 
-vi.mock('@/lib/messages', () => {
-  return {
-    sendExtensionMessage,
-  };
-});
+vi.mock('@/lib/messages', () => ({ sendExtensionMessage }));
 
 const SETTINGS: ExtensionSettings = {
-  deviceId: 'device-123',
-  githubToken: 'token-abc',
-  gistId: 'gist-456',
-  gistFileName: 'saved-tabs.json',
+  deviceId: 'replica-123',
   includePinnedTabs: true,
   closePinnedTabs: false,
   theme: 'dark',
 };
 
+const DISCONNECTED: ConnectionView = {
+  phase: 'disconnected',
+  sync: { state: 'disconnected' },
+};
+
+const CONNECTED: ConnectionView = {
+  phase: 'connected',
+  account: { id: 1, login: 'octocat' },
+  binding: {
+    gistId: 'gist-456',
+    fileName: 'tabstow.sync.json',
+    public: false,
+    htmlUrl: 'https://gist.github.com/octocat/gist-456',
+    ownerId: 1,
+  },
+  sync: { state: 'synced', lastSuccessAt: '2026-07-12T00:00:00.000Z' },
+};
+
 let container: HTMLDivElement;
+
+function respondWith(connection: ConnectionView) {
+  sendExtensionMessage.mockImplementation(async (message: { type: string }) => {
+    if (message.type === 'settings:get') return { ok: true, data: SETTINGS };
+    if (message.type === 'connection:get') return { ok: true, data: connection };
+    return { ok: false, error: { code: 'unexpected', message: message.type } };
+  });
+}
 
 describe('OptionsApp', () => {
   let root: Root;
@@ -40,72 +60,105 @@ describe('OptionsApp', () => {
   });
 
   afterEach(async () => {
-    await act(async () => {
-      root.unmount();
-    });
+    await act(async () => root.unmount());
     container.remove();
   });
 
-  it('loads saved settings and renders manual sync controls', async () => {
-    sendExtensionMessage.mockResolvedValueOnce({ ok: true, data: SETTINGS });
+  it('replaces token fields with GitHub Device Flow connect', async () => {
+    respondWith(DISCONNECTED);
 
-    await act(async () => {
-      root.render(<OptionsApp />);
-    });
+    await act(async () => root.render(<OptionsApp />));
 
-    expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'settings:get' });
-    expect(screen().getByRole('heading', { name: 'Tabstow Settings' })).not.toBeNull();
-    expect(screen().getByLabelText('GitHub token')).toHaveProperty('value', SETTINGS.githubToken);
-    expect(screen().getByLabelText('Gist ID')).toHaveProperty('value', SETTINGS.gistId);
-    expect(screen().getByLabelText('Gist filename')).toHaveProperty('value', SETTINGS.gistFileName);
+    expect(screen().getByRole('button', { name: 'Connect GitHub' })).not.toBeNull();
+    expect(container.textContent).not.toContain('GitHub token');
     expect(screen().getByLabelText('Save pinned tabs when stowing')).toHaveProperty(
       'checked',
-      SETTINGS.includePinnedTabs,
+      true,
     );
-    expect(screen().getByLabelText('Close pinned tabs after saving')).toHaveProperty(
-      'disabled',
-      false,
-    );
-    expect(screen().getByLabelText('Theme')).toHaveProperty('value', SETTINGS.theme);
-    expect(screen().getByText(SETTINGS.deviceId)).not.toBeNull();
-    expect(screen().getByRole('button', { name: 'Save' })).not.toBeNull();
-    expect(screen().getByRole('button', { name: 'Pull' })).not.toBeNull();
-    expect(screen().getByRole('button', { name: 'Push' })).not.toBeNull();
+    expect(screen().getByText('replica-123')).not.toBeNull();
   });
 
-  it('saves settings before running a manual pull sync', async () => {
-    sendExtensionMessage
-      .mockResolvedValueOnce({ ok: true, data: SETTINGS })
-      .mockResolvedValueOnce({ ok: true, data: SETTINGS })
-      .mockResolvedValueOnce({ ok: true, data: { sessionCount: 3, quickLinkCount: 2 } });
-
-    await act(async () => {
-      root.render(<OptionsApp />);
+  it('shows only sanitized Device Flow information', async () => {
+    respondWith({
+      phase: 'authorizing',
+      sync: { state: 'authorizing' },
+      deviceFlow: {
+        userCode: 'ABCD-EFGH',
+        verificationUri: 'https://github.com/login/device',
+        expiresAt: Date.now() + 900_000,
+        intervalSeconds: 300,
+      },
     });
 
-    await act(async () => {
-      screen().getByRole('button', { name: 'Pull' }).click();
+    await act(async () => root.render(<OptionsApp />));
+
+    expect(screen().getByText('ABCD-EFGH')).not.toBeNull();
+    expect(container.textContent).not.toContain('device-secret');
+    expect(screen().getByRole('button', { name: 'Open GitHub' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Cancel' })).not.toBeNull();
+  });
+
+  it('keeps manual Pull and Push only after a Gist is connected', async () => {
+    respondWith(CONNECTED);
+
+    await act(async () => root.render(<OptionsApp />));
+
+    expect(screen().getByRole('button', { name: 'Pull' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Push' })).not.toBeNull();
+    expect(screen().getByText('Connected as octocat')).not.toBeNull();
+  });
+
+  it('runs manual Pull without resaving settings first', async () => {
+    respondWith(CONNECTED);
+    await act(async () => root.render(<OptionsApp />));
+    sendExtensionMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type === 'sync:pull') {
+        return { ok: true, data: { sessionCount: 3, quickLinkCount: 2 } };
+      }
+      if (message.type === 'connection:get') return { ok: true, data: CONNECTED };
+      return { ok: false, error: { code: 'unexpected', message: message.type } };
     });
 
-    expect(sendExtensionMessage.mock.calls).toEqual([
-      [{ type: 'settings:get' }],
-      [
-        {
-          type: 'settings:update',
-          settings: SETTINGS,
-        },
-      ],
-      [{ type: 'sync:pull' }],
-    ]);
-    expect(screen().getByRole('status').textContent).toBe('Pulled 3 sessions and 2 quick links.');
+    await act(async () => screen().getByRole('button', { name: 'Pull' }).click());
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'sync:pull' });
+    expect(sendExtensionMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'settings:update' }),
+    );
+    expect(screen().getByRole('status').textContent).toBe(
+      'Pulled 3 sessions and 2 quick links.',
+    );
+  });
+
+  it('saves only fields changed in this Settings view', async () => {
+    respondWith(DISCONNECTED);
+    await act(async () => root.render(<OptionsApp />));
+    sendExtensionMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type === 'settings:update') {
+        return {
+          ok: true,
+          data: { ...SETTINGS, includePinnedTabs: false },
+        };
+      }
+      return { ok: false, error: { code: 'unexpected', message: message.type } };
+    });
+
+    await act(async () => screen().getByLabelText('Save pinned tabs when stowing').click());
+    await act(async () => screen().getByRole('button', { name: 'Save settings' }).click());
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'settings:update',
+      settings: { includePinnedTabs: false },
+    });
   });
 });
 
 function screen() {
   return {
     getByLabelText(text: string) {
-      const labels = Array.from(containerLabels());
-      const label = labels.find((candidate) => candidate.textContent?.includes(text));
+      const label = Array.from(document.querySelectorAll('label')).find((candidate) =>
+        candidate.textContent?.includes(text),
+      );
       if (!label) throw new Error(`Missing label: ${text}`);
       const control = label.querySelector('input, select, textarea');
       if (!control) throw new Error(`Missing control for label: ${text}`);
@@ -115,7 +168,6 @@ function screen() {
       const elements = Array.from(container.querySelectorAll<HTMLElement>('*')).filter((element) => {
         if (role === 'button') return element.tagName === 'BUTTON';
         if (role === 'status') return element.getAttribute('role') === 'status';
-        if (role === 'heading') return /^H[1-6]$/.test(element.tagName);
         return element.getAttribute('role') === role;
       });
       const match = elements.find((element) => {
@@ -133,8 +185,4 @@ function screen() {
       return match;
     },
   };
-}
-
-function* containerLabels() {
-  yield* Array.from(document.querySelectorAll('label'));
 }
