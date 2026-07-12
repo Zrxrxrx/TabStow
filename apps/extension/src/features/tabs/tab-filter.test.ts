@@ -9,7 +9,6 @@ import {
 
 const settings: ExtensionSettings = {
   deviceId: 'device-1',
-  gistFileName: 'tabstow.sync.json',
   includePinnedTabs: false,
   closePinnedTabs: false,
   theme: 'system',
