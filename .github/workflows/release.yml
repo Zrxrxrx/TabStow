@@ -28,6 +28,7 @@ jobs:
     env:
       BUMP: ${{ inputs.bump }}
       DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+      WXT_GITHUB_OAUTH_CLIENT_ID: ${{ vars.WXT_GITHUB_OAUTH_CLIENT_ID }}
     steps:
       - name: Check out the default branch
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
@@ -118,6 +119,7 @@ jobs:
       - name: Typecheck, test, and build the Chrome ZIP
         run: |
           set -euo pipefail
+          test -n "$WXT_GITHUB_OAUTH_CLIENT_ID"
           bun run typecheck
           bun run test
           bun run zip

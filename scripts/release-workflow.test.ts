@@ -223,6 +223,7 @@ describe('release workflow behavior', () => {
     expect(getRun('Typecheck, test, and build the Chrome ZIP')).toBe(
       [
         'set -euo pipefail',
+        'test -n "$WXT_GITHUB_OAUTH_CLIENT_ID"',
         'bun run typecheck',
         'bun run test',
         'bun run zip',

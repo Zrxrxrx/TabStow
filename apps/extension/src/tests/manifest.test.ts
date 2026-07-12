@@ -31,6 +31,7 @@ describe('extension manifest', () => {
       'tabGroups',
       'search',
       'favicon',
+      'alarms',
     ]);
   });
 
@@ -54,6 +55,8 @@ describe('extension manifest', () => {
     expect(manifest?.host_permissions).toEqual([
       'https://api.github.com/*',
       'https://gist.githubusercontent.com/*',
+      'https://github.com/*',
     ]);
+    expect(manifest?.permissions).not.toContain('identity');
   });
 });

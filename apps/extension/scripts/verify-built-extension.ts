@@ -15,6 +15,7 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
   chrome_url_overrides?: Record<string, string>;
   content_scripts?: unknown[];
   permissions?: string[];
+  host_permissions?: string[];
 };
 
 assert.deepEqual(manifest.permissions, [
@@ -24,7 +25,14 @@ assert.deepEqual(manifest.permissions, [
   'tabGroups',
   'search',
   'favicon',
+  'alarms',
 ]);
+assert.deepEqual(manifest.host_permissions, [
+  'https://api.github.com/*',
+  'https://gist.githubusercontent.com/*',
+  'https://github.com/*',
+]);
+assert.ok(!manifest.permissions?.includes('identity'), 'Built manifest must not request identity');
 assert.ok(!('content_scripts' in manifest), 'Built manifest must not register content scripts');
 assert.deepEqual(manifest.chrome_url_overrides, { newtab: 'newtab.html' });
 assert.ok(
