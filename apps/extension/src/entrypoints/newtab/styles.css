@@ -1238,10 +1238,66 @@ svg {
 
 .rail-links-scroll .quick-link-grid {
   grid-template-columns: 1fr;
+  gap: 3px;
 }
 
 .rail-links-scroll .quick-link-card {
-  min-height: 54px;
+  min-height: 40px;
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr);
+  gap: 6px;
+  align-content: center;
+  align-items: center;
+  justify-items: stretch;
+  padding: 4px 6px;
+  color: var(--muted);
+  border-color: transparent;
+  background: transparent;
+}
+
+.rail-links-scroll .quick-link-card:hover,
+.rail-links-scroll .quick-link-card:focus-visible {
+  color: var(--fg);
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.rail-links-scroll .quick-link-label {
+  color: currentColor;
+  font-size: 11px;
+  font-weight: 650;
+  text-align: left;
+}
+
+.rail-links-scroll .favicon,
+.rail-links-scroll .quick-link-image-icon,
+.rail-links-scroll .quick-link-site-icon {
+  width: 20px;
+  height: 20px;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.rail-links-scroll .quick-link-card-shell[draggable="true"] {
+  cursor: grab;
+}
+
+.rail-links-scroll .quick-link-card-shell[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.rail-links-scroll .quick-link-card-actions {
+  padding: 3px 0 7px;
+  border-bottom: 1px solid var(--border);
+}
+
+.rail-links-scroll .quick-link-card-actions .icon-button {
+  width: 26px;
+  min-height: 26px;
+}
+
+.quick-link-drop-end {
+  min-height: 12px;
 }
 
 .rail-utilities {

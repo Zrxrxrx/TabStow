@@ -1536,8 +1536,15 @@ describe('App', () => {
 
     await renderApp();
     await click(screen().getByRole('button', { name: 'Edit quick links' }));
-    await click(screen().getByLabelText('Move B up'));
+    const shells = Array.from(container.querySelectorAll<HTMLElement>('.quick-link-card-shell'));
+    const transfer = createDataTransfer();
+    await dragStart(shells[1]!, transfer);
+    await drop(shells[0]!, transfer);
 
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'quick-links:reorder',
+      orderedIds: ['link-b', 'link-a'],
+    });
     expect(saveQuickLinks).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'link-b' }),
       expect.objectContaining({ id: 'link-a' }),
@@ -2308,7 +2315,7 @@ describe('App', () => {
     expect(screen().getByRole('button', { name: 'Show quick links' })).toHaveProperty('disabled', false);
     expect(screen().getByLabelText('Add quick link')).toHaveProperty('disabled', false);
     expect(screen().getByRole('button', { name: 'Add open tab' })).toHaveProperty('disabled', false);
-    expect(screen().getByLabelText('Move One down')).toHaveProperty('disabled', false);
+    expect(container.querySelector('.quick-link-card-shell')).toHaveProperty('draggable', true);
     expect(screen().getByLabelText('Upload icon for One')).toHaveProperty('disabled', false);
     expect(screen().getByLabelText('Edit One')).toHaveProperty('disabled', false);
     expect(screen().getByLabelText('Remove One')).toHaveProperty('disabled', false);

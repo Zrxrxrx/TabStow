@@ -1,5 +1,5 @@
-import { ChevronDown, ChevronUp, ImageUp, Pencil, PencilLine, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { ImageUp, Pencil, PencilLine, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type { ActiveBrowserTab } from '@/features/active-tabs/types';
@@ -19,6 +19,12 @@ import { getQuickLinks } from '@/features/quick-links/quick-links-storage';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type ExtensionMessage } from '@/lib/messages';
 import { FormDialog } from './FormDialog';
+import {
+  readQuickLinksDragSource,
+  resolveQuickLinksDrop,
+  writeQuickLinksDragSource,
+  type QuickLinksDragSource,
+} from './quick-links-dnd';
 
 type Props = {
   disabled: boolean;
@@ -140,6 +146,8 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
   const [editing, setEditing] = useState(false);
   const disabledRef = useRef(disabled);
   const uploadInputRefs = useRef(new Map<string, HTMLInputElement>());
+  const dragSourceRef = useRef<QuickLinksDragSource | null>(null);
+  const dropPendingRef = useRef(false);
   disabledRef.current = disabled;
 
   useEffect(() => {
@@ -352,15 +360,41 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
     }
   }
 
-  async function move(id: string, direction: -1 | 1) {
-    if (disabledRef.current) return;
-    const index = links.findIndex((link) => link.id === id);
-    const nextIndex = index + direction;
-    if (index === -1 || nextIndex < 0 || nextIndex >= links.length) return;
+  function startDrag(event: DragEvent<HTMLDivElement>, linkId: string) {
+    if (!editing || disabledRef.current || dropPendingRef.current) {
+      event.preventDefault();
+      return;
+    }
+    if (event.target instanceof HTMLElement && event.target.closest('button, input')) {
+      event.preventDefault();
+      return;
+    }
+    const source = { linkId };
+    dragSourceRef.current = source;
+    writeQuickLinksDragSource(event.dataTransfer, source);
+  }
 
-    const orderedIds = links.map((link) => link.id);
-    [orderedIds[index], orderedIds[nextIndex]] = [orderedIds[nextIndex], orderedIds[index]];
-    await persistLinks({ type: 'quick-links:reorder', orderedIds });
+  async function drop(event: DragEvent, beforeLinkId: string | null) {
+    event.preventDefault();
+    const source = readQuickLinksDragSource(event.dataTransfer) ?? dragSourceRef.current;
+    const orderedIds = source
+      ? resolveQuickLinksDrop(source, {
+          beforeLinkId,
+          orderedIds: links.map((link) => link.id),
+        })
+      : null;
+    if (!orderedIds || dropPendingRef.current || disabledRef.current) return;
+
+    dropPendingRef.current = true;
+    try {
+      await persistLinks({ type: 'quick-links:reorder', orderedIds });
+    } catch (error) {
+      setLinks(await getQuickLinks());
+      setErrorMessage(error instanceof Error ? error.message : 'Could not reorder quick links.');
+    } finally {
+      dropPendingRef.current = false;
+      dragSourceRef.current = null;
+    }
   }
 
   return (
@@ -411,9 +445,23 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
         <div className="empty-state utility-empty-state">{t(locale, 'noQuickLinks')}</div>
       ) : (
         <div className="quick-link-grid" data-od-id="quick-link-grid">
-          {links.map((link, index) => (
-            <div className="quick-link-card-shell" key={link.id}>
-              <a href={link.url} target="_blank" rel="noreferrer" className="quick-link-card">
+          {links.map((link) => (
+            <div
+              className="quick-link-card-shell"
+              draggable={editing && !disabled}
+              key={link.id}
+              onDragEnd={() => { dragSourceRef.current = null; }}
+              onDragOver={(event) => { if (editing) event.preventDefault(); }}
+              onDragStart={(event) => startDrag(event, link.id)}
+              onDrop={(event) => void drop(event, link.id)}
+            >
+              <a
+                href={link.url}
+                target="_blank"
+                rel="noreferrer"
+                className="quick-link-card"
+                onClick={(event) => { if (editing) event.preventDefault(); }}
+              >
                 {link.icon?.kind === 'image' ? (
                   <QuickLinkImageIcon token={link.icon.value} link={link} />
                 ) : link.icon?.kind === 'emoji' ? (
@@ -427,24 +475,6 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
               </a>
               {editing ? (
                 <div className="quick-link-card-actions">
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={t(locale, 'moveUp', { label: link.label })}
-                    onClick={() => void move(link.id, -1)}
-                    disabled={disabled || index === 0}
-                  >
-                    <ChevronUp size={14} aria-hidden="true" />
-                  </button>
-                  <button
-                    type="button"
-                    className="icon-button"
-                    aria-label={t(locale, 'moveDown', { label: link.label })}
-                    onClick={() => void move(link.id, 1)}
-                    disabled={disabled || index === links.length - 1}
-                  >
-                    <ChevronDown size={14} aria-hidden="true" />
-                  </button>
                   <button
                     type="button"
                     className="icon-button"
@@ -496,6 +526,14 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
               ) : null}
             </div>
           ))}
+          {editing ? (
+            <div
+              aria-label={t(locale, 'dropQuickLinkAtEnd')}
+              className="quick-link-drop-end"
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => void drop(event, null)}
+            />
+          ) : null}
         </div>
       )}
 
