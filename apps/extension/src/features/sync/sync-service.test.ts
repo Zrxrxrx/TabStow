@@ -1,482 +1,468 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ExtensionSettings, TabSession } from '@tabstow/core';
-import { pullFromGist, pushToGist } from './sync-service';
+import { positionsForCount, type SyncDocumentV2 } from '@tabstow/core';
+import { reconcileGist, SyncTargetError } from './sync-service';
 
 const dbMocks = vi.hoisted(() => ({
-  exportSessions: vi.fn(),
-  importSessions: vi.fn(),
+  applyRemoteSyncDocument: vi.fn(),
+  getSyncSnapshot: vi.fn(),
   listSessions: vi.fn(),
-  mergeRemoteSessions: vi.fn(),
+  markSyncGenerationComplete: vi.fn(),
 }));
 
-const settingsMocks = vi.hoisted(() => ({
-  getSettings: vi.fn(),
-  updateSettings: vi.fn(),
+const connectionMocks = vi.hoisted(() => ({
+  getConnectionRecord: vi.fn(),
 }));
 
-const quickLinkMocks = vi.hoisted(() => ({
-  getQuickLinks: vi.fn(),
-  saveQuickLinks: vi.fn(),
-  updateQuickLinks: vi.fn(),
+const gistMocks = vi.hoisted(() => ({
+  getGist: vi.fn(),
+  getFileContentFromGist: vi.fn(),
+  updateFile: vi.fn(),
 }));
 
-const gistMocks = vi.hoisted(() => {
-  class GistFileNotFoundError extends Error {}
-
+vi.mock('@/db/db', () => dbMocks);
+vi.mock('./connection-store', () => connectionMocks);
+vi.mock('./gist-client', async (importOriginal) => {
+  const original = await importOriginal<typeof import('./gist-client')>();
   return {
-    getFileContent: vi.fn(),
-    updateFile: vi.fn(),
-    GistFileNotFoundError,
+    ...original,
+    GistClient: class {
+      getGist = gistMocks.getGist;
+      getFileContentFromGist = gistMocks.getFileContentFromGist;
+      updateFile = gistMocks.updateFile;
+    },
   };
 });
 
-vi.mock('@/db/db', () => dbMocks);
-vi.mock('@/features/quick-links/quick-links-storage', () => quickLinkMocks);
-vi.mock('@/features/settings/settings-storage', () => settingsMocks);
-vi.mock('./gist-client', () => ({
-  GistClient: class {
-    getFileContent = gistMocks.getFileContent;
-    updateFile = gistMocks.updateFile;
-  },
-  GistFileNotFoundError: gistMocks.GistFileNotFoundError,
-}));
+const timestamp = '2026-07-12T00:00:00.000Z';
 
-const SETTINGS: ExtensionSettings = {
-  deviceId: 'device-1',
-  githubToken: 'token-1',
-  gistId: 'gist-1',
-  gistFileName: 'tabstow.sync.json',
-  includePinnedTabs: false,
-  closePinnedTabs: false,
-  theme: 'system',
-};
-
-function createSession(id: string, title: string, updatedAt: string): TabSession {
+function document(title = 'Reading'): SyncDocumentV2 {
+  const [position] = positionsForCount(1);
   return {
-    id,
-    title,
-    tabs: [
+    format: 'tabstow',
+    schemaVersion: 2,
+    exportedAt: timestamp,
+    sessions: [
       {
-        id: `${id}-tab-1`,
-        url: `https://example.com/${id}`,
-        title: `${title} tab`,
-        createdAt: '2026-07-06T00:00:00.000Z',
+        id: 'session-1',
+        title,
+        createdAt: timestamp,
+        position: position!,
+        revision: { counter: 3, replicaId: 'replica-local' },
       },
     ],
-    createdAt: '2026-07-06T00:00:00.000Z',
-    updatedAt,
-    deviceId: 'device-1',
+    tabs: [],
+    quickLinks: [],
+    preferences: {
+      includePinnedTabs: {
+        value: false,
+        revision: { counter: 1, replicaId: 'replica-local' },
+      },
+      closePinnedTabs: {
+        value: false,
+        revision: { counter: 2, replicaId: 'replica-local' },
+      },
+    },
+    deletions: [],
   };
 }
 
-describe('sync service', () => {
+const gist = {
+  id: 'gist-1',
+  description: 'Tabstow',
+  public: false,
+  htmlUrl: 'https://gist.github.com/octocat/gist-1',
+  owner: { id: 1, login: 'octocat' },
+  files: { 'tabstow.sync.json': { content: '{}' } },
+};
+
+describe('Gist reconciliation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    quickLinkMocks.getQuickLinks.mockResolvedValue([]);
-    quickLinkMocks.saveQuickLinks.mockImplementation(async (links: unknown) => links);
-    quickLinkMocks.updateQuickLinks.mockImplementation(async (update: (currentLinks: unknown[]) => unknown[] | Promise<unknown[]>) => {
-      const currentLinks = await quickLinkMocks.getQuickLinks();
-      const nextLinks = await update(currentLinks);
-      await quickLinkMocks.saveQuickLinks(nextLinks);
-      return nextLinks;
-    });
-    settingsMocks.getSettings.mockResolvedValue(SETTINGS);
-    settingsMocks.updateSettings.mockResolvedValue(SETTINGS);
-    dbMocks.mergeRemoteSessions.mockResolvedValue([]);
-  });
-
-  it('merges remote sessions into a push while keeping local versions for matching ids', async () => {
-    const localOnly = createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z');
-    const sharedLocal = createSession('shared', 'Local shared', '2026-07-08T00:00:00.000Z');
-    const sharedRemote = createSession('shared', 'Remote shared', '2026-07-07T00:00:00.000Z');
-    const remoteOnly = createSession('remote-only', 'Remote only', '2026-07-09T00:00:00.000Z');
-
-    dbMocks.exportSessions.mockResolvedValue([localOnly, sharedLocal]);
-    gistMocks.getFileContent.mockResolvedValue(
-      JSON.stringify({
-        schemaVersion: 1,
-        deviceId: 'remote-device',
-        exportedAt: '2026-07-09T00:00:00.000Z',
-        sessions: [sharedRemote, remoteOnly],
-        settings: {
-          deviceId: 'remote-device',
-          gistId: 'gist-1',
-          gistFileName: 'tabstow.sync.json',
-          includePinnedTabs: false,
-          closePinnedTabs: false,
-          theme: 'system',
-        },
-      }),
-    );
-    gistMocks.updateFile.mockResolvedValue(undefined);
-
-    const result = await pushToGist();
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        sessionCount: 3,
-        quickLinkCount: 0,
-        exportedAt: expect.any(String),
+    connectionMocks.getConnectionRecord.mockResolvedValue({
+      generation: 1,
+      phase: 'connected',
+      token: 'oauth-token',
+      account: { id: 1, login: 'octocat' },
+      binding: {
+        gistId: 'gist-1',
+        fileName: 'tabstow.sync.json',
+        public: false,
+        htmlUrl: gist.htmlUrl,
+        ownerId: 1,
       },
+      sync: { state: 'pending' },
     });
-
-    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
-    expect(pushedDocument.sessions).toHaveLength(3);
-    expect(pushedDocument.settings).not.toHaveProperty('theme');
-    expect(
-      pushedDocument.sessions.find((session: TabSession) => session.id === 'shared')?.title,
-    ).toBe('Local shared');
-    expect(
-      pushedDocument.sessions.map((session: TabSession) => session.id).sort(),
-    ).toEqual(['local-only', 'remote-only', 'shared']);
-  });
-
-  it('pushes only the newer saved copy when different sessions contain the same URL', async () => {
-    const olderRemote = {
-      ...createSession('old-session', 'Old session', '2026-07-10T00:00:00.000Z'),
-      tabs: [
-        {
-          id: 'old-copy',
-          url: 'https://example.com/read#old',
-          title: 'Old copy',
-          createdAt: '2026-07-10T00:00:00.000Z',
-        },
-      ],
-    };
-    const newerLocal = {
-      ...createSession('new-session', 'New session', '2026-07-11T00:00:00.000Z'),
-      tabs: [
-        {
-          id: 'new-copy',
-          url: 'https://example.com/read#new',
-          title: 'New copy',
-          createdAt: '2026-07-11T00:00:00.000Z',
-        },
-      ],
-    };
-
-    dbMocks.exportSessions.mockResolvedValue([newerLocal]);
-    gistMocks.getFileContent.mockResolvedValue(
-      JSON.stringify({
-        schemaVersion: 1,
-        deviceId: 'remote-device',
-        exportedAt: '2026-07-10T00:00:00.000Z',
-        sessions: [olderRemote],
-        settings: {
-          deviceId: 'remote-device',
-          gistId: 'gist-1',
-          gistFileName: 'tabstow.sync.json',
-          includePinnedTabs: false,
-          closePinnedTabs: false,
-        },
-      }),
-    );
-    gistMocks.updateFile.mockResolvedValue(undefined);
-
-    await pushToGist();
-
-    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
-    expect(pushedDocument.sessions.flatMap((session: TabSession) => session.tabs)).toEqual([
-      expect.objectContaining({ id: 'new-copy' }),
-    ]);
-  });
-
-  it('pushes the local document when the configured gist file is missing', async () => {
-    const localOnly = createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z');
-
-    dbMocks.exportSessions.mockResolvedValue([localOnly]);
-    gistMocks.getFileContent.mockRejectedValue(
-      new gistMocks.GistFileNotFoundError('Gist file was not found.'),
-    );
-    gistMocks.updateFile.mockResolvedValue(undefined);
-
-    const result = await pushToGist();
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        sessionCount: 1,
-        quickLinkCount: 0,
-        exportedAt: expect.any(String),
-      },
+    dbMocks.getSyncSnapshot.mockResolvedValue({
+      document: document(),
+      replicaId: 'replica-local',
+      pendingGeneration: 4,
+      syncedGeneration: 3,
+      dueAt: Date.now(),
     });
-
-    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
-    expect(pushedDocument.sessions).toEqual([localOnly]);
-    expect(pushedDocument.settings).not.toHaveProperty('theme');
-  });
-
-  it.each([
-    ['missing', null],
-    ['empty', '{}'],
-  ])('deduplicates local sessions when the gist file is %s', async (_case, remoteContent) => {
-    const older = {
-      ...createSession('older', 'Older', '2026-07-10T00:00:00.000Z'),
-      tabs: [{
-        id: 'older-tab',
-        url: 'https://example.com/read#old',
-        title: 'Older',
-        createdAt: '2026-07-10T00:00:00.000Z',
-      }],
-    };
-    const newer = {
-      ...createSession('newer', 'Newer', '2026-07-11T00:00:00.000Z'),
-      tabs: [{
-        id: 'newer-tab',
-        url: 'https://example.com/read#new',
-        title: 'Newer',
-        createdAt: '2026-07-11T00:00:00.000Z',
-      }],
-    };
-    dbMocks.exportSessions.mockResolvedValue([older, newer]);
-    if (remoteContent === null) {
-      gistMocks.getFileContent.mockRejectedValue(
-        new gistMocks.GistFileNotFoundError('Gist file was not found.'),
-      );
-    } else {
-      gistMocks.getFileContent.mockResolvedValue(remoteContent);
-    }
+    dbMocks.listSessions.mockResolvedValue([]);
+    dbMocks.applyRemoteSyncDocument.mockImplementation(async (remote) => ({
+      document: remote,
+      removedImageTokens: [],
+      pendingGeneration: 4,
+    }));
+    dbMocks.markSyncGenerationComplete.mockResolvedValue(true);
+    gistMocks.getGist.mockResolvedValue(gist);
+    gistMocks.getFileContentFromGist.mockResolvedValue(JSON.stringify(document()));
     gistMocks.updateFile.mockResolvedValue(undefined);
-
-    await pushToGist();
-
-    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
-    expect(pushedDocument.sessions).toEqual([
-      expect.objectContaining({ id: 'newer' }),
-    ]);
   });
 
-  it('initializes an empty-object gist file on push', async () => {
-    const localOnly = createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z');
+  it('manual pull reads and merges without writing', async () => {
+    const result = await reconcileGist({ write: false });
 
-    dbMocks.exportSessions.mockResolvedValue([localOnly]);
-    gistMocks.getFileContent.mockResolvedValue('{}');
-    gistMocks.updateFile.mockResolvedValue(undefined);
-
-    const result = await pushToGist();
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        sessionCount: 1,
-        quickLinkCount: 0,
-        exportedAt: expect.any(String),
-      },
-    });
-
-    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
-    expect(pushedDocument.sessions).toEqual([localOnly]);
-  });
-
-  it('returns invalid-sync-document instead of overwriting invalid remote sync data on push', async () => {
-    dbMocks.exportSessions.mockResolvedValue([
-      createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z'),
-    ]);
-    gistMocks.getFileContent.mockResolvedValue('{');
-
-    const result = await pushToGist();
-
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        code: 'invalid-sync-document',
-        message: 'The configured Gist file did not contain valid JSON.',
-      },
-    });
+    expect(result).toMatchObject({ wrote: false, sessionCount: 1 });
+    expect(dbMocks.applyRemoteSyncDocument).toHaveBeenCalledTimes(1);
     expect(gistMocks.updateFile).not.toHaveBeenCalled();
   });
 
-  it('pushes quick links while excluding uploaded image icon tokens', async () => {
-    const localOnly = createSession('local-only', 'Local only', '2026-07-06T00:00:00.000Z');
-
-    dbMocks.exportSessions.mockResolvedValue([localOnly]);
-    quickLinkMocks.getQuickLinks.mockResolvedValue([
-      {
-        id: 'quick-image',
-        url: 'https://example.com/',
-        label: 'Example',
-        icon: { kind: 'image', value: 'quick-link-icon:local-only' },
-        createdAt: '2026-07-06T00:00:00.000Z',
-      },
-    ]);
-    gistMocks.getFileContent.mockRejectedValue(
-      new gistMocks.GistFileNotFoundError('Gist file was not found.'),
-    );
-    gistMocks.updateFile.mockResolvedValue(undefined);
-
-    const result = await pushToGist();
-
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        sessionCount: 1,
-        quickLinkCount: 1,
-        exportedAt: expect.any(String),
-      },
+  it('classifies an owner change as a rebinding problem', async () => {
+    gistMocks.getGist.mockResolvedValue({
+      ...gist,
+      owner: { id: 2, login: 'someone-else' },
     });
 
-    const pushedDocument = JSON.parse(gistMocks.updateFile.mock.calls[0]?.[2] as string);
-    expect(pushedDocument.quickLinks).toEqual([
-      {
-        id: 'quick-image',
-        url: 'https://example.com/',
-        label: 'Example',
-        icon: { kind: 'site', value: null },
-        createdAt: '2026-07-06T00:00:00.000Z',
-      },
-    ]);
+    await expect(reconcileGist({ write: false })).rejects.toMatchObject({
+      action: 'rebind',
+    } satisfies Partial<SyncTargetError>);
   });
 
-  it('pulls and saves merged quick links from the configured gist', async () => {
-    dbMocks.listSessions.mockResolvedValue([]);
-    dbMocks.importSessions.mockResolvedValue([]);
-    quickLinkMocks.getQuickLinks.mockResolvedValue([
-      {
-        id: 'local-only',
-        url: 'https://local.example/',
-        label: 'Local',
-        icon: null,
-        createdAt: '2026-07-06T00:00:00.000Z',
+  it('aborts when the bound Gist changes even if an epoch were reused', async () => {
+    const initialConnection = {
+      generation: 1,
+      phase: 'connected',
+      token: 'oauth-token',
+      account: { id: 1, login: 'octocat' },
+      binding: {
+        gistId: 'gist-1',
+        fileName: 'tabstow.sync.json',
+        public: false,
+        htmlUrl: gist.htmlUrl,
+        ownerId: 1,
       },
-    ]);
-    gistMocks.getFileContent.mockResolvedValue(
-      JSON.stringify({
-        schemaVersion: 1,
-        deviceId: 'remote-device',
-        exportedAt: '2026-07-09T00:00:00.000Z',
-        sessions: [],
-        quickLinks: [
+      sync: { state: 'pending' },
+    } as const;
+    connectionMocks.getConnectionRecord
+      .mockResolvedValueOnce(initialConnection)
+      .mockResolvedValue({
+        ...initialConnection,
+        binding: { ...initialConnection.binding, gistId: 'gist-2' },
+      });
+
+    await expect(reconcileGist({ write: false })).rejects.toThrow(
+      'connection changed',
+    );
+    expect(dbMocks.applyRemoteSyncDocument).not.toHaveBeenCalled();
+  });
+
+  it('imports the complete tab set from a newer version-one session', async () => {
+    const localDocument = document('Local');
+    const tabPositions = positionsForCount(2);
+    localDocument.tabs = [
+      {
+        id: 'tab-shared',
+        sessionId: 'session-1',
+        url: 'https://shared.example/',
+        title: 'Local shared tab',
+        createdAt: timestamp,
+        position: tabPositions[0]!,
+        revision: { counter: 5, replicaId: 'replica-local' },
+      },
+      {
+        id: 'tab-local-only',
+        sessionId: 'session-1',
+        url: 'https://local.example/',
+        title: 'Local-only tab',
+        createdAt: timestamp,
+        position: tabPositions[1]!,
+        revision: { counter: 6, replicaId: 'replica-local' },
+      },
+    ];
+    dbMocks.getSyncSnapshot.mockResolvedValue({
+      document: localDocument,
+      replicaId: 'replica-local',
+      pendingGeneration: 4,
+      syncedGeneration: 3,
+    });
+    dbMocks.listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Local',
+        tabs: [
           {
-            id: 'remote-only',
-            url: 'https://remote.example/',
-            label: 'Remote',
-            icon: { kind: 'site', value: null },
-            createdAt: '2026-07-09T00:00:00.000Z',
+            id: 'tab-shared',
+            url: 'https://shared.example/',
+            title: 'Local shared tab',
+            createdAt: timestamp,
+          },
+          {
+            id: 'tab-local-only',
+            url: 'https://local.example/',
+            title: 'Local-only tab',
+            createdAt: timestamp,
           },
         ],
-        settings: {
-          deviceId: 'remote-device',
-          gistId: 'gist-1',
-          gistFileName: 'tabstow.sync.json',
-          includePinnedTabs: false,
-          closePinnedTabs: false,
-        },
-      }),
-    );
-
-    const result = await pullFromGist();
-
-    expect(quickLinkMocks.saveQuickLinks).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'remote-only', label: 'Remote' }),
-      expect.objectContaining({ id: 'local-only', label: 'Local' }),
+        createdAt: timestamp,
+        updatedAt: '2026-07-11T00:00:00.000Z',
+        deviceId: 'replica-local',
+      },
     ]);
-    expect(result).toEqual({
-      ok: true,
-      data: {
-        sessionCount: 0,
-        quickLinkCount: 2,
-        importedAt: expect.any(String),
-      },
-    });
-  });
-
-  it('atomically merges pulled sessions with remote precedence', async () => {
-    const newerRemote = {
-      ...createSession('new-session', 'New session', '2026-07-11T00:00:00.000Z'),
-      tabs: [
-        {
-          id: 'new-copy',
-          url: 'https://example.com/read#new',
-          title: 'New copy',
-          createdAt: '2026-07-11T00:00:00.000Z',
-        },
-      ],
-    };
-
-    dbMocks.mergeRemoteSessions.mockResolvedValue([newerRemote]);
-    gistMocks.getFileContent.mockResolvedValue(
+    gistMocks.getFileContentFromGist.mockResolvedValue(
       JSON.stringify({
         schemaVersion: 1,
-        deviceId: 'remote-device',
-        exportedAt: '2026-07-11T00:00:00.000Z',
-        sessions: [newerRemote],
+        deviceId: 'legacy-remote',
+        exportedAt: timestamp,
+        sessions: [
+          {
+            id: 'session-1',
+            title: 'Remote v1 winner',
+            tabs: [
+              {
+                id: 'tab-shared',
+                url: 'https://shared.example/',
+                title: 'Remote shared tab',
+                createdAt: timestamp,
+              },
+              {
+                id: 'tab-remote-only',
+                url: 'https://remote.example/',
+                title: 'Remote-only tab',
+                createdAt: timestamp,
+              },
+            ],
+            createdAt: timestamp,
+            updatedAt: '2026-07-12T01:00:00.000Z',
+            deviceId: 'legacy-remote',
+          },
+        ],
+        quickLinks: [],
         settings: {
-          deviceId: 'remote-device',
-          gistId: 'gist-1',
-          gistFileName: 'tabstow.sync.json',
+          deviceId: 'legacy-remote',
+          includePinnedTabs: false,
+          closePinnedTabs: false,
+        },
+      }),
+    );
+    dbMocks.applyRemoteSyncDocument.mockImplementation(async (remote) => ({
+      document: remote,
+      removedImageTokens: [],
+      pendingGeneration: 4,
+    }));
+
+    await reconcileGist({ write: false });
+
+    expect(dbMocks.applyRemoteSyncDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessions: [
+          expect.objectContaining({
+            title: 'Remote v1 winner',
+            revision: { counter: 4, replicaId: 'replica-local' },
+          }),
+        ],
+        tabs: [
+          expect.objectContaining({
+            id: 'tab-shared',
+            title: 'Remote shared tab',
+            revision: { counter: 6, replicaId: 'replica-local' },
+          }),
+          expect.objectContaining({ id: 'tab-remote-only' }),
+        ],
+        deletions: [
+          expect.objectContaining({
+            entityType: 'tab',
+            entityId: 'tab-local-only',
+            revision: { counter: 7, replicaId: 'replica-local' },
+          }),
+        ],
+      }),
+    );
+  });
+
+  it('keeps the complete tab set from a newer local session during version-one import', async () => {
+    const localDocument = document('Local winner');
+    const tabPositions = positionsForCount(2);
+    localDocument.tabs = [
+      {
+        id: 'tab-shared',
+        sessionId: 'session-1',
+        url: 'https://shared.example/',
+        title: 'Local shared tab',
+        createdAt: timestamp,
+        position: tabPositions[0]!,
+        revision: { counter: 5, replicaId: 'replica-local' },
+      },
+      {
+        id: 'tab-local-only',
+        sessionId: 'session-1',
+        url: 'https://local.example/',
+        title: 'Local-only tab',
+        createdAt: timestamp,
+        position: tabPositions[1]!,
+        revision: { counter: 6, replicaId: 'replica-local' },
+      },
+    ];
+    dbMocks.getSyncSnapshot.mockResolvedValue({
+      document: localDocument,
+      replicaId: 'replica-local',
+      pendingGeneration: 4,
+      syncedGeneration: 3,
+    });
+    dbMocks.listSessions.mockResolvedValue([
+      {
+        id: 'session-1',
+        title: 'Local winner',
+        tabs: [
+          {
+            id: 'tab-shared',
+            url: 'https://shared.example/',
+            title: 'Local shared tab',
+            createdAt: timestamp,
+          },
+          {
+            id: 'tab-local-only',
+            url: 'https://local.example/',
+            title: 'Local-only tab',
+            createdAt: timestamp,
+          },
+        ],
+        createdAt: timestamp,
+        updatedAt: '2026-07-12T02:00:00.000Z',
+        deviceId: 'replica-local',
+      },
+    ]);
+    gistMocks.getFileContentFromGist.mockResolvedValue(
+      JSON.stringify({
+        schemaVersion: 1,
+        deviceId: 'legacy-remote',
+        exportedAt: timestamp,
+        sessions: [
+          {
+            id: 'session-1',
+            title: 'Older remote v1',
+            tabs: [
+              {
+                id: 'tab-shared',
+                url: 'https://shared.example/',
+                title: 'Older remote shared tab',
+                createdAt: timestamp,
+              },
+              {
+                id: 'tab-remote-only',
+                url: 'https://remote.example/',
+                title: 'Older remote-only tab',
+                createdAt: timestamp,
+              },
+            ],
+            createdAt: timestamp,
+            updatedAt: '2026-07-11T00:00:00.000Z',
+            deviceId: 'legacy-remote',
+          },
+        ],
+        quickLinks: [],
+        settings: {
+          deviceId: 'legacy-remote',
           includePinnedTabs: false,
           closePinnedTabs: false,
         },
       }),
     );
 
-    await pullFromGist();
+    await reconcileGist({ write: false });
 
-    expect(dbMocks.mergeRemoteSessions).toHaveBeenCalledWith([newerRemote]);
-    expect(dbMocks.listSessions).not.toHaveBeenCalled();
-    expect(dbMocks.importSessions).not.toHaveBeenCalled();
-  });
-
-  it('rejects a malicious sync session with duplicate tab ids before changing local sessions', async () => {
-    const malicious = createSession('malicious', 'Malicious', '2026-07-11T00:00:00.000Z');
-    malicious.tabs.push({
-      ...malicious.tabs[0]!,
-      url: 'https://example.com/distinct',
-    });
-    gistMocks.getFileContent.mockResolvedValue(
-      JSON.stringify({
-        schemaVersion: 1,
-        deviceId: 'remote-device',
-        exportedAt: '2026-07-11T00:00:00.000Z',
-        sessions: [malicious],
-        settings: {
-          deviceId: 'remote-device',
-          gistId: 'gist-1',
-          gistFileName: 'tabstow.sync.json',
-          includePinnedTabs: false,
-          closePinnedTabs: false,
-        },
+    expect(dbMocks.applyRemoteSyncDocument).toHaveBeenCalledWith(
+      expect.objectContaining({
+        sessions: [
+          expect.objectContaining({
+            id: 'session-1',
+            revision: { counter: 0, replicaId: 'replica-local' },
+          }),
+        ],
+        tabs: [],
+        deletions: [],
       }),
     );
-
-    await expect(pullFromGist()).resolves.toEqual({
-      ok: false,
-      error: {
-        code: 'invalid-sync-document',
-        message: 'The configured Gist file was not a valid Tabstow sync document.',
-      },
-    });
-    expect(dbMocks.mergeRemoteSessions).not.toHaveBeenCalled();
   });
 
-  it('classifies zod validation failures during pull as invalid sync documents', async () => {
-    dbMocks.listSessions.mockResolvedValue([]);
-    dbMocks.importSessions.mockResolvedValue([]);
-    gistMocks.getFileContent.mockResolvedValue(
-      JSON.stringify({
-        schemaVersion: 1,
-        deviceId: 'device-1',
-        exportedAt: '2026-07-06T00:00:00.000Z',
-        sessions: [],
-        settings: {
-          deviceId: 'device-1',
-          gistFileName: 'tabstow.sync.json',
-          includePinnedTabs: false,
-          closePinnedTabs: false,
-          githubToken: 'secret',
-        },
-      }),
+  it('skips PATCH when only exportedAt differs', async () => {
+    gistMocks.getFileContentFromGist.mockResolvedValue(
+      JSON.stringify({ ...document(), exportedAt: '2030-01-01T00:00:00.000Z' }),
     );
 
-    const result = await pullFromGist();
+    const result = await reconcileGist({ write: true });
 
-    expect(result).toEqual({
-      ok: false,
-      error: {
-        code: 'invalid-sync-document',
-        message: 'The configured Gist file was not a valid Tabstow sync document.',
-      },
+    expect(result.wrote).toBe(false);
+    expect(gistMocks.updateFile).not.toHaveBeenCalled();
+  });
+
+  it('never initializes a missing file during ordinary push', async () => {
+    gistMocks.getGist.mockResolvedValue({ ...gist, files: {} });
+
+    await expect(reconcileGist({ write: true })).rejects.toThrow('not found');
+    expect(gistMocks.updateFile).not.toHaveBeenCalled();
+  });
+
+  it('initializes a missing file only through the confirmed path', async () => {
+    gistMocks.getGist
+      .mockResolvedValueOnce({ ...gist, files: {} })
+      .mockResolvedValueOnce(gist);
+    gistMocks.getFileContentFromGist.mockResolvedValue(JSON.stringify(document()));
+
+    const result = await reconcileGist({ write: true, allowInitialize: true });
+
+    expect(result.wrote).toBe(true);
+    expect(gistMocks.updateFile).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not overwrite invalid non-empty content', async () => {
+    gistMocks.getFileContentFromGist.mockResolvedValue('{');
+
+    await expect(reconcileGist({ write: true })).rejects.toThrow();
+    expect(gistMocks.updateFile).not.toHaveBeenCalled();
+  });
+
+  it('detects a competing writer during read-back verification', async () => {
+    const local = document('Local winner');
+    dbMocks.getSyncSnapshot.mockResolvedValue({
+      document: local,
+      replicaId: 'replica-local',
+      pendingGeneration: 4,
+      syncedGeneration: 3,
     });
+    gistMocks.getFileContentFromGist
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          ...document('Old remote'),
+          sessions: [
+            {
+              ...document().sessions[0]!,
+              title: 'Old remote',
+              revision: { counter: 1, replicaId: 'replica-remote' },
+            },
+          ],
+        }),
+      )
+      .mockResolvedValueOnce(
+        JSON.stringify({
+          ...document('Racing remote'),
+          sessions: [
+            {
+              ...document().sessions[0]!,
+              title: 'Racing remote',
+              revision: { counter: 1, replicaId: 'replica-remote' },
+            },
+          ],
+        }),
+      );
+    dbMocks.applyRemoteSyncDocument.mockImplementation(async () => ({
+      document: local,
+      removedImageTokens: [],
+      pendingGeneration: 4,
+    }));
+
+    await expect(reconcileGist({ write: true })).rejects.toThrow('verification');
+    expect(dbMocks.markSyncGenerationComplete).not.toHaveBeenCalled();
   });
 });
