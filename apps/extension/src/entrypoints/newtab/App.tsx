@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { Languages, Moon, Settings, SlidersHorizontal, Sun, X } from 'lucide-react';
+import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import {
   getLanguagePreference,
   resolveLocale,
@@ -18,13 +19,12 @@ import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
-import { SearchBox } from './components/SearchBox';
 import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
 import { StowedSessions } from './components/StowedSessions';
 import { StowCurrentWindowButton } from './components/StowCurrentWindowButton';
 import { TodosPanel } from './components/TodosPanel';
-import { WorkspaceSearch } from './components/WorkspaceSearch';
+import { UnifiedSearch } from './components/UnifiedSearch';
 
 type StatusState = {
   tone: 'info' | 'success' | 'error';
@@ -36,6 +36,8 @@ const DISCONNECTED_SYNC: ConnectionView = {
   sync: { state: 'disconnected' },
 };
 
+const EMPTY_ACTIVE_SNAPSHOT: ActiveTabsSnapshot = { windows: [], tabs: [], chromeGroups: [] };
+
 type AppProps = {
   initialThemeError?: string | null;
   initialThemeMode?: ThemeMode;
@@ -43,6 +45,7 @@ type AppProps = {
 
 export function App({ initialThemeError = null, initialThemeMode }: AppProps = {}) {
   const [sessions, setSessions] = useState<TabSession[]>([]);
+  const [activeSnapshot, setActiveSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_ACTIVE_SNAPSHOT);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>(
     initialThemeError
@@ -257,10 +260,15 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
 
         <section className="newtab-stage">
           <header className="top-strip" data-od-id="top-strip">
-            <SearchBox
+            <UnifiedSearch
+              activeSnapshot={activeSnapshot}
               disabled={busyAction !== null}
               locale={locale}
+              onChange={setTabQuery}
+              onSavedOpened={loadSessions}
               onStatus={(tone, message) => setStatus({ tone, message })}
+              sessions={sessions}
+              value={tabQuery}
             />
             <div className="top-strip-controls" data-od-id="topbar-actions">
             <button
@@ -313,15 +321,15 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
           <NewTabFeedback message={status.message} tone={status.tone} />
 
           <section className="workspace-container v2-workspace" aria-label="Tab workspace">
-            <WorkspaceSearch locale={locale} value={tabQuery} onChange={setTabQuery} />
             <div className="v2-workspace-columns" data-od-id="workspace-grid">
               <div className="active-region">
                 <ActiveWorkspace
                   busy={busyAction !== null}
                   locale={locale}
-                  onAuthoritativeRefresh={() =>
-                    setStowPreviewRefreshKey((value) => value + 1)
-                  }
+                  onSnapshot={(snapshot) => {
+                    setActiveSnapshot(snapshot);
+                    setStowPreviewRefreshKey((value) => value + 1);
+                  }}
                   onStatus={(tone, message) => setStatus({ tone, message })}
                   query={tabQuery}
                   refreshKey={activeWorkspaceRefreshKey}

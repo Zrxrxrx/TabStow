@@ -25,7 +25,7 @@ import { GroupNav } from './GroupNav';
 type Props = {
   busy: boolean;
   locale: Locale;
-  onAuthoritativeRefresh?: () => void;
+  onSnapshot?: (snapshot: ActiveTabsSnapshot) => void;
   onStatus: (tone: 'success' | 'error', message: string) => void;
   onStowTab: (tab: ActiveBrowserTab) => Promise<void>;
   query: string;
@@ -37,7 +37,7 @@ const EMPTY_SNAPSHOT: ActiveTabsSnapshot = { windows: [], tabs: [], chromeGroups
 export function ActiveWorkspace({
   busy,
   locale,
-  onAuthoritativeRefresh,
+  onSnapshot,
   onStatus,
   onStowTab,
   query,
@@ -75,7 +75,7 @@ export function ActiveWorkspace({
       onStatus('error', response.error.message);
     } else {
       setSnapshot(response.data);
-      onAuthoritativeRefresh?.();
+      onSnapshot?.(response.data);
     }
 
     settleAuthoritativeRefreshWaiters();

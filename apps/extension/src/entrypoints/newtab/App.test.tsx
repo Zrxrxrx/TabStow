@@ -434,12 +434,8 @@ describe('App', () => {
 
     await renderApp();
 
-    expect(screen().getByLabelText('Search the web')).not.toBeNull();
-    const tabSearch = screen().getByLabelText('Search active and saved tabs');
+    const tabSearch = screen().getByLabelText('Search active tabs, saved tabs, or the web');
     expect(tabSearch.getAttribute('type')).toBe('search');
-    expect(
-      container.querySelector<HTMLAnchorElement>('.workspace-history-link')?.getAttribute('href'),
-    ).toBe('chrome-extension://tabstow-test/saved-history.html');
 
     await change(tabSearch, 'GITHUB');
 
@@ -1230,7 +1226,7 @@ describe('App', () => {
     expect(screen().getByText('1 个会话')).not.toBeNull();
     expect(screen().getByText('1 个标签页')).not.toBeNull();
     expect(screen().getByLabelText('1 个会话，1 个标签页')).not.toBeNull();
-    expect(screen().getByLabelText('搜索网页')).not.toBeNull();
+    expect(screen().getByLabelText('搜索打开的标签页、已保存标签页或网页')).not.toBeNull();
     expect(screen().getByLabelText('编辑快捷链接')).not.toBeNull();
     expect(screen().getByText('收起当前窗口')).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
