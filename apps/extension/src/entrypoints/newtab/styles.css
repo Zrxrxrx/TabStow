@@ -1596,6 +1596,72 @@ svg {
   grid-row: 2;
 }
 
+.active-workspace .tab-group {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border-radius: 0;
+}
+
+.active-workspace .tab-group > header {
+  min-height: 33px;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 8px;
+  padding: 0 4px 0 8px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface-warm), var(--surface) 72%);
+}
+
+.active-workspace .tab-group .chrome-group-meta {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: 4px minmax(0, 1fr) auto;
+  justify-content: initial;
+  gap: 8px;
+}
+
+.active-workspace .tab-group .chrome-group-color {
+  width: 4px;
+  height: 19px;
+  border-radius: 0;
+}
+
+.active-workspace .tab-group h4 {
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  font: 800 11px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  letter-spacing: 0.07em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.active-workspace .tab-group .status-pill {
+  min-height: 0;
+  padding: 0;
+  color: var(--muted);
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font: 800 7px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.active-workspace .tab-group > header > .icon-button {
+  width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border-radius: 0;
+}
+
+.active-workspace .tab-group .tab-row {
+  border-inline: 0;
+  border-radius: 0;
+}
+
 .tab-row,
 .saved-tab-row {
   position: relative;
