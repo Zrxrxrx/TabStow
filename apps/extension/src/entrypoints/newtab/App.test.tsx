@@ -2149,6 +2149,48 @@ describe('App', () => {
     });
   });
 
+  it('sleeps an eligible tab from its row action and refreshes its state', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+    const sleepButton = screen().getByLabelText('Sleep Spec draft') as HTMLButtonElement;
+
+    expect(sleepButton.disabled).toBe(false);
+    await click(sleepButton);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:sleep',
+      tabIds: [12],
+    });
+    expect(sentMessageTypes()).not.toContain('active-tabs:focus');
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
+    expect(screen().getByText('Sleeping')).not.toBeNull();
+    expect(screen().getByText('Slept 1 tab.')).not.toBeNull();
+  });
+
+  it('protects active, pinned, audible, sleeping, and internal tabs from manual sleep', async () => {
+    const protectedTabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, active: true, id: 21, index: 0, title: 'Active tab' },
+      { ...UNIQUE_TAB, id: 22, index: 1, pinned: true, title: 'Pinned tab' },
+      { ...UNIQUE_TAB, audible: true, id: 23, index: 2, title: 'Audible tab' },
+      { ...UNIQUE_TAB, discarded: true, id: 24, index: 3, title: 'Sleeping tab' },
+      {
+        ...UNIQUE_TAB,
+        id: 25,
+        index: 4,
+        title: 'Internal tab',
+        url: 'chrome://settings',
+      },
+    ];
+    mockMessages({ activeTabs: protectedTabs });
+
+    await renderApp();
+
+    for (const label of protectedTabs.map((tab) => `Sleep ${tab.title}`)) {
+      expect((screen().getByLabelText(label) as HTMLButtonElement).disabled).toBe(true);
+    }
+  });
+
   it('refreshes active tabs after stowing from saved sessions', async () => {
     let activeTabs = [UNIQUE_TAB];
     sendExtensionMessage.mockImplementation(async (message: { type: string; tabIds?: number[] }) => {
@@ -2534,20 +2576,22 @@ function mockMessages({
   focusedWindowId?: number;
   sessions?: TabSession[];
 }) {
+  let currentActiveTabs = activeTabs;
+
   sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
     if (message.type === 'sessions:stow-current-window-preview') {
-      return { ok: true, data: { eligibleTabCount: activeTabs.length } };
+      return { ok: true, data: { eligibleTabCount: currentActiveTabs.length } };
     }
 
     if (message.type === 'active-tabs:snapshot') {
       return {
         ok: true,
-        data: activeTabsSnapshot(activeTabs, { chromeGroups, focusedWindowId }),
+        data: activeTabsSnapshot(currentActiveTabs, { chromeGroups, focusedWindowId }),
       };
     }
 
     if (message.type === 'active-tabs:list') {
-      return { ok: true, data: activeTabs };
+      return { ok: true, data: currentActiveTabs };
     }
 
     if (message.type === 'sessions:list') {
@@ -2577,6 +2621,19 @@ function mockMessages({
 
     if (message.type === 'active-tabs:close') {
       return { ok: true, data: { closed: true, tabCount: message.tabIds.length } };
+    }
+
+    if (message.type === 'active-tabs:sleep') {
+      const sleepingTabIds = new Set(message.tabIds);
+      currentActiveTabs = currentActiveTabs.map((tab) =>
+        typeof tab.id === 'number' && sleepingTabIds.has(tab.id)
+          ? { ...tab, discarded: true }
+          : tab,
+      );
+      return {
+        ok: true,
+        data: { sleptTabIds: message.tabIds, skippedTabIds: [], failures: [] },
+      };
     }
 
     if (message.type === 'active-tabs:focus') {

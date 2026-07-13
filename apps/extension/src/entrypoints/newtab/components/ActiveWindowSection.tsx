@@ -30,7 +30,9 @@ type Props = {
   onDrop: (event: DragEvent, target: ActiveTabsDropTarget) => void;
   onFocusTab: (tab: ActiveBrowserTab) => void;
   onRegisterTarget: (key: string, node: HTMLElement | null) => void;
+  onSleepTabs: (tabIds: number[]) => void;
   onStowTab: (tab: ActiveBrowserTab) => void;
+  sleepEligibleTabIds: ReadonlySet<number>;
 };
 
 type DropZoneProps = {
@@ -192,6 +194,7 @@ export function ActiveWindowSection(props: Props) {
 
   function tabRow(tab: ActiveBrowserTab) {
     const label = getTabLabel(tab);
+    const sleepEligible = typeof tab.id === 'number' && props.sleepEligibleTabIds.has(tab.id);
     const source: ActiveTabsDragSource = {
       kind: 'tab',
       tabId: tab.id as number,
@@ -263,9 +266,12 @@ export function ActiveWindowSection(props: Props) {
           <button
             aria-label={t(props.locale, 'sleepTab', { label })}
             className="icon-button"
-            disabled
-            onClick={stopAction}
-            title={t(props.locale, 'sleepUnavailableReason')}
+            disabled={props.disabled || !sleepEligible}
+            onClick={(event) => {
+              stopAction(event);
+              if (sleepEligible && typeof tab.id === 'number') props.onSleepTabs([tab.id]);
+            }}
+            title={sleepEligible ? undefined : t(props.locale, 'sleepProtectedReason')}
             type="button"
           >
             <MoonStar aria-hidden="true" size={14} />

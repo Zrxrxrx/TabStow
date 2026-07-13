@@ -79,6 +79,8 @@ describe('i18n', () => {
     expect(t('en', 'tabstowSubtitle')).toBe('Tab operations');
     expect(t('en', 'stowTabsReady', { count: 3 })).toBe('3 tabs ready');
     expect(t('en', 'stowingWindow')).toBe('Stowing window…');
+    expect(t('en', 'sleptTab')).toBe('Slept 1 tab.');
+    expect(t('en', 'sleptTabs', { count: 3 })).toBe('Slept 3 tabs.');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -155,6 +157,8 @@ describe('i18n', () => {
     expect(t('zh-CN', 'tabstowSubtitle')).toBe('标签页操作');
     expect(t('zh-CN', 'stowTabsReady', { count: 3 })).toBe('3 个标签页待收起');
     expect(t('zh-CN', 'stowingWindow')).toBe('正在收起窗口…');
+    expect(t('zh-CN', 'sleptTab')).toBe('已休眠 1 个标签页。');
+    expect(t('zh-CN', 'sleptTabs', { count: 3 })).toBe('已休眠 3 个标签页。');
   });
 
   it('includes English and Simplified Chinese labels for the History page', async () => {

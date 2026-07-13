@@ -7,10 +7,12 @@ import type {
   ActiveBrowserTab,
   ActiveTabsDragSource,
   ActiveTabsMoveResult,
+  ActiveTabsSleepResult,
   ActiveTabsSnapshot,
 } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
 import { filterActiveTabsSnapshot } from '@/features/tab-search/tab-search';
+import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import {
@@ -52,10 +54,12 @@ export function ActiveWorkspace({
   const [movePending, setMovePending] = useState(false);
   const [selectedWindowId, setSelectedWindowId] = useState<number | null>(null);
   const [policyOpen, setPolicyOpen] = useState(false);
+  const [sleepPending, setSleepPending] = useState(false);
   const targetRefs = useRef(new Map<string, HTMLElement>());
   const closePendingRef = useRef(false);
   const dragSourceRef = useRef<ActiveTabsDragSource | null>(null);
   const movePendingRef = useRef(false);
+  const sleepPendingRef = useRef(false);
   const refreshTokenRef = useRef(0);
   const authoritativeRefreshWaitersRef = useRef(new Set<() => void>());
   const activeRef = useRef(true);
@@ -134,11 +138,41 @@ export function ActiveWorkspace({
     () => findDuplicateTabGroups(filteredSnapshot.tabs),
     [filteredSnapshot.tabs],
   );
-  const controlsDisabled = busy || closePending || movePending || !snapshotReady;
+  const sleepEligibleTabIds = useMemo(() => {
+    const incognitoWindowIds = new Set(
+      snapshot.windows.filter((window) => window.incognito).map((window) => window.id),
+    );
+    const eligibleTabIds = new Set<number>();
+
+    for (const tab of snapshot.tabs) {
+      if (
+        typeof tab.id === 'number' &&
+        !tab.active &&
+        !tab.audible &&
+        !tab.discarded &&
+        !tab.pinned &&
+        !incognitoWindowIds.has(tab.windowId) &&
+        !isBlockedTabUrl(tab.url)
+      ) {
+        eligibleTabIds.add(tab.id);
+      }
+    }
+
+    return eligibleTabIds;
+  }, [snapshot]);
+  const controlsDisabled = busy || closePending || movePending || sleepPending || !snapshotReady;
   const dragDisabled = controlsDisabled || query.trim() !== '';
 
   async function closeTabs(tabIds: number[]) {
-    if (busy || closePendingRef.current || movePendingRef.current || tabIds.length === 0) return;
+    if (
+      busy ||
+      closePendingRef.current ||
+      movePendingRef.current ||
+      sleepPendingRef.current ||
+      tabIds.length === 0
+    ) {
+      return;
+    }
 
     closePendingRef.current = true;
     setClosePending(true);
@@ -166,7 +200,8 @@ export function ActiveWorkspace({
       closePendingRef.current ||
       movePendingRef.current ||
       typeof tab.id !== 'number' ||
-      typeof tab.windowId !== 'number'
+      typeof tab.windowId !== 'number' ||
+      sleepPendingRef.current
     ) {
       return;
     }
@@ -184,7 +219,7 @@ export function ActiveWorkspace({
       event.preventDefault();
       return;
     }
-    if (dragDisabled || movePendingRef.current) {
+    if (dragDisabled || movePendingRef.current || sleepPendingRef.current) {
       event.preventDefault();
       return;
     }
@@ -206,7 +241,7 @@ export function ActiveWorkspace({
     event.stopPropagation();
     const source = readActiveTabsDragSource(event.dataTransfer) ?? dragSourceRef.current;
     const dropRequest = source ? resolveActiveTabsDropRequest(source, target) : null;
-    if (!dropRequest || movePendingRef.current) return;
+    if (!dropRequest || movePendingRef.current || sleepPendingRef.current) return;
 
     event.preventDefault();
     movePendingRef.current = true;
@@ -241,6 +276,61 @@ export function ActiveWorkspace({
     targetRefs.current.delete(key);
   }
 
+  async function sleepTabs(tabIds: number[]) {
+    if (
+      busy ||
+      closePendingRef.current ||
+      movePendingRef.current ||
+      sleepPendingRef.current ||
+      tabIds.length === 0
+    ) {
+      return;
+    }
+
+    sleepPendingRef.current = true;
+    setSleepPending(true);
+
+    try {
+      const response = await sendExtensionMessage<AppResult<ActiveTabsSleepResult>>({
+        type: 'active-tabs:sleep',
+        tabIds,
+      });
+      if (!response.ok) {
+        onStatus('error', response.error.message);
+      } else if (response.data.failures.length > 0) {
+        onStatus(
+          'error',
+          t(locale, 'sleepTabsPartial', {
+            failed: response.data.failures.length,
+            skipped: response.data.skippedTabIds.length,
+            slept: response.data.sleptTabIds.length,
+          }),
+        );
+      } else if (response.data.sleptTabIds.length > 0) {
+        const messageKey = response.data.skippedTabIds.length > 0
+          ? 'sleepTabsPartial'
+          : response.data.sleptTabIds.length === 1
+            ? 'sleptTab'
+            : 'sleptTabs';
+        onStatus(
+          'success',
+          t(locale, messageKey, {
+            failed: 0,
+            skipped: response.data.skippedTabIds.length,
+            slept: response.data.sleptTabIds.length,
+            count: response.data.sleptTabIds.length,
+          }),
+        );
+      } else {
+        onStatus('error', t(locale, 'noEligibleTabsToSleep'));
+      }
+    } finally {
+      await refreshThroughLatest();
+      sleepPendingRef.current = false;
+      if (activeRef.current) setSleepPending(false);
+    }
+  }
+
   return (
     <section
       className="panel column active-workspace"
@@ -260,7 +350,7 @@ export function ActiveWorkspace({
       </div>
 
       <div className="active-tools">
-        <button className="secondary-button" disabled title={t(locale, 'sleepUnavailableReason')} type="button">
+        <button className="secondary-button" disabled type="button">
           <MoonStar aria-hidden="true" size={15} />
           {t(locale, 'sleepEligibleTabs')}
         </button>
@@ -305,14 +395,16 @@ export function ActiveWorkspace({
             onDrop={(event, target) => void dropOnTarget(event, target)}
             onFocusTab={(tab) => void focusTab(tab)}
             onRegisterTarget={registerTarget}
+            onSleepTabs={(tabIds) => void sleepTabs(tabIds)}
             onStowTab={(tab) => void onStowTab(tab)}
+            sleepEligibleTabIds={sleepEligibleTabIds}
           />
         ))}
       </div>
       {policyOpen ? (
         <ModalDialog closeLabel={t(locale, 'cancel')} onClose={() => setPolicyOpen(false)} title={t(locale, 'sleepPolicy')}>
           <p>{t(locale, 'sleepPolicyDescription')}</p>
-          <p className="subtle">{t(locale, 'sleepUnavailableReason')}</p>
+          <p className="subtle">{t(locale, 'sleepPolicyUnavailableReason')}</p>
         </ModalDialog>
       ) : null}
     </section>
