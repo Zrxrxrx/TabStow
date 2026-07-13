@@ -1515,12 +1515,85 @@ svg {
   align-content: start;
 }
 
+.active-window-items,
+.active-tab-list,
+.saved-tab-list {
+  gap: 0;
+}
+
+.saved-sessions .session-list {
+  gap: 5px;
+}
+
+.drop-insertion {
+  position: relative;
+  z-index: 2;
+  height: 8px;
+  margin-block: -4px;
+}
+
+.drop-insertion.is-active-drop-target {
+  min-height: 8px;
+}
+
+.session-card {
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
 .saved-sessions .session-card > header {
-  grid-template-columns: 1fr;
+  min-height: 52px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface-warm), var(--surface) 72%);
 }
 
 .saved-sessions .session-card > header .row-actions {
-  justify-content: flex-start;
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.saved-sessions .session-card > header .row-actions button {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+}
+
+.saved-sessions .session-card > header .row-actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.saved-sessions .saved-tab-row {
+  min-height: 42px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+}
+
+.active-workspace .tab-row .tab-copy {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  column-gap: 4px;
+}
+
+.active-workspace .tab-row .tab-title {
+  grid-column: 1 / -1;
+}
+
+.active-workspace .tab-row .tab-url {
+  grid-column: 1;
+  grid-row: 2;
+}
+
+.active-workspace .tab-row .state-tag {
+  grid-row: 2;
 }
 
 .tab-row,
