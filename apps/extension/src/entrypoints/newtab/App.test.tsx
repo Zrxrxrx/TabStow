@@ -499,6 +499,9 @@ describe('App', () => {
     expect(
       screen().getByLabelText('Close GitHub active issue') as HTMLButtonElement,
     ).toHaveProperty('disabled', false);
+    expect(
+      screen().getByRole('button', { name: 'Sleep eligible tabs' }) as HTMLButtonElement,
+    ).toHaveProperty('disabled', true);
     const savedDragSurfaces = Array.from(
       container.querySelectorAll<HTMLElement>('.saved-sessions [aria-disabled="true"][draggable="false"]'),
     );
@@ -1866,6 +1869,127 @@ describe('App', () => {
     });
   });
 
+  it('sleeps eligible tabs across visible windows from the bulk action', async () => {
+    const tabs: ActiveBrowserTab[] = [
+      { ...UNIQUE_TAB, id: 40, title: 'Eligible one', url: 'https://sleep.example/one' },
+      {
+        ...UNIQUE_TAB,
+        active: true,
+        id: 41,
+        index: 1,
+        title: 'Active tab',
+        url: 'https://sleep.example/active',
+      },
+      {
+        ...UNIQUE_TAB,
+        id: 42,
+        index: 2,
+        pinned: true,
+        title: 'Pinned tab',
+        url: 'https://sleep.example/pinned',
+      },
+      {
+        ...UNIQUE_TAB,
+        audible: true,
+        id: 43,
+        index: 3,
+        title: 'Audible tab',
+        url: 'https://sleep.example/audible',
+      },
+      {
+        ...UNIQUE_TAB,
+        discarded: true,
+        id: 44,
+        index: 4,
+        title: 'Sleeping tab',
+        url: 'https://sleep.example/sleeping',
+      },
+      {
+        ...UNIQUE_TAB,
+        id: 45,
+        title: 'Eligible two',
+        url: 'https://sleep.example/two',
+        windowId: 8,
+      },
+    ];
+    mockMessages({ activeTabs: tabs, focusedWindowId: 4 });
+
+    await renderApp();
+    const bulkSleep = screen().getByRole('button', { name: 'Sleep eligible tabs' }) as HTMLButtonElement;
+
+    expect(bulkSleep.disabled).toBe(false);
+    await click(bulkSleep);
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:sleep',
+      tabIds: [40, 45],
+    });
+    expect(screen().getByText('Slept 2 tabs.')).not.toBeNull();
+  });
+
+  it('scopes bulk sleeping to the selected window', async () => {
+    mockMessages({
+      activeTabs: [
+        {
+          ...UNIQUE_TAB,
+          id: 50,
+          title: 'Current eligible',
+          url: 'https://sleep.example/current',
+        },
+        {
+          ...UNIQUE_TAB,
+          id: 51,
+          title: 'Other eligible',
+          url: 'https://sleep.example/other',
+          windowId: 8,
+        },
+      ],
+      focusedWindowId: 4,
+    });
+
+    await renderApp();
+    await click(screen().getByText('Window 2').closest<HTMLButtonElement>('button')!);
+    await click(screen().getByRole('button', { name: 'Sleep eligible tabs' }));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:sleep',
+      tabIds: [51],
+    });
+  });
+
+  it('excludes incognito tabs from row and bulk sleeping', async () => {
+    mockMessages({
+      activeTabs: [
+        {
+          ...UNIQUE_TAB,
+          id: 60,
+          title: 'Normal eligible',
+          url: 'https://sleep.example/normal',
+        },
+        {
+          ...UNIQUE_TAB,
+          id: 61,
+          title: 'Incognito protected',
+          url: 'https://sleep.example/incognito',
+          windowId: 8,
+        },
+      ],
+      focusedWindowId: 4,
+      incognitoWindowIds: [8],
+    });
+
+    await renderApp();
+
+    expect(
+      (screen().getByLabelText('Sleep Incognito protected') as HTMLButtonElement).disabled,
+    ).toBe(true);
+    await click(screen().getByRole('button', { name: 'Sleep eligible tabs' }));
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'active-tabs:sleep',
+      tabIds: [60],
+    });
+  });
+
   it('disables active workspace close controls and guards close reentry while a close is pending', async () => {
     const pendingClose = deferred<AppResult<{ closed: true; tabCount: number }>>();
     const groupedTabs = DUPLICATE_TABS.map((tab) =>
@@ -2548,6 +2672,7 @@ function activeTabsSnapshot(
   options: {
     chromeGroups?: ActiveTabsSnapshot['chromeGroups'];
     focusedWindowId?: number;
+    incognitoWindowIds?: number[];
   } = {},
 ): ActiveTabsSnapshot {
   const windowIds = [...new Set(tabs.map((tab) => tab.windowId))].sort((a, b) => a - b);
@@ -2557,7 +2682,7 @@ function activeTabsSnapshot(
     windows: windowIds.map((id) => ({
       id,
       focused: id === focusedWindowId,
-      incognito: false,
+      incognito: options.incognitoWindowIds?.includes(id) ?? false,
       type: 'normal',
     })),
     tabs,
@@ -2569,11 +2694,13 @@ function mockMessages({
   activeTabs,
   chromeGroups = [],
   focusedWindowId,
+  incognitoWindowIds = [],
   sessions = SESSIONS,
 }: {
   activeTabs: ActiveBrowserTab[];
   chromeGroups?: ActiveTabsSnapshot['chromeGroups'];
   focusedWindowId?: number;
+  incognitoWindowIds?: number[];
   sessions?: TabSession[];
 }) {
   let currentActiveTabs = activeTabs;
@@ -2586,7 +2713,11 @@ function mockMessages({
     if (message.type === 'active-tabs:snapshot') {
       return {
         ok: true,
-        data: activeTabsSnapshot(currentActiveTabs, { chromeGroups, focusedWindowId }),
+        data: activeTabsSnapshot(currentActiveTabs, {
+          chromeGroups,
+          focusedWindowId,
+          incognitoWindowIds,
+        }),
       };
     }
 

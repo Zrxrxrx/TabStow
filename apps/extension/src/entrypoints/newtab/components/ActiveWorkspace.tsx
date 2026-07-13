@@ -162,6 +162,19 @@ export function ActiveWorkspace({
   }, [snapshot]);
   const controlsDisabled = busy || closePending || movePending || sleepPending || !snapshotReady;
   const dragDisabled = controlsDisabled || query.trim() !== '';
+  const bulkSleepTabIds = useMemo(
+    () =>
+      snapshot.tabs.flatMap((tab) =>
+        typeof tab.id === 'number' &&
+        sleepEligibleTabIds.has(tab.id) &&
+        (selectedWindowId === null || tab.windowId === selectedWindowId)
+          ? [tab.id]
+          : [],
+      ),
+    [selectedWindowId, sleepEligibleTabIds, snapshot.tabs],
+  );
+  const bulkSleepDisabled =
+    controlsDisabled || query.trim() !== '' || bulkSleepTabIds.length === 0;
 
   async function closeTabs(tabIds: number[]) {
     if (
@@ -350,7 +363,19 @@ export function ActiveWorkspace({
       </div>
 
       <div className="active-tools">
-        <button className="secondary-button" disabled type="button">
+        <button
+          className="secondary-button"
+          disabled={bulkSleepDisabled}
+          onClick={() => void sleepTabs(bulkSleepTabIds)}
+          title={
+            query.trim() !== ''
+              ? t(locale, 'sleepSearchUnavailableReason')
+              : bulkSleepTabIds.length === 0
+                ? t(locale, 'noEligibleTabsToSleep')
+                : undefined
+          }
+          type="button"
+        >
           <MoonStar aria-hidden="true" size={15} />
           {t(locale, 'sleepEligibleTabs')}
         </button>
