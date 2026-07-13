@@ -109,8 +109,12 @@ export async function sleepActiveTabs(
         skippedTabIds.push(tabId);
         continue;
       }
-      await browser.tabs.discard(tabId);
-      sleptTabIds.push(tabId);
+      const discardedTab = await browser.tabs.discard(tabId);
+      if (discardedTab?.discarded) {
+        sleptTabIds.push(tabId);
+      } else {
+        skippedTabIds.push(tabId);
+      }
     } catch (error) {
       failures.push({ tabId, message: toErrorMessage(error) });
     }

@@ -2305,6 +2305,13 @@ describe('App', () => {
         title: 'Internal tab',
         url: 'chrome://settings',
       },
+      {
+        ...UNIQUE_TAB,
+        id: 26,
+        index: 5,
+        title: 'DevTools tab',
+        url: 'devtools://devtools/bundled/inspector.html',
+      },
     ];
     mockMessages({ activeTabs: protectedTabs });
 

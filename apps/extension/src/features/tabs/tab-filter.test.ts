@@ -32,6 +32,7 @@ describe('tab filtering', () => {
     expect(isBlockedTabUrl('edge://settings')).toBe(true);
     expect(isBlockedTabUrl('about:blank')).toBe(true);
     expect(isBlockedTabUrl('chrome-extension://abc/newtab.html')).toBe(true);
+    expect(isBlockedTabUrl('devtools://devtools/bundled/inspector.html')).toBe(true);
     expect(isBlockedTabUrl('https://example.com/')).toBe(false);
   });
 

@@ -224,6 +224,7 @@ describe('active tabs service', () => {
       [13, { audible: true }],
       [14, { incognito: true }],
       [15, { url: 'chrome://settings' }],
+      [16, { url: 'devtools://devtools/bundled/inspector.html' }],
     ]);
     browserMocks.tabs.get.mockImplementation(async (tabId: number) => ({
       id: tabId,
@@ -237,14 +238,39 @@ describe('active tabs service', () => {
     }));
 
     const { sleepActiveTabs } = await import('./active-tabs-service');
-    const result = await sleepActiveTabs([10, 11, 12, 13, 14, 15]);
+    const result = await sleepActiveTabs([10, 11, 12, 13, 14, 15, 16]);
 
     expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
     expect(result).toEqual({
       ok: true,
       data: {
         sleptTabIds: [],
-        skippedTabIds: [10, 11, 12, 13, 14, 15],
+        skippedTabIds: [10, 11, 12, 13, 14, 15, 16],
+        failures: [],
+      },
+    });
+  });
+
+  it('reports a tab as skipped when Chrome declines the discard after validation', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 18,
+      active: false,
+      audible: false,
+      discarded: false,
+      incognito: false,
+      pinned: false,
+      url: 'https://example.com/racing-tab',
+    });
+    browserMocks.tabs.discard.mockResolvedValue(undefined);
+
+    const { sleepActiveTabs } = await import('./active-tabs-service');
+    const result = await sleepActiveTabs([18]);
+
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sleptTabIds: [],
+        skippedTabIds: [18],
         failures: [],
       },
     });

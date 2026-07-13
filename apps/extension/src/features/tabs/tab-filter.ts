@@ -5,7 +5,13 @@ export type StowableBrowserTab = Pick<
   'active' | 'favIconUrl' | 'id' | 'pinned' | 'title' | 'url' | 'windowId'
 >;
 
-const BLOCKED_URL_PREFIXES = ['chrome://', 'edge://', 'about:', 'chrome-extension://'];
+const BLOCKED_URL_PREFIXES = [
+  'chrome://',
+  'edge://',
+  'about:',
+  'chrome-extension://',
+  'devtools://',
+];
 
 export function isBlockedTabUrl(url: string | undefined): boolean {
   if (!url) return true;
