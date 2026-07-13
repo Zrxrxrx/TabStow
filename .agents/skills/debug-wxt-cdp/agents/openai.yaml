@@ -1,0 +1,4 @@
+interface:
+  display_name: "Debug WXT via CDP"
+  short_description: "Inspect WXT extensions with raw CDP"
+  default_prompt: "Use $debug-wxt-cdp to launch isolated WXT Chrome and inspect Tabstow New Tab DOM and extension lifecycle through raw CDP."
