@@ -8,6 +8,8 @@ const browserMocks = vi.hoisted(() => ({
     query: vi.fn(),
   },
   tabs: {
+    discard: vi.fn(),
+    get: vi.fn(),
     query: vi.fn(),
     remove: vi.fn(),
     update: vi.fn(),
@@ -181,6 +183,106 @@ describe('active tabs service', () => {
 
     expect(browserMocks.tabs.remove).toHaveBeenCalledWith([3, 4]);
     expect(result).toEqual({ ok: true, data: { closed: true, tabCount: 2 } });
+  });
+
+  it('sleeps each requested eligible tab once with an explicit tab id', async () => {
+    browserMocks.tabs.get.mockImplementation(async (tabId: number) => ({
+      id: tabId,
+      active: false,
+      audible: false,
+      autoDiscardable: false,
+      discarded: false,
+      incognito: false,
+      pinned: false,
+      url: `https://example.com/${tabId}`,
+    }));
+    browserMocks.tabs.discard.mockImplementation(async (tabId: number) => ({
+      id: tabId,
+      discarded: true,
+    }));
+
+    const { sleepActiveTabs } = await import('./active-tabs-service');
+    const result = await sleepActiveTabs([3, 4, 3]);
+
+    expect(browserMocks.tabs.get.mock.calls).toEqual([[3], [4]]);
+    expect(browserMocks.tabs.discard.mock.calls).toEqual([[3], [4]]);
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sleptTabIds: [3, 4],
+        skippedTabIds: [],
+        failures: [],
+      },
+    });
+  });
+
+  it('skips tabs protected by the manual sleep policy', async () => {
+    const protectedTabs = new Map<number, Partial<chrome.tabs.Tab>>([
+      [10, { active: true }],
+      [11, { discarded: true }],
+      [12, { pinned: true }],
+      [13, { audible: true }],
+      [14, { incognito: true }],
+      [15, { url: 'chrome://settings' }],
+    ]);
+    browserMocks.tabs.get.mockImplementation(async (tabId: number) => ({
+      id: tabId,
+      active: false,
+      audible: false,
+      discarded: false,
+      incognito: false,
+      pinned: false,
+      url: 'https://example.com',
+      ...protectedTabs.get(tabId),
+    }));
+
+    const { sleepActiveTabs } = await import('./active-tabs-service');
+    const result = await sleepActiveTabs([10, 11, 12, 13, 14, 15]);
+
+    expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sleptTabIds: [],
+        skippedTabIds: [10, 11, 12, 13, 14, 15],
+        failures: [],
+      },
+    });
+  });
+
+  it('reports per-tab failures without stopping the remaining batch', async () => {
+    browserMocks.tabs.get.mockImplementation(async (tabId: number) => {
+      if (tabId === 22) throw new Error('Tab disappeared');
+      return {
+        id: tabId,
+        active: false,
+        audible: false,
+        discarded: false,
+        incognito: false,
+        pinned: false,
+        url: `https://example.com/${tabId}`,
+      };
+    });
+    browserMocks.tabs.discard.mockImplementation(async (tabId: number) => {
+      if (tabId === 20) throw new Error('Cannot discard tab');
+      return { id: tabId, discarded: true };
+    });
+
+    const { sleepActiveTabs } = await import('./active-tabs-service');
+    const result = await sleepActiveTabs([20, 21, 22]);
+
+    expect(browserMocks.tabs.discard.mock.calls).toEqual([[20], [21]]);
+    expect(result).toEqual({
+      ok: true,
+      data: {
+        sleptTabIds: [21],
+        skippedTabIds: [],
+        failures: [
+          { tabId: 20, message: 'Cannot discard tab' },
+          { tabId: 22, message: 'Tab disappeared' },
+        ],
+      },
+    });
   });
 
   it('runs a default search with trimmed query text', async () => {

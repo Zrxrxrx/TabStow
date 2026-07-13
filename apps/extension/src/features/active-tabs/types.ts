@@ -100,6 +100,12 @@ export type ActiveGroupMoveRequest = {
 
 export type ActiveTabsMoveResult = { moved: boolean };
 
+export type ActiveTabsSleepResult = {
+  sleptTabIds: number[];
+  skippedTabIds: number[];
+  failures: Array<{ tabId: number; message: string }>;
+};
+
 export type ActiveTabsDragSource =
   | { kind: 'tab'; tabId: number; windowId: number; pinned: boolean; incognito: boolean }
   | { kind: 'group'; groupId: number; windowId: number; incognito: boolean };

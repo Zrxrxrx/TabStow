@@ -4,6 +4,7 @@ import type {
   ActiveGroupMoveRequest,
   ActiveTabMoveRequest,
   ActiveTabsMoveResult,
+  ActiveTabsSleepResult,
   ActiveTabsSnapshot,
 } from '@/features/active-tabs/types';
 import type { QuickLink, QuickLinkIcon } from '@/features/quick-links/quick-links';
@@ -49,6 +50,7 @@ export type ExtensionMessage =
   | { type: 'active-tabs:move-group'; request: ActiveGroupMoveRequest }
   | { type: 'active-tabs:focus'; tabId: number; windowId: number }
   | { type: 'active-tabs:close'; tabIds: number[] }
+  | { type: 'active-tabs:sleep'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
   | { type: 'quick-links:add'; link: QuickLink }
   | { type: 'quick-links:list' }
@@ -85,6 +87,7 @@ export type ExtensionMessageResponse =
   | AppResult<HistoryEntry[]>
   | AppResult<ActiveBrowserTab[]>
   | AppResult<ActiveTabsMoveResult>
+  | AppResult<ActiveTabsSleepResult>
   | AppResult<ActiveTabsSnapshot>
   | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>

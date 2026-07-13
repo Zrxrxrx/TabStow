@@ -18,6 +18,7 @@ import {
   listActiveTabs,
   listActiveTabsSnapshot,
   runDefaultSearch,
+  sleepActiveTabs,
 } from '@/features/active-tabs/active-tabs-service';
 import {
   moveActiveTab,
@@ -210,6 +211,8 @@ async function routeMessage(
         return focusActiveTab(message.tabId, message.windowId);
       case 'active-tabs:close':
         return closeActiveTabs(message.tabIds);
+      case 'active-tabs:sleep':
+        return sleepActiveTabs(message.tabIds);
       case 'active-tabs:search':
         return runDefaultSearch(message.query);
       case 'quick-links:add':

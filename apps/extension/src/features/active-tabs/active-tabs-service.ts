@@ -4,6 +4,7 @@ import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
 import type {
   ActiveBrowserTab,
   ActiveChromeWindowInfo,
+  ActiveTabsSleepResult,
   ActiveTabsSnapshot,
   ChromeTabGroupInfo,
 } from './types';
@@ -85,6 +86,37 @@ export async function closeActiveTabs(
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));
   }
+}
+
+export async function sleepActiveTabs(
+  tabIds: number[],
+): Promise<AppResult<ActiveTabsSleepResult>> {
+  const sleptTabIds: number[] = [];
+  const skippedTabIds: number[] = [];
+  const failures: ActiveTabsSleepResult['failures'] = [];
+
+  for (const tabId of new Set(tabIds)) {
+    try {
+      const tab = await browser.tabs.get(tabId);
+      if (
+        tab.active
+        || tab.discarded
+        || tab.pinned
+        || tab.audible
+        || tab.incognito
+        || isBlockedTabUrl(tab.url)
+      ) {
+        skippedTabIds.push(tabId);
+        continue;
+      }
+      await browser.tabs.discard(tabId);
+      sleptTabIds.push(tabId);
+    } catch (error) {
+      failures.push({ tabId, message: toErrorMessage(error) });
+    }
+  }
+
+  return ok({ sleptTabIds, skippedTabIds, failures });
 }
 
 export async function runDefaultSearch(

@@ -99,6 +99,7 @@ const activeTabsMocks = vi.hoisted(() => ({
   moveActiveTab: vi.fn(),
   moveActiveTabGroup: vi.fn(),
   runDefaultSearch: vi.fn(),
+  sleepActiveTabs: vi.fn(),
 }));
 
 const chromeTabGroupMocks = vi.hoisted(() => ({
@@ -320,6 +321,27 @@ describe('background message routing', () => {
     await dispatchRuntimeMessage({ type: 'active-tabs:close', tabIds: [11, 12] });
 
     expect(activeTabsMocks.closeActiveTabs).toHaveBeenCalledWith([11, 12]);
+  });
+
+  it('routes active tab sleep messages without scheduling synchronized work', async () => {
+    activeTabsMocks.sleepActiveTabs.mockResolvedValue({
+      ok: true,
+      data: { sleptTabIds: [11], skippedTabIds: [12], failures: [] },
+    });
+
+    await import('../entrypoints/background');
+
+    const { response } = await dispatchRuntimeMessage({
+      type: 'active-tabs:sleep',
+      tabIds: [11, 12],
+    });
+
+    expect(activeTabsMocks.sleepActiveTabs).toHaveBeenCalledWith([11, 12]);
+    expect(response).toEqual({
+      ok: true,
+      data: { sleptTabIds: [11], skippedTabIds: [12], failures: [] },
+    });
+    expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });
 
   it('routes semantic tab move messages', async () => {
