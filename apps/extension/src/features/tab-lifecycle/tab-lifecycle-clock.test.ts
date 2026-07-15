@@ -9,6 +9,8 @@ describe('lifecycle operation clock', () => {
       .mockReturnValueOnce(NOW + 2)
       .mockReturnValueOnce(NOW + 1)
       .mockReturnValueOnce(Number.NaN)
+      .mockReturnValueOnce(Number.POSITIVE_INFINITY)
+      .mockReturnValueOnce(Number.NEGATIVE_INFINITY)
       .mockReturnValueOnce(NOW + 3);
 
     const operationClock = createLifecycleOperationClock({
@@ -21,8 +23,27 @@ describe('lifecycle operation clock', () => {
     expect(operationClock.read()).toBe(NOW + 2);
     expect(operationClock.read()).toBe(NOW + 2);
     expect(operationClock.read()).toBe(NOW + 2);
+    expect(operationClock.read()).toBe(NOW + 2);
+    expect(operationClock.read()).toBe(NOW + 2);
     expect(operationClock.read()).toBe(NOW + 3);
   });
+
+  it.each([
+    ['NaN', Number.NaN, Number.NaN],
+    ['positive infinity', Number.POSITIVE_INFINITY, Number.POSITIVE_INFINITY],
+    ['negative infinity', Number.NEGATIVE_INFINITY, NOW],
+  ])(
+    'preserves the existing recovery behavior from an initial %s',
+    (_label, initialNow, expected) => {
+      const operationClock = createLifecycleOperationClock({
+        now: initialNow,
+        clock: () => NOW,
+      });
+
+      expect(operationClock.initialNow).toBe(initialNow);
+      expect(operationClock.read()).toBe(expected);
+    },
+  );
 
   it('samples an injected source once when no explicit start is supplied', () => {
     const source = vi.fn()
