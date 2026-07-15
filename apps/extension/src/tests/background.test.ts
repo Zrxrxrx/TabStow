@@ -70,6 +70,12 @@ const automaticSleepMocks = vi.hoisted(() => ({
   previewAutomaticSleepRule: vi.fn(),
 }));
 
+const stowSuggestionMocks = vi.hoisted(() => ({
+  listStowSuggestions: vi.fn(),
+  snoozeStowSuggestions: vi.fn(),
+  suppressStowSuggestions: vi.fn(),
+}));
+
 const connectionServiceMocks = vi.hoisted(() => ({
   cancelGitHubOAuth: vi.fn(),
   chooseAnotherGist: vi.fn(),
@@ -149,6 +155,7 @@ vi.mock('@/features/tab-lifecycle/tab-lifecycle-coordinator', () => ({
 }));
 vi.mock('@/features/tab-lifecycle/tab-lifecycle-events', () => tabLifecycleEventMocks);
 vi.mock('@/features/tab-lifecycle/automatic-sleep', () => automaticSleepMocks);
+vi.mock('@/features/tab-lifecycle/stow-suggestions', () => stowSuggestionMocks);
 vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
 vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
 vi.mock('@/features/sync/sync-coordinator', () => ({
@@ -455,6 +462,50 @@ describe('background message routing', () => {
     expect(automaticSleepMocks.previewAutomaticSleepRule).toHaveBeenCalledWith(7);
     expect(response).toBe(result);
     expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
+  });
+
+  it('lists and updates device-local stow suggestions without scheduling sync', async () => {
+    const listResult = { ok: true, data: { afterDays: 14, candidates: [] } };
+    const mutationResult = { ok: true, data: { updatedObservationCount: 2 } };
+    stowSuggestionMocks.listStowSuggestions.mockResolvedValue(listResult);
+    stowSuggestionMocks.snoozeStowSuggestions.mockResolvedValue(mutationResult);
+    stowSuggestionMocks.suppressStowSuggestions.mockResolvedValue(mutationResult);
+
+    await import('../entrypoints/background');
+    await expect(
+      dispatchRuntimeMessage({ type: 'tab-lifecycle:list-suggestions' }),
+    ).resolves.toEqual(expect.objectContaining({ response: listResult }));
+    await expect(dispatchRuntimeMessage({
+      type: 'tab-lifecycle:snooze-suggestions',
+      observationIds: ['one', 'two'],
+    })).resolves.toEqual(expect.objectContaining({ response: mutationResult }));
+    await expect(dispatchRuntimeMessage({
+      type: 'tab-lifecycle:suppress-suggestions',
+      observationIds: ['one'],
+    })).resolves.toEqual(expect.objectContaining({ response: mutationResult }));
+
+    expect(stowSuggestionMocks.listStowSuggestions).toHaveBeenCalledTimes(1);
+    expect(stowSuggestionMocks.snoozeStowSuggestions).toHaveBeenCalledWith(['one', 'two']);
+    expect(stowSuggestionMocks.suppressStowSuggestions).toHaveBeenCalledWith(['one']);
+    expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
+  });
+
+  it('rejects malformed stow suggestion identity lists', async () => {
+    await import('../entrypoints/background');
+
+    const { response } = await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:snooze-suggestions',
+      observationIds: ['valid', ''],
+    });
+
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'unknown-error',
+        message: 'Invalid tab-lifecycle:snooze-suggestions message.',
+      },
+    });
+    expect(stowSuggestionMocks.snoozeStowSuggestions).not.toHaveBeenCalled();
   });
 
   it('routes semantic tab move messages', async () => {
