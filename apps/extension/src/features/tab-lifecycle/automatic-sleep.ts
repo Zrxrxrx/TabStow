@@ -1,11 +1,14 @@
 import { browser } from '@/lib/browser';
-import { isOpenableTabUrl } from '@/features/tabs/tab-filter';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import {
   AUTOMATIC_SLEEP_DAY_PRESETS,
   type AutomaticSleepDays,
   type TabLifecyclePolicy,
 } from './types';
+import {
+  isInactiveUnprotectedHttpTab,
+  validLastAccessed,
+} from './tab-lifecycle-eligibility';
 
 const DAY_MS = 86_400_000;
 
@@ -39,22 +42,12 @@ function isEligibleTab(
   cutoff: number,
   now: number,
 ): tab is EligibleAutomaticSleepTab {
+  const lastAccessed = validLastAccessed(tab.lastAccessed, now);
   return (
-    typeof tab.id === 'number'
-    && Number.isFinite(tab.id)
-    && typeof tab.url === 'string'
-    && isOpenableTabUrl(tab.url)
-    && !tab.active
+    isInactiveUnprotectedHttpTab(tab)
     && !tab.discarded
-    && !tab.pinned
-    && !tab.audible
-    && !tab.incognito
-    && tab.autoDiscardable !== false
-    && typeof tab.lastAccessed === 'number'
-    && Number.isFinite(tab.lastAccessed)
-    && tab.lastAccessed >= 0
-    && tab.lastAccessed <= now
-    && tab.lastAccessed <= cutoff
+    && lastAccessed !== undefined
+    && lastAccessed <= cutoff
   );
 }
 

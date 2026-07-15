@@ -1,4 +1,10 @@
 import { storage } from '#imports';
+import {
+  isIdentifiableHttpTab,
+  isInactiveUnprotectedHttpTab,
+  validLastAccessed,
+  type IdentifiableHttpTab,
+} from './tab-lifecycle-eligibility';
 
 const OBSERVATIONS_STORAGE_KEY = 'local:tabstow-sleep-observations-v1';
 const BROWSER_SESSION_STORAGE_KEY = 'session:tabstow-browser-session-id-v1';
@@ -48,12 +54,6 @@ async function fingerprintUrl(url: string): Promise<string> {
     new Uint8Array(digest),
     (byte) => byte.toString(16).padStart(2, '0'),
   ).join('');
-}
-
-function validLastAccessed(value: unknown, now: number): number | undefined {
-  return typeof value === 'number' && Number.isFinite(value) && value >= 0 && value <= now
-    ? value
-    : undefined;
 }
 
 function canContinueObservedSleepPeriod(
@@ -127,38 +127,10 @@ function normalizeObservation(value: unknown, now: number): SleepObservation | n
   };
 }
 
-function identifiableHttpTab(tab: chrome.tabs.Tab): tab is chrome.tabs.Tab & {
-  id: number;
-  url: string;
-} {
-  if (
-    !Number.isInteger(tab.id)
-    || (tab.id as number) < 0
-    || typeof tab.url !== 'string'
-  ) {
-    return false;
-  }
-  let protocol: string;
-  try {
-    protocol = new URL(tab.url).protocol;
-  } catch {
-    return false;
-  }
-  return protocol === 'http:' || protocol === 'https:';
-}
-
-function eligibleSleepingTab(tab: chrome.tabs.Tab): tab is chrome.tabs.Tab & {
-  id: number;
-  url: string;
-} {
+function eligibleSleepingTab(tab: chrome.tabs.Tab): tab is IdentifiableHttpTab {
   return (
-    identifiableHttpTab(tab)
+    isInactiveUnprotectedHttpTab(tab)
     && tab.discarded === true
-    && tab.active !== true
-    && tab.pinned !== true
-    && tab.audible !== true
-    && tab.incognito !== true
-    && tab.autoDiscardable !== false
   );
 }
 
@@ -301,7 +273,7 @@ export async function reconcileSleepObservations(
       readStoredObservations(now),
       getBrowserSessionId(),
     ]);
-    const identifiableTabs = tabs.filter(identifiableHttpTab);
+    const identifiableTabs = tabs.filter(isIdentifiableHttpTab);
     const identifiableFingerprints = await Promise.all(
       identifiableTabs.map((tab) => fingerprintUrl(tab.url)),
     );

@@ -1,7 +1,6 @@
 import type { SavedTab, TabSession } from '@tabstow/core';
 import { createSessionsBatch } from '@/db/db';
 import { getSettings } from '@/features/settings/settings-storage';
-import { isOpenableTabUrl } from '@/features/tabs/tab-filter';
 import { browser } from '@/lib/browser';
 import {
   err,
@@ -21,6 +20,7 @@ import {
   isCurrentTabLifecycleGeneration,
   tabLifecycleSettingsChanged,
 } from './tab-lifecycle-generation';
+import { isInactiveUnprotectedHttpTab } from './tab-lifecycle-eligibility';
 import type {
   StowSuggestionCandidate,
   SuggestedStowResult,
@@ -60,17 +60,12 @@ function isEligibleSleepingTab(
   candidate: StowSuggestionCandidate,
 ): tab is chrome.tabs.Tab & { id: number; index: number; url: string; windowId: number } {
   return (
-    tab.id === candidate.tabId
+    isInactiveUnprotectedHttpTab(tab)
+    && tab.id === candidate.tabId
     && typeof tab.index === 'number'
     && typeof tab.windowId === 'number'
     && tab.url === candidate.url
-    && isOpenableTabUrl(tab.url)
     && tab.discarded === true
-    && tab.active !== true
-    && tab.pinned !== true
-    && tab.audible !== true
-    && tab.incognito !== true
-    && tab.autoDiscardable !== false
   );
 }
 
