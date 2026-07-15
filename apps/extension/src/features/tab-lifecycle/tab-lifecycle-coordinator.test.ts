@@ -190,13 +190,14 @@ describe('tab lifecycle coordinator', () => {
         finishGet = resolve;
       }),
     );
-    const { handleTabLifecycleAlarm, invalidateAutomaticSleepScans } = await import(
-      './tab-lifecycle-coordinator'
+    const { handleTabLifecycleAlarm } = await import('./tab-lifecycle-coordinator');
+    const { invalidateTabLifecycleGeneration } = await import(
+      './tab-lifecycle-generation'
     );
 
     const scan = handleTabLifecycleAlarm();
     await vi.waitFor(() => expect(browserMocks.tabs.get).toHaveBeenCalledTimes(1));
-    invalidateAutomaticSleepScans();
+    invalidateTabLifecycleGeneration();
     finishGet(eligibleTab());
 
     await expect(scan).resolves.toEqual({

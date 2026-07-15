@@ -20,13 +20,8 @@ export const TAB_LIFECYCLE_ALARM_NAME = 'tabstow-tab-lifecycle-v1';
 const FIRST_SCAN_DELAY_MINUTES = 1;
 const SCAN_PERIOD_MINUTES = 30;
 
-let policyGeneration = 0;
 let scanInFlight: Promise<AutomaticSleepScanResult | null> | null = null;
 let bootstrapInFlight: Promise<void> | null = null;
-
-export function invalidateAutomaticSleepScans(): void {
-  policyGeneration += 1;
-}
 
 export async function reconcileTabLifecycleAlarm(): Promise<void> {
   const generation = currentTabLifecycleGeneration();
@@ -79,7 +74,7 @@ export function bootstrapTabLifecycleCoordinator(): Promise<void> {
 
 export function handleTabLifecycleAlarm(): Promise<AutomaticSleepScanResult | null> {
   if (scanInFlight) return scanInFlight;
-  const generation = policyGeneration;
+  const generation = currentTabLifecycleGeneration();
   scanInFlight = (async () => {
     const state = await getTabLifecycleState();
     if (
@@ -91,7 +86,7 @@ export function handleTabLifecycleAlarm(): Promise<AutomaticSleepScanResult | nu
     }
 
     const scanResult = await runAutomaticSleepScan(state.data.policy, {
-      shouldContinue: () => generation === policyGeneration,
+      shouldContinue: () => isCurrentTabLifecycleGeneration(generation),
     });
     if (scanResult.sleptTabIds.length > 0) {
       try {
