@@ -54,6 +54,13 @@ const tabLifecycleMocks = vi.hoisted(() => ({
   updateTabLifecyclePolicy: vi.fn(),
 }));
 
+const tabLifecycleCoordinatorMocks = vi.hoisted(() => ({
+  bootstrapTabLifecycleCoordinator: vi.fn(),
+  handleTabLifecycleAlarm: vi.fn(),
+  invalidateAutomaticSleepScans: vi.fn(),
+  reconcileTabLifecycleAlarm: vi.fn(),
+}));
+
 const connectionServiceMocks = vi.hoisted(() => ({
   cancelGitHubOAuth: vi.fn(),
   chooseAnotherGist: vi.fn(),
@@ -127,6 +134,10 @@ vi.mock('@/features/context-menu/context-menu', () => contextMenuMocks);
 vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
 vi.mock('@/features/tab-lifecycle/tab-lifecycle-policy', () => tabLifecycleMocks);
+vi.mock('@/features/tab-lifecycle/tab-lifecycle-coordinator', () => ({
+  ...tabLifecycleCoordinatorMocks,
+  TAB_LIFECYCLE_ALARM_NAME: 'tabstow-tab-lifecycle-v1',
+}));
 vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
 vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
 vi.mock('@/features/sync/sync-coordinator', () => ({
@@ -229,6 +240,18 @@ describe('background message routing', () => {
 
     expect(coordinatorMocks.handleOAuthAlarm).toHaveBeenCalledTimes(1);
     expect(coordinatorMocks.handleSyncAlarm).toHaveBeenCalledTimes(1);
+  });
+
+  it('bootstraps and routes the named tab lifecycle alarm', async () => {
+    await import('../entrypoints/background');
+
+    const listener = browserMocks.alarms.onAlarm.addListener.mock.calls[0]?.[0];
+    listener?.({ name: 'tabstow-tab-lifecycle-v1' });
+    await Promise.resolve();
+
+    expect(tabLifecycleCoordinatorMocks.bootstrapTabLifecycleCoordinator)
+      .toHaveBeenCalledTimes(1);
+    expect(tabLifecycleCoordinatorMocks.handleTabLifecycleAlarm).toHaveBeenCalledTimes(1);
   });
 
   it('starts OAuth Device Flow and schedules background polling', async () => {
@@ -397,6 +420,10 @@ describe('background message routing', () => {
 
     expect(tabLifecycleMocks.updateTabLifecyclePolicy).toHaveBeenCalledWith(policy);
     expect(response).toBe(result);
+    expect(tabLifecycleCoordinatorMocks.invalidateAutomaticSleepScans)
+      .toHaveBeenCalledTimes(1);
+    expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleAlarm)
+      .toHaveBeenCalledTimes(1);
     expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });
 

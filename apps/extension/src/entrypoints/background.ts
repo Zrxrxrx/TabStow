@@ -32,6 +32,13 @@ import {
   updateTabLifecyclePolicy,
 } from '@/features/tab-lifecycle/tab-lifecycle-policy';
 import {
+  bootstrapTabLifecycleCoordinator,
+  handleTabLifecycleAlarm,
+  invalidateAutomaticSleepScans,
+  reconcileTabLifecycleAlarm,
+  TAB_LIFECYCLE_ALARM_NAME,
+} from '@/features/tab-lifecycle/tab-lifecycle-coordinator';
+import {
   cancelGitHubOAuth,
   chooseAnotherGist,
   rescanGists,
@@ -221,8 +228,14 @@ async function routeMessage(
         return runDefaultSearch(message.query);
       case 'tab-lifecycle:get-state':
         return getTabLifecycleState();
-      case 'tab-lifecycle:update-policy':
-        return updateTabLifecyclePolicy(message.policy);
+      case 'tab-lifecycle:update-policy': {
+        const result = await updateTabLifecyclePolicy(message.policy);
+        if (result.ok) {
+          invalidateAutomaticSleepScans();
+          await runBestEffort(reconcileTabLifecycleAlarm);
+        }
+        return result;
+      }
       case 'quick-links:add':
         return ok(await updateQuickLinks((links) => [...links, message.link]));
       case 'quick-links:list':
@@ -337,21 +350,26 @@ export default defineBackground(() => {
   browser.runtime.onInstalled.addListener(() => {
     void registerContextMenu();
     void bootstrapSyncCoordinator();
+    void bootstrapTabLifecycleCoordinator();
   });
 
   browser.runtime.onStartup.addListener(() => {
     void registerContextMenu();
     void bootstrapSyncCoordinator();
+    void bootstrapTabLifecycleCoordinator();
   });
 
   registerContextMenuClickHandler();
   void bootstrapSyncCoordinator();
+  void bootstrapTabLifecycleCoordinator();
 
   browser.alarms.onAlarm.addListener(async (alarm) => {
     if (alarm.name === SYNC_ALARM_NAME) {
       await handleSyncAlarm();
     } else if (alarm.name === OAUTH_ALARM_NAME) {
       await handleOAuthAlarm();
+    } else if (alarm.name === TAB_LIFECYCLE_ALARM_NAME) {
+      await handleTabLifecycleAlarm();
     }
   });
 
