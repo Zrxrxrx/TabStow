@@ -137,13 +137,24 @@ export async function runAutomaticSleepScan(
         result.skippedTabIds.push(candidate.id);
         continue;
       }
+      const latest = await browser.tabs.get(candidate.id);
+      if (
+        !isEligibleTab(latest, cutoff, now)
+        || latest.id !== current.id
+        || latest.url !== current.url
+        || latest.windowId !== current.windowId
+        || latest.lastAccessed !== current.lastAccessed
+      ) {
+        result.skippedTabIds.push(candidate.id);
+        continue;
+      }
 
       if (!shouldContinue()) {
         result.skippedTabIds.push(...candidates.slice(index).map((tab) => tab.id));
         break;
       }
 
-      const discarded = await browser.tabs.discard(candidate.id);
+      const discarded = await browser.tabs.discard(latest.id);
       if (discarded?.discarded) {
         result.sleptTabIds.push(candidate.id);
       } else {

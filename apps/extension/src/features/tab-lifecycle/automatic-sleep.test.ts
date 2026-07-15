@@ -150,7 +150,7 @@ describe('automatic sleep', () => {
       failures: [],
     });
     expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
-    expect(browserMocks.tabs.get.mock.calls).toEqual([[21], [22]]);
+    expect(browserMocks.tabs.get.mock.calls).toEqual([[21], [21], [22], [22]]);
     expect(browserMocks.tabs.discard.mock.calls).toEqual([[21], [22]]);
   });
 
@@ -173,6 +173,27 @@ describe('automatic sleep', () => {
       failures: [],
     });
     expect(browserMocks.windows.get).toHaveBeenCalledWith(2);
+    expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
+  });
+
+  it('skips a candidate that changes while its window is being validated', async () => {
+    const candidate = makeTab({ id: 25 });
+    let current = candidate;
+    browserMocks.tabs.query.mockResolvedValue([candidate]);
+    browserMocks.tabs.get.mockImplementation(async () => ({ ...current }));
+    browserMocks.windows.get.mockImplementation(async () => {
+      current = { ...current, pinned: true, lastAccessed: NOW };
+      return { id: 1, incognito: false, type: 'normal' };
+    });
+    const { runAutomaticSleepScan } = await import('./automatic-sleep');
+
+    await expect(
+      runAutomaticSleepScan(ENABLED_POLICY, { now: NOW }),
+    ).resolves.toEqual({
+      sleptTabIds: [],
+      skippedTabIds: [25],
+      failures: [],
+    });
     expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
   });
 
@@ -201,7 +222,7 @@ describe('automatic sleep', () => {
       failures: [],
     });
     expect(shouldContinue).toHaveBeenCalledTimes(2);
-    expect(browserMocks.tabs.get.mock.calls).toEqual([[31]]);
+    expect(browserMocks.tabs.get.mock.calls).toEqual([[31], [31]]);
     expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
   });
 });
