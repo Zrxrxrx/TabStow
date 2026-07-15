@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveBrowserTab, ActiveTabsSnapshot } from '@/features/active-tabs/types';
+import type { StowSuggestionList } from '@/features/tab-lifecycle/types';
 import { reorderQuickLinks, updateQuickLink, type QuickLink } from '@/features/quick-links/quick-links';
 import type { AppResult } from '@/lib/errors';
 import type { ExtensionMessage, StowResult } from '@/lib/messages';
@@ -388,6 +389,99 @@ describe('App', () => {
     expect(container.textContent).not.toContain('Audible tab');
     expect(container.textContent).toContain('Sleeping tab');
     expect(sentMessageTypes()).not.toContain('active-tabs:discard');
+  });
+
+  it('places global lifecycle suggestions above the window filter and refreshes them on focus and policy close', async () => {
+    const candidate = {
+      observationId: 'observed-sleeping-tab',
+      tabId: 32,
+      windowId: 8,
+      index: 0,
+      title: 'Sleeping tab',
+      url: 'https://sleeping.example/article',
+      observedSleepingSince: 1,
+      observedSleepingDays: 16,
+    };
+    mockMessages({
+      activeTabs: [{ ...UNIQUE_TAB, id: 32, windowId: 8, discarded: true }],
+      focusedWindowId: 8,
+      suggestions: { afterDays: 14, candidates: [candidate] },
+    });
+
+    await renderApp();
+
+    const workspace = container.querySelector('.active-workspace')!;
+    const banner = workspace.querySelector('.lifecycle-suggestion-banner')!;
+    const tools = workspace.querySelector('.active-tools')!;
+    const filter = workspace.querySelector('.window-filter')!;
+    expect(tools.compareDocumentPosition(banner) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(banner.compareDocumentPosition(filter) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+
+    const initialLoads = sentMessageTypes().filter(
+      (type) => type === 'tab-lifecycle:list-suggestions',
+    ).length;
+    await act(async () => window.dispatchEvent(new Event('focus')));
+    expect(sentMessageTypes().filter(
+      (type) => type === 'tab-lifecycle:list-suggestions',
+    ).length).toBeGreaterThan(initialLoads);
+
+    await click(screen().getByRole('button', { name: 'Tab lifecycle' }));
+    const policyDialog = screen().getByRole('dialog', { name: 'Tab lifecycle' });
+    const cancel = Array.from(policyDialog.querySelectorAll<HTMLButtonElement>('button')).find(
+      (button) => button.textContent === 'Cancel',
+    )!;
+    const beforePolicyClose = sentMessageTypes().filter(
+      (type) => type === 'tab-lifecycle:list-suggestions',
+    ).length;
+    await click(cancel);
+    expect(sentMessageTypes().filter(
+      (type) => type === 'tab-lifecycle:list-suggestions',
+    ).length).toBeGreaterThan(beforePolicyClose);
+  });
+
+  it('reloads Active tabs, Saved for later, and suggestions after a confirmed suggested stow', async () => {
+    mockMessages({
+      activeTabs: [{ ...UNIQUE_TAB, id: 32, windowId: 8, discarded: true }],
+      focusedWindowId: 8,
+      suggestions: {
+        afterDays: 14,
+        candidates: [{
+          observationId: 'observed-sleeping-tab',
+          tabId: 32,
+          windowId: 8,
+          index: 0,
+          title: 'Sleeping tab',
+          url: 'https://sleeping.example/article',
+          observedSleepingSince: 1,
+          observedSleepingDays: 16,
+        }],
+      },
+    });
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Review' }));
+    const before = {
+      active: sentMessageTypes().filter((type) => type === 'active-tabs:snapshot').length,
+      saved: sentMessageTypes().filter((type) => type === 'sessions:list').length,
+      suggestions: sentMessageTypes().filter(
+        (type) => type === 'tab-lifecycle:list-suggestions',
+      ).length,
+    };
+
+    await click(screen().getByRole('button', {
+      name: 'Save 1 for later and close original tabs',
+    }));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'tab-lifecycle:stow-suggestions',
+      observationIds: ['observed-sleeping-tab'],
+    });
+    expect(sentMessageTypes().filter((type) => type === 'sessions:list').length)
+      .toBeGreaterThan(before.saved);
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot').length)
+      .toBeGreaterThan(before.active);
+    expect(sentMessageTypes().filter(
+      (type) => type === 'tab-lifecycle:list-suggestions',
+    ).length).toBeGreaterThan(before.suggestions);
   });
 
   it('filters active and saved tabs locally while keeping web search and tab actions available', async () => {
@@ -1115,8 +1209,10 @@ describe('App', () => {
           locale="en"
           onStatus={onStatus}
           onStowTab={async () => {}}
+          onSuggestedStow={async () => {}}
           query=""
           refreshKey={0}
+          suggestionRefreshKey={0}
         />,
       );
     });
@@ -2703,12 +2799,14 @@ function mockMessages({
   focusedWindowId,
   incognitoWindowIds = [],
   sessions = SESSIONS,
+  suggestions = { afterDays: 14, candidates: [] },
 }: {
   activeTabs: ActiveBrowserTab[];
   chromeGroups?: ActiveTabsSnapshot['chromeGroups'];
   focusedWindowId?: number;
   incognitoWindowIds?: number[];
   sessions?: TabSession[];
+  suggestions?: StowSuggestionList;
 }) {
   let currentActiveTabs = activeTabs;
 
@@ -2734,6 +2832,38 @@ function mockMessages({
 
     if (message.type === 'sessions:list') {
       return { ok: true, data: sessions };
+    }
+
+    if (message.type === 'tab-lifecycle:list-suggestions') {
+      return { ok: true, data: suggestions };
+    }
+
+    if (message.type === 'tab-lifecycle:get-state') {
+      return {
+        ok: true,
+        data: {
+          policy: {
+            automaticSleepEnabled: false,
+            automaticSleepAfterDays: 7,
+            stowSuggestionsEnabled: true,
+            stowSuggestionAfterDays: 14,
+          },
+          automaticSleepCapability: { status: 'supported' },
+        },
+      };
+    }
+
+    if (message.type === 'tab-lifecycle:stow-suggestions') {
+      return {
+        ok: true,
+        data: {
+          savedTabCount: message.observationIds.length,
+          createdSessionCount: 1,
+          closedTabCount: message.observationIds.length,
+          skipped: [],
+          closeFailures: [],
+        },
+      };
     }
 
     if (message.type === 'sessions:open-tab') {
