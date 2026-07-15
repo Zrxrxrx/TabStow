@@ -51,3 +51,23 @@
 - Rename or remove the bound file and confirm Tabstow pauses instead of silently switching Gists.
 - Disconnect and confirm local Saved for Later, Quick Links, and History remain, the remote Gist is unchanged, and Settings links to GitHub for full OAuth revocation.
 - Upgrade a valid version-one file and confirm only version two is written afterward.
+
+## Tab lifecycle
+
+- Open **Tab lifecycle** from Active Tabs. Confirm Automatic sleep defaults off, Saved for later suggestions default on, thresholds remain visible while disabled, and Cancel discards every draft change.
+- Save each automatic-sleep preset and each suggestion preset. Reload Tabstow and confirm the device-local policy persists without appearing in the Gist sync document.
+- On Chrome 121 or later, enable Automatic sleep and confirm the dialog shows a live matching-tab preview before Save. On an older Chromium build, confirm only Automatic sleep is disabled and the upgrade message appears; manual sleep and suggestions remain available.
+- Simulate a transient Tabs API failure and confirm the dialog shows Retry rather than claiming the browser is too old. Retry must preserve unsaved suggestion settings.
+- Leave eligible HTTP(S) tabs inactive beyond the selected threshold. Confirm only normal-window, non-selected, non-pinned, non-audible, non-incognito, auto-discardable tabs sleep; recent, protected, internal, and already-sleeping tabs remain unchanged.
+- Change, activate, pin, make audible, close, or navigate a candidate during a scan. Confirm the scanner revalidates it and continues processing other eligible tabs after an individual failure.
+- Sleep tabs manually, through Automatic sleep, and through Chrome Memory Saver. Confirm every origin can begin the same observed-sleep flow, while waking or navigating starts a new observed period.
+- After candidates reach the observed-sleep threshold, confirm the global banner appears below the Active Tabs tools regardless of search text or selected window filter.
+- Choose **Remind me about these in 7 days** and confirm only the currently listed candidates disappear. A newly qualifying candidate may still show the banner.
+- Open Review and confirm the snapshot is grouped by source window in Chrome tab order, every row starts selected, and Select all/Clear all update both the tab and resulting-session counts.
+- Use **Open tab** on one row and confirm Chrome focuses and wakes it, then removes it from the review. Use **Keep sleeping** on another and confirm it stays open but does not reappear until it wakes or navigates.
+- Review live duplicate URLs, fragment-only variants, and URLs already present in Saved for later. Confirm only the deterministic unsaved representative appears and excluded tabs are never closed.
+- Confirm a multi-window selection creates one non-empty Saved session per contributing window, persists every represented tab before closing any original, and closes originals individually.
+- Change, wake, move, or protect a selected tab while confirmation is running. Confirm its Saved copy remains after persistence and the changed original stays open. Force one close failure and confirm other represented tabs still close with accurate partial-result counts.
+- Trigger confirmation twice quickly and retry the same completed request. Confirm no duplicate Saved sessions are created and no unrelated tab closes.
+- After a successful or partial suggested Stow, confirm Saved for later, Active Tabs, and the banner refresh together. Only a result that saved at least one tab should schedule Gist synchronization.
+- Disable Saved for later suggestions, reload the service worker, and confirm observation, snooze, and suppression state is cleared. Re-enable it and confirm currently sleeping tabs begin a new conservative observed period rather than inheriting an unknown duration.
