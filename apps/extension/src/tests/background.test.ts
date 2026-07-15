@@ -76,6 +76,10 @@ const stowSuggestionMocks = vi.hoisted(() => ({
   suppressStowSuggestions: vi.fn(),
 }));
 
+const suggestedStowMocks = vi.hoisted(() => ({
+  stowSuggestedTabs: vi.fn(),
+}));
+
 const connectionServiceMocks = vi.hoisted(() => ({
   cancelGitHubOAuth: vi.fn(),
   chooseAnotherGist: vi.fn(),
@@ -156,6 +160,7 @@ vi.mock('@/features/tab-lifecycle/tab-lifecycle-coordinator', () => ({
 vi.mock('@/features/tab-lifecycle/tab-lifecycle-events', () => tabLifecycleEventMocks);
 vi.mock('@/features/tab-lifecycle/automatic-sleep', () => automaticSleepMocks);
 vi.mock('@/features/tab-lifecycle/stow-suggestions', () => stowSuggestionMocks);
+vi.mock('@/features/tab-lifecycle/suggested-stow', () => suggestedStowMocks);
 vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
 vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
 vi.mock('@/features/sync/sync-coordinator', () => ({
@@ -506,6 +511,63 @@ describe('background message routing', () => {
       },
     });
     expect(stowSuggestionMocks.snoozeStowSuggestions).not.toHaveBeenCalled();
+  });
+
+  it('schedules sync only when a suggested stow saved at least one tab', async () => {
+    suggestedStowMocks.stowSuggestedTabs
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          savedTabCount: 2,
+          createdSessionCount: 1,
+          closedTabCount: 1,
+          skipped: [],
+          closeFailures: [],
+        },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        data: {
+          savedTabCount: 0,
+          createdSessionCount: 0,
+          closedTabCount: 0,
+          skipped: [],
+          closeFailures: [],
+        },
+      });
+    await import('../entrypoints/background');
+
+    const first = await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:stow-suggestions',
+      observationIds: ['one', 'two'],
+    });
+    expect(first.response).toEqual(expect.objectContaining({ ok: true }));
+    expect(suggestedStowMocks.stowSuggestedTabs).toHaveBeenCalledWith(['one', 'two']);
+    expect(coordinatorMocks.noteSynchronizedMutation).toHaveBeenCalledTimes(1);
+
+    await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:stow-suggestions',
+      observationIds: ['three'],
+    });
+    expect(coordinatorMocks.noteSynchronizedMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects duplicate suggested stow identities before persistence', async () => {
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:stow-suggestions',
+      observationIds: ['same', 'same'],
+    });
+
+    expect(response).toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-stow-suggestions',
+        message: 'Suggested tab identities are invalid.',
+      },
+    });
+    expect(suggestedStowMocks.stowSuggestedTabs).not.toHaveBeenCalled();
+    expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });
 
   it('routes semantic tab move messages', async () => {
