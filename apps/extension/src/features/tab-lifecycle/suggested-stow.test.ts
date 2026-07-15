@@ -329,6 +329,42 @@ describe('suggested stow', () => {
     expect(browserMocks.tabs.remove.mock.calls).toEqual([[1]]);
   });
 
+  it('uses the advanced reconciliation time for every cleanup in a batch', async () => {
+    const records = await observe([
+      sleepingTab({ id: 1, index: 0, url: 'https://example.com/first' }),
+      sleepingTab({ id: 2, index: 1, url: 'https://example.com/second' }),
+      sleepingTab({ id: 3, index: 2, url: 'https://example.com/unselected' }),
+    ]);
+    let currentNow = NOW;
+    dbMocks.createSessionsBatch.mockImplementationOnce(async (sessions: TabSession[]) => {
+      currentNow = NOW + 1;
+      return structuredClone(sessions);
+    });
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs(
+        records.slice(0, 2).map(({ observationId }) => observationId),
+        { now: NOW, clock: () => currentNow },
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        savedTabCount: 2,
+        createdSessionCount: 1,
+        closedTabCount: 2,
+        skipped: [],
+        closeFailures: [],
+      },
+    });
+    expect(browserMocks.tabs.remove.mock.calls).toEqual([[1], [2]]);
+
+    const observations = await import('./sleep-observations');
+    await expect(observations.listSleepObservations(currentNow)).resolves.toEqual([
+      expect.objectContaining({ observationId: records[2]!.observationId }),
+    ]);
+  });
+
   it('aborts before persistence when lifecycle policy changes during confirmation', async () => {
     const [record] = await observe([sleepingTab()]);
     settingsMocks.getSettings.mockImplementationOnce(async () => {

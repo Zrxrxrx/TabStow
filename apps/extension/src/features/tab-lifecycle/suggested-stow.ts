@@ -296,14 +296,16 @@ async function stowSuggestedTabsUnlocked(
     closeFailures: [],
   };
 
+  let postSaveNow = revalidationNow;
   let postSaveObservationIds = new Set<string>();
   if (isCurrentTabLifecycleGeneration(generation)) {
     try {
       const tabs = await browser.tabs.query({ windowType: 'normal' });
       if (isCurrentTabLifecycleGeneration(generation)) {
+        postSaveNow = currentTimeAtOrAfter(clock, revalidationNow);
         const observations = await reconcileSleepObservations(
           tabs,
-          currentTimeAtOrAfter(clock, revalidationNow),
+          postSaveNow,
         );
         if (isCurrentTabLifecycleGeneration(generation)) {
           postSaveObservationIds = new Set(
@@ -316,7 +318,9 @@ async function stowSuggestedTabsUnlocked(
     }
   }
 
+  let operationNow = postSaveNow;
   for (const item of represented) {
+    operationNow = currentTimeAtOrAfter(clock, operationNow);
     let tab: PreparedTab['tab'] | null = null;
     if (
       postSaveObservationIds.has(item.candidate.observationId)
@@ -328,7 +332,7 @@ async function stowSuggestedTabsUnlocked(
         && await matchesSleepObservation(
           item.candidate.observationId,
           observedTab,
-          currentTimeAtOrAfter(clock, revalidationNow),
+          operationNow,
         );
       if (observationMatches && isCurrentTabLifecycleGeneration(generation)) {
         const currentTab = await readEligibleTab(item.candidate);
@@ -348,21 +352,24 @@ async function stowSuggestedTabsUnlocked(
         observationId: item.candidate.observationId,
         reason: 'state-changed',
       });
-      await suppressBestEffort(item.candidate.observationId, now);
+      operationNow = currentTimeAtOrAfter(clock, operationNow);
+      await suppressBestEffort(item.candidate.observationId, operationNow);
       continue;
     }
 
     try {
       await browser.tabs.remove(tab.id);
       result.closedTabCount += 1;
-      await removeObservationBestEffort(tab.id, now);
+      operationNow = currentTimeAtOrAfter(clock, operationNow);
+      await removeObservationBestEffort(tab.id, operationNow);
     } catch (error) {
       result.closeFailures.push({
         observationId: item.candidate.observationId,
         tabId: tab.id,
         message: toErrorMessage(error),
       });
-      await suppressBestEffort(item.candidate.observationId, now);
+      operationNow = currentTimeAtOrAfter(clock, operationNow);
+      await suppressBestEffort(item.candidate.observationId, operationNow);
     }
   }
 
