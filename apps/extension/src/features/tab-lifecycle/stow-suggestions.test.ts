@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
+import {
+  DAY_MS,
+  NOW,
+  sleepingTab,
+  storedLifecyclePolicy,
+} from './tab-lifecycle-test-support';
 
 const storageMocks = vi.hoisted(() => ({
   getItem: vi.fn(),
@@ -20,41 +26,9 @@ vi.mock('#imports', () => ({ storage: storageMocks }));
 vi.mock('@/lib/browser', () => ({ browser: browserMocks }));
 vi.mock('@/db/db', () => ({ listSessions: dbMocks.listSessions }));
 
-const DAY_MS = 86_400_000;
-const NOW = Date.UTC(2026, 6, 15, 12);
 const LOCAL_KEY = 'local:tabstow-sleep-observations-v1';
 const POLICY_KEY = 'local:tabstow-tab-lifecycle-policy-v1';
 const SESSION_KEY = 'session:tabstow-browser-session-id-v1';
-
-function lifecyclePolicy(stowSuggestionsEnabled = true) {
-  return {
-    schemaVersion: 1,
-    automaticSleepEnabled: false,
-    automaticSleepAfterDays: 7,
-    stowSuggestionsEnabled,
-    stowSuggestionAfterDays: 14,
-  };
-}
-
-function sleepingTab(overrides: Partial<chrome.tabs.Tab> = {}): chrome.tabs.Tab {
-  return {
-    id: 1,
-    index: 0,
-    windowId: 1,
-    highlighted: false,
-    active: false,
-    pinned: false,
-    incognito: false,
-    discarded: true,
-    autoDiscardable: true,
-    audible: false,
-    url: 'https://example.com/one',
-    title: 'Example one',
-    favIconUrl: 'https://example.com/favicon.ico',
-    lastAccessed: NOW - 30 * DAY_MS,
-    ...overrides,
-  } as chrome.tabs.Tab;
-}
 
 function savedSession(url: string): TabSession {
   return {
@@ -76,7 +50,7 @@ describe('stow suggestions', () => {
     vi.resetModules();
     uuid = 0;
     stored = new Map<string, unknown>([
-      [POLICY_KEY, lifecyclePolicy()],
+      [POLICY_KEY, storedLifecyclePolicy()],
       [SESSION_KEY, 'browser-session-1'],
     ]);
     storageMocks.getItem.mockImplementation(async (key: string) =>
@@ -264,7 +238,7 @@ describe('stow suggestions', () => {
   });
 
   it('clears observations and avoids tab or database reads when suggestions are off', async () => {
-    stored.set(POLICY_KEY, lifecyclePolicy(false));
+    stored.set(POLICY_KEY, storedLifecyclePolicy({ stowSuggestionsEnabled: false }));
     const observations = await import('./sleep-observations');
     await observations.observeDiscardedTab(sleepingTab(), NOW - 20 * DAY_MS);
 
