@@ -636,9 +636,12 @@ describe('sleep observations', () => {
     });
   });
 
-  it('serializes concurrent mutations against the latest durable value', async () => {
+  it('serializes mutations against the latest value and execution-time inputs', async () => {
     const module = await import('./sleep-observations');
-    await module.reconcileSleepObservations([sleepingTab()], 2_000);
+    await module.reconcileSleepObservations(
+      [sleepingTab(), sleepingTab({ id: 8, url: 'https://other.example/' })],
+      2_000,
+    );
 
     let releaseWrite = () => {};
     let markWriteStarted = () => {};
@@ -664,17 +667,25 @@ describe('sleep observations', () => {
       2_500,
     );
     await writeStarted;
-    const suppress = module.suppressSleepObservations(['observation-1'], 2_500);
+    const observationIds = ['observation-1'];
+    const suppress = module.suppressSleepObservations(observationIds, 2_500);
+    observationIds[0] = 'observation-2';
     releaseWrite();
     await Promise.all([snooze, suppress]);
 
-    await expect(module.listSleepObservations(2_500)).resolves.toEqual([
+    const observations = await module.listSleepObservations(2_500);
+    expect(observations).toEqual([
       expect.objectContaining({
         observationId: 'observation-1',
         snoozedUntil: 10_000,
+      }),
+      expect.objectContaining({
+        observationId: 'observation-2',
         suppressedUntilWake: true,
       }),
     ]);
+    expect(observations[0]).not.toHaveProperty('suppressedUntilWake');
+    expect(observations[1]).not.toHaveProperty('snoozedUntil');
   });
 
   it.each(INELIGIBLE_TAB_CASES)(
