@@ -153,6 +153,34 @@ describe('sleep observations', () => {
     expect((stored.get(LOCAL_KEY) as { records: unknown[] }).records).toHaveLength(1);
   });
 
+  it('preserves controls while both observation paths refresh a continued period', async () => {
+    const module = await import('./sleep-observations');
+    await module.reconcileSleepObservations([sleepingTab()], 2_000);
+    await module.snoozeSleepObservations(['observation-1'], 10_000, 2_500);
+    await module.suppressSleepObservations(['observation-1'], 2_500);
+
+    await expect(
+      module.observeDiscardedTab(sleepingTab(), 3_000),
+    ).resolves.toEqual(expect.objectContaining({
+      observationId: 'observation-1',
+      observedSleepingSince: 2_000,
+      lastObservedAt: 3_000,
+      snoozedUntil: 10_000,
+      suppressedUntilWake: true,
+    }));
+    await expect(
+      module.reconcileSleepObservations([sleepingTab()], 3_500),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        observationId: 'observation-1',
+        observedSleepingSince: 2_000,
+        lastObservedAt: 3_500,
+        snoozedUntil: 10_000,
+        suppressedUntilWake: true,
+      }),
+    ]);
+  });
+
   it('starts a new direct observation when lastAccessed proves the tab became active', async () => {
     const {
       observeDiscardedTab,
