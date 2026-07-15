@@ -16,6 +16,14 @@ _Avoid_: Exact sleep duration, discarded-at time, tab age
 A Sleeping Tab whose Observed Sleep Period has crossed the configured threshold for a Saved for Later suggestion.
 _Avoid_: Stale tab, old tab
 
+**Tab Lifecycle Policy**:
+The related but independently controlled rules for automatically sleeping eligible Active Tabs and suggesting that eligible Long-sleeping Tabs be placed in Saved for Later.
+_Avoid_: Sleep policy, retention policy
+
+**Stow Suggestion**:
+A non-destructive prompt recommending that eligible Long-sleeping Tabs be placed in Saved for Later; it never saves or closes tabs without confirmation.
+_Avoid_: Auto-archive, automatic close
+
 ## Saved tabs
 
 **Saved for Later**:

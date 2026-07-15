@@ -63,7 +63,15 @@ for (const tab of tabs) {
 }
 ```
 
-If Tabstow relies exclusively on `lastAccessed`, it should either set `minimum_chrome_version` to 121 or feature-detect the property and fall back to its own observation data. Automatic **sleep** is reversible and should be the default. Automatic **close** via `tabs.remove()` is technically possible, but it is destructive; it should require a separate explicit opt-in, a substantially longer threshold, and protections for active, pinned, audible, incognito, allowlisted, and already-sleeping tabs. The scan is best-effort because tabs can close or activate between query and action. ([Chrome Tabs API: `discard` and `remove`](https://developer.chrome.com/docs/extensions/reference/api/tabs))
+If Tabstow relies exclusively on `lastAccessed`, it should either set `minimum_chrome_version` to 121 or feature-detect the property and fall back to its own observation data. Automatic **sleep** is less destructive than closing a tab but can still discard in-memory page state, so it requires explicit opt-in. Automatic **close** via `tabs.remove()` is technically possible, but it is destructive and remains outside this policy. The scan is best-effort because tabs can close or activate between query and action. ([Chrome Tabs API: `discard` and `remove`](https://developer.chrome.com/docs/extensions/reference/api/tabs))
+
+## Confirmed Phase 3 and Phase 4 direction
+
+The two phases form one Tab Lifecycle settings area but retain independent consent boundaries:
+
+- Automatic sleep is disabled by default and must be enabled explicitly because discarding can lose in-memory page state.
+- Stow Suggestions are enabled by default because they are local, non-destructive prompts; they never save or close a tab without explicit confirmation.
+- Stow Suggestions cover eligible Sleeping Tabs regardless of whether Tabstow or Chrome initiated the discard. Suggestion timing uses the conservative Observed Sleep Period defined in [ADR 0021](../adr/0021-base-stow-suggestions-on-observed-sleep-periods.md), never an inferred exact discard time.
 
 ## Minimal Tabstow change shape
 
