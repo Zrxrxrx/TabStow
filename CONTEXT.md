@@ -43,8 +43,12 @@ The set of Tab Sessions retained for future reopening and eligible for cross-dev
 _Avoid_: Tag, label, archive
 
 **Stow**:
-The safe transition requested for one or more Active Tabs: preserve them as Saved Tabs before attempting to close their browser copies. Every Tab Session produced by one confirmed batch becomes durable before any browser copy may close, and a multi-window selection creates one session per source window.
+The safe transition requested for one or more Active Tabs: preserve them as Saved Tabs before attempting to close their browser copies. Every Tab Session produced by one confirmed batch becomes durable before any browser copy may close, and a multi-window selection creates one session per contributing source window after Saved URL deduplication.
 _Avoid_: Move, archive, close
+
+**Saved URL**:
+The globally unique normalized page identity used by Saved for Later; URL fragments do not create separate Saved URLs.
+_Avoid_: Exact URL, open-tab identity
 
 **Tab Session**:
 An ordered group of Saved Tabs captured together.

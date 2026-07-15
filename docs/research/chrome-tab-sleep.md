@@ -76,6 +76,7 @@ The two phases form one Tab Lifecycle settings area but retain independent conse
 - Stow Suggestions cover eligible Sleeping Tabs regardless of whether Tabstow or Chrome initiated the discard. Suggestion timing uses the conservative Observed Sleep Period defined in [ADR 0021](../adr/0021-base-stow-suggestions-on-observed-sleep-periods.md), never an inferred exact discard time.
 - Confirming a multi-window Stow Suggestion creates one Tab Session per source Chrome window and preserves the selected tabs' order within that window. The review must state both the tab count and resulting session count, and it must not promise reconstruction of Chrome windows or tab groups.
 - Confirmation saves every resulting session in one local batch before attempting any close. Persistence failure closes nothing; after persistence, each live tab is revalidated and closed only if it still matches the selected Sleeping Tab, while skipped or failed closes leave the Saved copy intact and produce an accurate partial-result summary.
+- Stow Suggestions preserve Saved for Later's global normalized-URL uniqueness. Existing Saved URLs are not suggested; live candidates are deduplicated before Review, empty source-window groups disappear, and excluded duplicates are never closed by the suggestion flow.
 
 ## Minimal Tabstow change shape
 

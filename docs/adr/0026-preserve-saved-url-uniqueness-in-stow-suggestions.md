@@ -1,0 +1,3 @@
+# Preserve Saved URL Uniqueness in Stow Suggestions
+
+Stow Suggestions will preserve Saved for Later's existing global Saved URL uniqueness instead of changing the core storage and synchronization model. Candidates whose normalized URL already exists in Saved for Later are excluded, and multiple live candidates for the same Saved URL are deterministically reduced to the earliest observed candidate before Review; source windows that contribute no remaining candidate create no Tab Session. Review counts are calculated after this reduction, and Tabstow never closes a duplicate that was hidden, excluded, or not explicitly selected. Duplicate cleanup remains a separate user action.
