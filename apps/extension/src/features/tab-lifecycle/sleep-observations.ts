@@ -56,6 +56,17 @@ function validLastAccessed(value: unknown, now: number): number | undefined {
     : undefined;
 }
 
+function canContinueObservedSleepPeriod(
+  record: SleepObservation,
+  lastAccessed: number | undefined,
+): boolean {
+  return (
+    record.lastAccessed === undefined
+    || lastAccessed === undefined
+    || record.lastAccessed === lastAccessed
+  );
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 }
@@ -216,13 +227,14 @@ export async function observeDiscardedTab(
       getBrowserSessionId(),
       fingerprintUrl(tab.url),
     ]);
+    const lastAccessed = validLastAccessed(tab.lastAccessed, now);
     const existing = records.find(
       (record) =>
         record.browserSessionId === browserSessionId
         && record.tabId === tab.id
-        && record.urlFingerprint === urlFingerprint,
+        && record.urlFingerprint === urlFingerprint
+        && canContinueObservedSleepPeriod(record, lastAccessed),
     );
-    const lastAccessed = validLastAccessed(tab.lastAccessed, now);
     const observation: SleepObservation = {
       observationId: existing?.observationId ?? crypto.randomUUID(),
       tabId: tab.id,
@@ -286,13 +298,14 @@ export async function reconcileSleepObservations(
     const consumedObservationIds = new Set<string>();
     const liveRecords = eligibleTabs.map((tab, index): SleepObservation => {
       const urlFingerprint = fingerprints[index]!;
+      const lastAccessed = validLastAccessed(tab.lastAccessed, now);
       const sameSession = records.find(
         (record) =>
           record.browserSessionId === browserSessionId
           && record.tabId === tab.id
-          && record.urlFingerprint === urlFingerprint,
+          && record.urlFingerprint === urlFingerprint
+          && canContinueObservedSleepPeriod(record, lastAccessed),
       );
-      const lastAccessed = validLastAccessed(tab.lastAccessed, now);
       const previousSessionMatches =
         previousSessionByFingerprint.get(urlFingerprint) ?? [];
       const previousSession =

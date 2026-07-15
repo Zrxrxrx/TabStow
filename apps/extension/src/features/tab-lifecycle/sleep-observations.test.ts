@@ -139,18 +139,59 @@ describe('sleep observations', () => {
     await observeDiscardedTab(sleepingTab(), 2_000);
 
     await expect(
-      observeDiscardedTab(sleepingTab({ lastAccessed: 1_500 }), 3_000),
+      observeDiscardedTab(sleepingTab(), 3_000),
     ).resolves.toEqual({
       observationId: 'observation-1',
       tabId: 7,
       browserSessionId: 'browser-session-1',
       urlFingerprint: FINGERPRINT,
-      lastAccessed: 1_500,
+      lastAccessed: 1_000,
       observedSleepingSince: 2_000,
       lastObservedAt: 3_000,
     });
     expect(cryptoMocks.randomUUID).toHaveBeenCalledTimes(2);
     expect((stored.get(LOCAL_KEY) as { records: unknown[] }).records).toHaveLength(1);
+  });
+
+  it('starts a new direct observation when lastAccessed proves the tab became active', async () => {
+    const {
+      observeDiscardedTab,
+      snoozeSleepObservations,
+      suppressSleepObservations,
+    } = await import('./sleep-observations');
+    await observeDiscardedTab(sleepingTab(), 2_000);
+    await snoozeSleepObservations(['observation-1'], 10_000, 2_500);
+    await suppressSleepObservations(['observation-1'], 2_500);
+
+    await expect(
+      observeDiscardedTab(sleepingTab({ lastAccessed: 1_500 }), 3_000),
+    ).resolves.toEqual({
+      observationId: 'observation-2',
+      tabId: 7,
+      browserSessionId: 'browser-session-1',
+      urlFingerprint: FINGERPRINT,
+      lastAccessed: 1_500,
+      observedSleepingSince: 3_000,
+      lastObservedAt: 3_000,
+    });
+  });
+
+  it('starts a new reconciled observation when lastAccessed proves a missed wake', async () => {
+    const { reconcileSleepObservations } = await import('./sleep-observations');
+    await reconcileSleepObservations([sleepingTab()], 2_000);
+
+    await expect(
+      reconcileSleepObservations(
+        [sleepingTab({ lastAccessed: 1_500 })],
+        3_000,
+      ),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        observationId: 'observation-2',
+        lastAccessed: 1_500,
+        observedSleepingSince: 3_000,
+      }),
+    ]);
   });
 
   it('reconciles all supplied tabs and returns only eligible live observations', async () => {
