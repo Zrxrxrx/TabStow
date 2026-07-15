@@ -23,6 +23,7 @@ import {
 } from './active-tabs-dnd';
 import { ActiveWindowSection } from './ActiveWindowSection';
 import { TabLifecyclePolicyDialog } from './TabLifecyclePolicyDialog';
+import { TabLifecycleSuggestions } from './TabLifecycleSuggestions';
 import { WindowFilter } from './WindowFilter';
 
 type Props = {
@@ -31,8 +32,10 @@ type Props = {
   onSnapshot?: (snapshot: ActiveTabsSnapshot) => void;
   onStatus: (tone: 'success' | 'error', message: string) => void;
   onStowTab: (tab: ActiveBrowserTab) => Promise<void>;
+  onSuggestedStow: () => void | Promise<void>;
   query: string;
   refreshKey: number;
+  suggestionRefreshKey: number;
 };
 
 const EMPTY_SNAPSHOT: ActiveTabsSnapshot = { windows: [], tabs: [], chromeGroups: [] };
@@ -43,8 +46,10 @@ export function ActiveWorkspace({
   onSnapshot,
   onStatus,
   onStowTab,
+  onSuggestedStow,
   query,
   refreshKey,
+  suggestionRefreshKey,
 }: Props) {
   const [snapshot, setSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_SNAPSHOT);
   const [snapshotReady, setSnapshotReady] = useState(false);
@@ -54,6 +59,7 @@ export function ActiveWorkspace({
   const [movePending, setMovePending] = useState(false);
   const [selectedWindowId, setSelectedWindowId] = useState<number | null>(null);
   const [policyOpen, setPolicyOpen] = useState(false);
+  const [localSuggestionRefreshKey, setLocalSuggestionRefreshKey] = useState(0);
   const [sleepPending, setSleepPending] = useState(false);
   const targetRefs = useRef(new Map<string, HTMLElement>());
   const closePendingRef = useRef(false);
@@ -384,6 +390,15 @@ export function ActiveWorkspace({
         </button>
       </div>
 
+      {snapshotReady ? (
+        <TabLifecycleSuggestions
+          disabled={controlsDisabled}
+          locale={locale}
+          onStowed={onSuggestedStow}
+          refreshKey={suggestionRefreshKey + localSuggestionRefreshKey}
+        />
+      ) : null}
+
       <WindowFilter locale={locale} onChange={setSelectedWindowId} value={selectedWindowId} windows={windows} />
 
       {duplicateGroups.length > 0 && (
@@ -427,7 +442,13 @@ export function ActiveWorkspace({
         ))}
       </div>
       {policyOpen ? (
-        <TabLifecyclePolicyDialog locale={locale} onClose={() => setPolicyOpen(false)} />
+        <TabLifecyclePolicyDialog
+          locale={locale}
+          onClose={() => {
+            setPolicyOpen(false);
+            setLocalSuggestionRefreshKey((value) => value + 1);
+          }}
+        />
       ) : null}
     </section>
   );

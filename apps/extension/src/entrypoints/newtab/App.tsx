@@ -62,6 +62,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   );
   const [activeWorkspaceRefreshKey, setActiveWorkspaceRefreshKey] = useState(0);
   const [stowPreviewRefreshKey, setStowPreviewRefreshKey] = useState(0);
+  const [suggestionRefreshKey, setSuggestionRefreshKey] = useState(0);
   const [quickLinksRefreshKey, setQuickLinksRefreshKey] = useState(0);
   const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED_SYNC);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
@@ -122,10 +123,14 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
     function handleFocus() {
       void observeSync('focus');
       setStowPreviewRefreshKey((value) => value + 1);
+      setSuggestionRefreshKey((value) => value + 1);
     }
 
     function handleVisibility() {
-      if (document.visibilityState === 'visible') void observeSync('focus');
+      if (document.visibilityState === 'visible') {
+        void observeSync('focus');
+        setSuggestionRefreshKey((value) => value + 1);
+      }
     }
 
     function handleRuntimeMessage(message: unknown) {
@@ -356,6 +361,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                   onSnapshot={(snapshot) => {
                     setActiveSnapshot(snapshot);
                     setStowPreviewRefreshKey((value) => value + 1);
+                    setSuggestionRefreshKey((value) => value + 1);
                   }}
                   onStatus={(tone, message) => setStatus({ tone, message })}
                   query={tabQuery}
@@ -377,6 +383,11 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
                       }),
                     );
                   }}
+                  onSuggestedStow={async () => {
+                    await loadSessions();
+                    setActiveWorkspaceRefreshKey((value) => value + 1);
+                  }}
+                  suggestionRefreshKey={suggestionRefreshKey}
                 />
               </div>
               <div className="saved-region">
