@@ -21,15 +21,16 @@ import {
   tabLifecycleSettingsChanged,
 } from './tab-lifecycle-generation';
 import { isUnselectedUnprotectedHttpTab } from './tab-lifecycle-eligibility';
+import {
+  createLifecycleOperationClock,
+  type LifecycleClockOptions,
+} from './tab-lifecycle-clock';
 import type {
   StowSuggestionCandidate,
   SuggestedStowResult,
 } from './types';
 
-type SuggestedStowOptions = {
-  clock?: () => number;
-  now?: number;
-};
+type SuggestedStowOptions = LifecycleClockOptions;
 
 type PreparedTab = {
   candidate: StowSuggestionCandidate;
@@ -38,11 +39,6 @@ type PreparedTab = {
 };
 
 let stowInFlight: Promise<AppResult<SuggestedStowResult>> | null = null;
-
-function currentTimeAtOrAfter(clock: () => number, floor: number): number {
-  const current = clock();
-  return Number.isFinite(current) && current >= floor ? current : floor;
-}
 
 function validObservationIds(value: unknown): value is string[] {
   return (
@@ -150,10 +146,10 @@ async function removeObservationBestEffort(tabId: number, now: number): Promise<
 async function stowSuggestedTabsUnlocked(
   observationIds: string[],
   now: number,
-  clock: () => number,
+  readCurrentTime: () => number,
   generation: number,
 ): Promise<AppResult<SuggestedStowResult>> {
-  const listResult = await listStowSuggestions({ now, clock });
+  const listResult = await listStowSuggestions({ now, clock: readCurrentTime });
   if (!isCurrentTabLifecycleGeneration(generation)) {
     return tabLifecycleSettingsChanged();
   }
@@ -216,7 +212,7 @@ async function stowSuggestedTabsUnlocked(
     if (!isCurrentTabLifecycleGeneration(generation)) {
       return tabLifecycleSettingsChanged();
     }
-    revalidationNow = currentTimeAtOrAfter(clock, now);
+    revalidationNow = readCurrentTime();
     const currentObservations = await reconcileSleepObservations(
       currentTabs,
       revalidationNow,
@@ -297,7 +293,7 @@ async function stowSuggestedTabsUnlocked(
     try {
       const tabs = await browser.tabs.query({ windowType: 'normal' });
       if (isCurrentTabLifecycleGeneration(generation)) {
-        postSaveNow = currentTimeAtOrAfter(clock, revalidationNow);
+        postSaveNow = readCurrentTime();
         const observations = await reconcileSleepObservations(
           tabs,
           postSaveNow,
@@ -315,7 +311,7 @@ async function stowSuggestedTabsUnlocked(
 
   let operationNow = postSaveNow;
   for (const item of represented) {
-    operationNow = currentTimeAtOrAfter(clock, operationNow);
+    operationNow = readCurrentTime();
     let tab: PreparedTab['tab'] | null = null;
     if (
       postSaveObservationIds.has(item.candidate.observationId)
@@ -331,7 +327,7 @@ async function stowSuggestedTabsUnlocked(
         );
       if (observationMatches && isCurrentTabLifecycleGeneration(generation)) {
         const currentTab = await readEligibleTab(item.candidate);
-        operationNow = currentTimeAtOrAfter(clock, operationNow);
+        operationNow = readCurrentTime();
         const currentObservationMatches = currentTab
           && isCurrentTabLifecycleGeneration(generation)
           && await matchesSleepObservation(
@@ -356,7 +352,7 @@ async function stowSuggestedTabsUnlocked(
         observationId: item.candidate.observationId,
         reason: 'state-changed',
       });
-      operationNow = currentTimeAtOrAfter(clock, operationNow);
+      operationNow = readCurrentTime();
       await suppressBestEffort(item.candidate.observationId, operationNow);
       continue;
     }
@@ -364,7 +360,7 @@ async function stowSuggestedTabsUnlocked(
     try {
       await browser.tabs.remove(tab.id);
       result.closedTabCount += 1;
-      operationNow = currentTimeAtOrAfter(clock, operationNow);
+      operationNow = readCurrentTime();
       await removeObservationBestEffort(tab.id, operationNow);
     } catch (error) {
       result.closeFailures.push({
@@ -372,7 +368,7 @@ async function stowSuggestedTabsUnlocked(
         tabId: tab.id,
         message: toErrorMessage(error),
       });
-      operationNow = currentTimeAtOrAfter(clock, operationNow);
+      operationNow = readCurrentTime();
       await suppressBestEffort(item.candidate.observationId, operationNow);
     }
   }
@@ -395,14 +391,12 @@ export function stowSuggestedTabs(
     );
   }
 
-  const fixedNow = options.now;
-  const clock = options.clock ?? (fixedNow === undefined ? Date.now : () => fixedNow);
-  const now = fixedNow ?? clock();
+  const operationClock = createLifecycleOperationClock(options);
   const generation = currentTabLifecycleGeneration();
   stowInFlight = stowSuggestedTabsUnlocked(
     observationIds,
-    now,
-    clock,
+    operationClock.initialNow,
+    operationClock.read,
     generation,
   ).finally(() => {
     stowInFlight = null;
