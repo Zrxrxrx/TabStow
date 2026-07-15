@@ -46,6 +46,7 @@ import {
   snoozeStowSuggestions,
   suppressStowSuggestions,
 } from '@/features/tab-lifecycle/stow-suggestions';
+import { stowSuggestedTabs } from '@/features/tab-lifecycle/suggested-stow';
 import {
   cancelGitHubOAuth,
   chooseAnotherGist,
@@ -121,6 +122,23 @@ function hasId(value: unknown): value is string {
 
 function hasObservationIds(value: unknown): value is string[] {
   return Array.isArray(value) && value.every(hasId);
+}
+
+function hasUniqueObservationIds(value: unknown): value is string[] {
+  return (
+    hasObservationIds(value)
+    && value.length > 0
+    && new Set(value).size === value.length
+  );
+}
+
+function savedSuggestedTabs(response: AppResult<unknown>): boolean {
+  if (!response.ok || !response.data || typeof response.data !== 'object') return false;
+  if (!('savedTabCount' in response.data)) return false;
+  return (
+    typeof response.data.savedTabCount === 'number'
+    && response.data.savedTabCount > 0
+  );
 }
 
 function isValidSavedMoveRequest(request: unknown): request is MoveSavedTabRequest {
@@ -259,6 +277,14 @@ async function routeMessage(
       case 'tab-lifecycle:suppress-suggestions':
         if (!hasObservationIds(message.observationIds)) return invalidMessage(message.type);
         return suppressStowSuggestions(message.observationIds);
+      case 'tab-lifecycle:stow-suggestions':
+        if (!hasUniqueObservationIds(message.observationIds)) {
+          return err(
+            'invalid-stow-suggestions',
+            'Suggested tab identities are invalid.',
+          );
+        }
+        return stowSuggestedTabs(message.observationIds);
       case 'quick-links:add':
         return ok(await updateQuickLinks((links) => [...links, message.link]));
       case 'quick-links:list':
@@ -362,7 +388,9 @@ async function handleMessage(
     (SYNC_MUTATION_MESSAGES.has(rawMessage.type as ExtensionMessage['type']) ||
       (rawMessage.type === 'sessions:open-tab' &&
         'consume' in rawMessage &&
-        rawMessage.consume === true))
+        rawMessage.consume === true) ||
+      (rawMessage.type === 'tab-lifecycle:stow-suggestions'
+        && savedSuggestedTabs(response)))
   ) {
     noteSynchronizedMutationBestEffort();
   }

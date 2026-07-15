@@ -14,6 +14,7 @@ export type AppErrorCode =
   | 'empty-session'
   | 'automatic-sleep-unavailable'
   | 'invalid-tab-lifecycle-policy'
+  | 'invalid-stow-suggestions'
   | 'unknown-error';
 
 export type AppError = {

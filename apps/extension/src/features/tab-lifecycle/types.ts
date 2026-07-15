@@ -42,6 +42,26 @@ export type StowSuggestionMutationResult = {
   updatedObservationCount: number;
 };
 
+export type SuggestedStowSkipReason =
+  | 'not-suggested'
+  | 'state-changed'
+  | 'saved-url-unavailable';
+
+export type SuggestedStowResult = {
+  savedTabCount: number;
+  createdSessionCount: number;
+  closedTabCount: number;
+  skipped: Array<{
+    observationId: string;
+    reason: SuggestedStowSkipReason;
+  }>;
+  closeFailures: Array<{
+    observationId: string;
+    tabId: number;
+    message: string;
+  }>;
+};
+
 export const DEFAULT_TAB_LIFECYCLE_POLICY: TabLifecyclePolicy = {
   automaticSleepEnabled: false,
   automaticSleepAfterDays: 7,
