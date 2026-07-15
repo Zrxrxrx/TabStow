@@ -1783,9 +1783,141 @@ svg {
   border-top: 1px solid var(--border-soft);
 }
 
+.lifecycle-suggestion-banner {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid color-mix(in oklab, var(--accent), var(--border) 54%);
+  border-radius: var(--radius-md);
+  background: color-mix(in oklab, var(--accent), transparent 90%);
+}
+
+.lifecycle-suggestion-copy {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.lifecycle-suggestion-error {
+  color: var(--danger);
+  font-weight: 510;
+}
+
+.lifecycle-suggestion-actions,
+.lifecycle-review-toolbar,
+.lifecycle-review-row-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.lifecycle-suggestion-actions {
+  flex: 0 0 auto;
+}
+
+.lifecycle-review-dialog {
+  width: min(100%, 760px);
+}
+
+.lifecycle-review-toolbar {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.lifecycle-review-toolbar:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 4px;
+}
+
+.lifecycle-review-count {
+  margin-left: auto;
+}
+
+.lifecycle-review-groups,
+.lifecycle-review-list {
+  display: grid;
+  gap: 10px;
+}
+
+.lifecycle-review-group {
+  display: grid;
+  gap: 8px;
+}
+
+.lifecycle-review-group h3 {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.lifecycle-review-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-warm);
+}
+
+.lifecycle-review-selection {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+}
+
+.lifecycle-review-selection > input {
+  width: 18px;
+  min-width: 18px;
+  min-height: 18px;
+  margin: 0;
+}
+
+.lifecycle-review-age {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lifecycle-review-row-actions {
+  justify-content: flex-end;
+}
+
+.lifecycle-review-empty {
+  min-height: 96px;
+}
+
 @media (max-width: 560px) {
   .lifecycle-policy-rule {
     grid-template-columns: 1fr;
+  }
+
+  .lifecycle-suggestion-banner,
+  .lifecycle-review-row {
+    align-items: stretch;
+    grid-template-columns: 1fr;
+  }
+
+  .lifecycle-suggestion-banner {
+    display: grid;
+  }
+
+  .lifecycle-review-count {
+    flex-basis: 100%;
+    margin-left: 0;
+  }
+
+  .lifecycle-review-row-actions {
+    justify-content: flex-start;
   }
 }
 
