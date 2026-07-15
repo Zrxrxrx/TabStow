@@ -22,7 +22,7 @@ import {
   type ActiveTabsDropTarget,
 } from './active-tabs-dnd';
 import { ActiveWindowSection } from './ActiveWindowSection';
-import { ModalDialog } from './ModalDialog';
+import { TabLifecyclePolicyDialog } from './TabLifecyclePolicyDialog';
 import { WindowFilter } from './WindowFilter';
 
 type Props = {
@@ -380,7 +380,7 @@ export function ActiveWorkspace({
           {t(locale, 'sleepEligibleTabs')}
         </button>
         <button className="secondary-button" onClick={() => setPolicyOpen(true)} type="button">
-          {t(locale, 'sleepPolicy')}
+          {t(locale, 'tabLifecycle')}
         </button>
       </div>
 
@@ -427,10 +427,7 @@ export function ActiveWorkspace({
         ))}
       </div>
       {policyOpen ? (
-        <ModalDialog closeLabel={t(locale, 'cancel')} onClose={() => setPolicyOpen(false)} title={t(locale, 'sleepPolicy')}>
-          <p>{t(locale, 'sleepPolicyDescription')}</p>
-          <p className="subtle">{t(locale, 'sleepPolicyUnavailableReason')}</p>
-        </ModalDialog>
+        <TabLifecyclePolicyDialog locale={locale} onClose={() => setPolicyOpen(false)} />
       ) : null}
     </section>
   );
