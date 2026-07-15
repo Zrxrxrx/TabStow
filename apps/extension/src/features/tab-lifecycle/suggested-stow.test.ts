@@ -221,6 +221,36 @@ describe('suggested stow', () => {
     expect(browserMocks.tabs.remove).toHaveBeenCalledWith(3);
   });
 
+  it('drops a stale observation identity immediately before persistence', async () => {
+    const [record] = await observe([sleepingTab()]);
+    settingsMocks.getSettings.mockImplementationOnce(async () => {
+      liveTabs.set(1, {
+        ...liveTabs.get(1)!,
+        lastAccessed: NOW - DAY_MS,
+      });
+      return { deviceId: 'device-1' };
+    });
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs([record!.observationId], { now: NOW }),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        savedTabCount: 0,
+        createdSessionCount: 0,
+        closedTabCount: 0,
+        skipped: [{
+          observationId: record!.observationId,
+          reason: 'state-changed',
+        }],
+        closeFailures: [],
+      },
+    });
+    expect(dbMocks.createSessionsBatch).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
   it('never closes a candidate filtered by a concurrent Saved URL write', async () => {
     const records = await observe([
       sleepingTab({ id: 1, index: 0, url: 'https://example.com/raced' }),

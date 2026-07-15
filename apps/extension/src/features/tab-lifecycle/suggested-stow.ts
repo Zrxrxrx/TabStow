@@ -181,11 +181,57 @@ async function stowSuggestedTabsUnlocked(
     });
   }
 
+  let deviceId: string;
+  try {
+    deviceId = (await getSettings()).deviceId;
+  } catch (error) {
+    return err('unknown-error', toErrorMessage(error));
+  }
+
+  let revalidated: PreparedTab[];
+  try {
+    const currentTabs = await browser.tabs.query({ windowType: 'normal' });
+    const currentObservations = await reconcileSleepObservations(currentTabs, now);
+    const tabsById = new Map(
+      currentTabs.flatMap((tab) => typeof tab.id === 'number' ? [[tab.id, tab] as const] : []),
+    );
+    const observationsById = new Map(
+      currentObservations.map((observation) => [observation.observationId, observation]),
+    );
+    revalidated = prepared.flatMap((item): PreparedTab[] => {
+      const observation = observationsById.get(item.candidate.observationId);
+      const tab = tabsById.get(item.candidate.tabId);
+      if (
+        observation?.tabId !== item.candidate.tabId
+        || !tab
+        || !isEligibleSleepingTab(tab, item.candidate)
+      ) {
+        skipped.push({
+          observationId: item.candidate.observationId,
+          reason: 'state-changed',
+        });
+        return [];
+      }
+      return [{ ...item, tab }];
+    });
+  } catch (error) {
+    return err('unknown-error', toErrorMessage(error));
+  }
+
+  if (revalidated.length === 0) {
+    return ok({
+      savedTabCount: 0,
+      createdSessionCount: 0,
+      closedTabCount: 0,
+      skipped,
+      closeFailures: [],
+    });
+  }
+
   let createdSessions: TabSession[];
   try {
-    const settings = await getSettings();
     createdSessions = await createSessionsBatch(
-      createGroupedSessions(prepared, settings.deviceId, createdAt),
+      createGroupedSessions(revalidated, deviceId, createdAt),
     );
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
@@ -194,7 +240,7 @@ async function stowSuggestedTabsUnlocked(
   const representedSavedTabIds = new Set(
     createdSessions.flatMap(({ tabs }) => tabs.map(({ id }) => id)),
   );
-  const represented = prepared.filter(({ savedTab, candidate }) => {
+  const represented = revalidated.filter(({ savedTab, candidate }) => {
     if (representedSavedTabIds.has(savedTab.id)) return true;
     skipped.push({
       observationId: candidate.observationId,
