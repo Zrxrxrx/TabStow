@@ -424,8 +424,8 @@ export async function snoozeSleepObservations(
   if (!Number.isFinite(snoozedUntil) || snoozedUntil <= now) {
     throw new RangeError('snoozedUntil must be a future timestamp.');
   }
-  const ids = new Set(observationIds);
   return mutateRetainedObservations(now, (records, browserSessionId) => {
+    const ids = new Set(observationIds);
     let updatedObservationCount = 0;
     const updatedRecords = records.map((record) => {
       if (
@@ -445,8 +445,8 @@ export async function suppressSleepObservations(
   observationIds: readonly string[],
   now = Date.now(),
 ): Promise<number> {
-  const ids = new Set(observationIds);
   return mutateRetainedObservations(now, (records, browserSessionId) => {
+    const ids = new Set(observationIds);
     let updatedObservationCount = 0;
     const updatedRecords = records.map((record): SleepObservation => {
       if (
