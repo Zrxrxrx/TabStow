@@ -251,6 +251,30 @@ describe('suggested stow', () => {
     expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
   });
 
+  it('aborts before persistence when lifecycle policy changes during confirmation', async () => {
+    const [record] = await observe([sleepingTab()]);
+    settingsMocks.getSettings.mockImplementationOnce(async () => {
+      const { invalidateTabLifecycleGeneration } = await import(
+        './tab-lifecycle-generation'
+      );
+      invalidateTabLifecycleGeneration();
+      return { deviceId: 'device-1' };
+    });
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs([record!.observationId], { now: NOW }),
+    ).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'operation-in-progress',
+        message: 'Tab lifecycle settings changed. Retry the action.',
+      },
+    });
+    expect(dbMocks.createSessionsBatch).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
   it('never closes a candidate filtered by a concurrent Saved URL write', async () => {
     const records = await observe([
       sleepingTab({ id: 1, index: 0, url: 'https://example.com/raced' }),

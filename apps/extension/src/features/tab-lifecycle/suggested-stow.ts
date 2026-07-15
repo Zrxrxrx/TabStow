@@ -15,6 +15,11 @@ import {
   suppressSleepObservations,
 } from './sleep-observations';
 import { listStowSuggestions } from './stow-suggestions';
+import {
+  currentTabLifecycleGeneration,
+  isCurrentTabLifecycleGeneration,
+  tabLifecycleSettingsChanged,
+} from './tab-lifecycle-generation';
 import type {
   StowSuggestionCandidate,
   SuggestedStowResult,
@@ -143,8 +148,12 @@ async function removeObservationBestEffort(tabId: number, now: number): Promise<
 async function stowSuggestedTabsUnlocked(
   observationIds: string[],
   now: number,
+  generation: number,
 ): Promise<AppResult<SuggestedStowResult>> {
   const listResult = await listStowSuggestions({ now });
+  if (!isCurrentTabLifecycleGeneration(generation)) {
+    return tabLifecycleSettingsChanged();
+  }
   if (!listResult.ok) return listResult;
 
   const requested = new Set(observationIds);
@@ -159,7 +168,13 @@ async function stowSuggestedTabsUnlocked(
   const createdAt = new Date(now).toISOString();
   const prepared: PreparedTab[] = [];
   for (const candidate of candidates) {
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
     const tab = await readEligibleTab(candidate);
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
     if (!tab) {
       skipped.push({ observationId: candidate.observationId, reason: 'state-changed' });
       continue;
@@ -184,6 +199,9 @@ async function stowSuggestedTabsUnlocked(
   let deviceId: string;
   try {
     deviceId = (await getSettings()).deviceId;
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
   }
@@ -191,7 +209,13 @@ async function stowSuggestedTabsUnlocked(
   let revalidated: PreparedTab[];
   try {
     const currentTabs = await browser.tabs.query({ windowType: 'normal' });
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
     const currentObservations = await reconcileSleepObservations(currentTabs, now);
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
     const tabsById = new Map(
       currentTabs.flatMap((tab) => typeof tab.id === 'number' ? [[tab.id, tab] as const] : []),
     );
@@ -230,6 +254,9 @@ async function stowSuggestedTabsUnlocked(
 
   let createdSessions: TabSession[];
   try {
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
     createdSessions = await createSessionsBatch(
       createGroupedSessions(revalidated, deviceId, createdAt),
     );
@@ -257,15 +284,20 @@ async function stowSuggestedTabsUnlocked(
   };
 
   let postSaveObservationIds = new Set<string>();
-  try {
-    const tabs = await browser.tabs.query({ windowType: 'normal' });
-    postSaveObservationIds = new Set(
-      (await reconcileSleepObservations(tabs, now)).map(({ observationId }) =>
-        observationId,
-      ),
-    );
-  } catch {
-    // Without a fresh identity snapshot, keeping every original tab open is safest.
+  if (isCurrentTabLifecycleGeneration(generation)) {
+    try {
+      const tabs = await browser.tabs.query({ windowType: 'normal' });
+      if (isCurrentTabLifecycleGeneration(generation)) {
+        const observations = await reconcileSleepObservations(tabs, now);
+        if (isCurrentTabLifecycleGeneration(generation)) {
+          postSaveObservationIds = new Set(
+            observations.map(({ observationId }) => observationId),
+          );
+        }
+      }
+    } catch {
+      // Without a fresh identity snapshot, keeping every original tab open is safest.
+    }
   }
 
   for (const item of represented) {
@@ -315,7 +347,8 @@ export function stowSuggestedTabs(
   }
 
   const now = options.now ?? Date.now();
-  stowInFlight = stowSuggestedTabsUnlocked(observationIds, now).finally(() => {
+  const generation = currentTabLifecycleGeneration();
+  stowInFlight = stowSuggestedTabsUnlocked(observationIds, now, generation).finally(() => {
     stowInFlight = null;
   });
   return stowInFlight;

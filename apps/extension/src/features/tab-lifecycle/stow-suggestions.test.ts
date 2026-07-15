@@ -287,4 +287,29 @@ describe('stow suggestions', () => {
       error: { code: 'chrome-tabs-error', message: 'Tabs unavailable' },
     });
   });
+
+  it('drops a suggestion read invalidated while its tab query is pending', async () => {
+    let resolveTabs!: (tabs: chrome.tabs.Tab[]) => void;
+    browserMocks.tabs.query.mockReturnValue(new Promise((resolve) => {
+      resolveTabs = resolve;
+    }));
+    const { listStowSuggestions } = await import('./stow-suggestions');
+    const { invalidateTabLifecycleGeneration } = await import(
+      './tab-lifecycle-generation'
+    );
+
+    const pending = listStowSuggestions({ now: NOW });
+    await vi.waitFor(() => expect(browserMocks.tabs.query).toHaveBeenCalledTimes(1));
+    invalidateTabLifecycleGeneration();
+    resolveTabs([sleepingTab()]);
+
+    await expect(pending).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'operation-in-progress',
+        message: 'Tab lifecycle settings changed. Retry the action.',
+      },
+    });
+    expect(dbMocks.listSessions).not.toHaveBeenCalled();
+  });
 });

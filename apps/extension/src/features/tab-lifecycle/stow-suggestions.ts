@@ -9,6 +9,11 @@ import {
 } from '@/lib/errors';
 import { getTabLifecyclePolicy } from './tab-lifecycle-policy';
 import {
+  currentTabLifecycleGeneration,
+  isCurrentTabLifecycleGeneration,
+  tabLifecycleSettingsChanged,
+} from './tab-lifecycle-generation';
+import {
   clearSleepObservations,
   reconcileSleepObservations,
   snoozeSleepObservations,
@@ -38,15 +43,22 @@ async function queryNormalTabs(): Promise<AppResult<chrome.tabs.Tab[]>> {
 
 async function reconcileCurrentObservations(
   now: number,
+  generation: number,
 ): Promise<AppResult<{ tabs: chrome.tabs.Tab[]; observations: SleepObservation[] }>> {
   const tabsResult = await queryNormalTabs();
   if (!tabsResult.ok) return tabsResult;
+  if (!isCurrentTabLifecycleGeneration(generation)) {
+    return tabLifecycleSettingsChanged();
+  }
 
   try {
-    return ok({
+    const result = {
       tabs: tabsResult.data,
       observations: await reconcileSleepObservations(tabsResult.data, now),
-    });
+    };
+    return isCurrentTabLifecycleGeneration(generation)
+      ? ok(result)
+      : tabLifecycleSettingsChanged();
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
   }
@@ -68,20 +80,27 @@ export async function listStowSuggestions(
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionList>> {
   const now = options.now ?? Date.now();
+  const generation = currentTabLifecycleGeneration();
   const policyResult = await getTabLifecyclePolicy();
+  if (!isCurrentTabLifecycleGeneration(generation)) {
+    return tabLifecycleSettingsChanged();
+  }
   if (!policyResult.ok) return policyResult;
   const policy = policyResult.data;
 
   if (!policy.stowSuggestionsEnabled) {
     try {
       await clearSleepObservations();
+      if (!isCurrentTabLifecycleGeneration(generation)) {
+        return tabLifecycleSettingsChanged();
+      }
       return ok({ afterDays: policy.stowSuggestionAfterDays, candidates: [] });
     } catch (error) {
       return err('unknown-error', toErrorMessage(error));
     }
   }
 
-  const currentResult = await reconcileCurrentObservations(now);
+  const currentResult = await reconcileCurrentObservations(now, generation);
   if (!currentResult.ok) return currentResult;
 
   let savedUrls: Set<string>;
@@ -92,6 +111,9 @@ export async function listStowSuggestions(
         .map(({ url }) => normalizeSavedTabUrl(url))
         .filter((url): url is string => url !== null),
     );
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
   }
@@ -158,18 +180,25 @@ async function mutateCurrentObservations(
   mutation: (ids: string[]) => Promise<void>,
   now: number,
 ): Promise<AppResult<StowSuggestionMutationResult>> {
+  const generation = currentTabLifecycleGeneration();
   const policyResult = await getTabLifecyclePolicy();
+  if (!isCurrentTabLifecycleGeneration(generation)) {
+    return tabLifecycleSettingsChanged();
+  }
   if (!policyResult.ok) return policyResult;
   if (!policyResult.data.stowSuggestionsEnabled) {
     try {
       await clearSleepObservations();
+      if (!isCurrentTabLifecycleGeneration(generation)) {
+        return tabLifecycleSettingsChanged();
+      }
       return ok({ updatedObservationCount: 0 });
     } catch (error) {
       return err('unknown-error', toErrorMessage(error));
     }
   }
 
-  const currentResult = await reconcileCurrentObservations(now);
+  const currentResult = await reconcileCurrentObservations(now, generation);
   if (!currentResult.ok) return currentResult;
   const requestedIds = new Set(observationIds);
   const currentIds = currentResult.data.observations
@@ -177,8 +206,13 @@ async function mutateCurrentObservations(
     .filter((observationId) => requestedIds.has(observationId));
 
   try {
+    if (!isCurrentTabLifecycleGeneration(generation)) {
+      return tabLifecycleSettingsChanged();
+    }
     await mutation(currentIds);
-    return ok({ updatedObservationCount: currentIds.length });
+    return isCurrentTabLifecycleGeneration(generation)
+      ? ok({ updatedObservationCount: currentIds.length })
+      : tabLifecycleSettingsChanged();
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));
   }
