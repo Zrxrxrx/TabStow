@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   isIdentifiableHttpTab,
-  isInactiveUnprotectedHttpTab,
+  isUnselectedUnprotectedHttpTab,
   validLastAccessed,
 } from './tab-lifecycle-eligibility';
 
@@ -40,7 +40,7 @@ describe('tab lifecycle eligibility', () => {
   });
 
   it('excludes selected and lifecycle-protected tabs', () => {
-    expect(isInactiveUnprotectedHttpTab(tab({ autoDiscardable: undefined }))).toBe(true);
+    expect(isUnselectedUnprotectedHttpTab(tab({ autoDiscardable: undefined }))).toBe(true);
 
     for (const candidate of [
       tab({ active: true }),
@@ -49,7 +49,7 @@ describe('tab lifecycle eligibility', () => {
       tab({ incognito: true }),
       tab({ autoDiscardable: false }),
     ]) {
-      expect(isInactiveUnprotectedHttpTab(candidate)).toBe(false);
+      expect(isUnselectedUnprotectedHttpTab(candidate)).toBe(false);
     }
   });
 

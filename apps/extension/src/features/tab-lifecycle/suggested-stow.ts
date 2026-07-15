@@ -20,7 +20,7 @@ import {
   isCurrentTabLifecycleGeneration,
   tabLifecycleSettingsChanged,
 } from './tab-lifecycle-generation';
-import { isInactiveUnprotectedHttpTab } from './tab-lifecycle-eligibility';
+import { isUnselectedUnprotectedHttpTab } from './tab-lifecycle-eligibility';
 import type {
   StowSuggestionCandidate,
   SuggestedStowResult,
@@ -60,7 +60,7 @@ function isEligibleSleepingTab(
   candidate: StowSuggestionCandidate,
 ): tab is chrome.tabs.Tab & { id: number; index: number; url: string; windowId: number } {
   return (
-    isInactiveUnprotectedHttpTab(tab)
+    isUnselectedUnprotectedHttpTab(tab)
     && tab.id === candidate.tabId
     && typeof tab.index === 'number'
     && typeof tab.windowId === 'number'

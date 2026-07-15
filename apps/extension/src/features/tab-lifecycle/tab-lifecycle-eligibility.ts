@@ -16,7 +16,7 @@ export function isIdentifiableHttpTab(
   );
 }
 
-export function isInactiveUnprotectedHttpTab(
+export function isUnselectedUnprotectedHttpTab(
   tab: chrome.tabs.Tab,
 ): tab is IdentifiableHttpTab {
   return (

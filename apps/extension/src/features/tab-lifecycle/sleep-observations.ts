@@ -1,7 +1,7 @@
 import { storage } from '#imports';
 import {
   isIdentifiableHttpTab,
-  isInactiveUnprotectedHttpTab,
+  isUnselectedUnprotectedHttpTab,
   validLastAccessed,
   type IdentifiableHttpTab,
 } from './tab-lifecycle-eligibility';
@@ -129,7 +129,7 @@ function normalizeObservation(value: unknown, now: number): SleepObservation | n
 
 function eligibleSleepingTab(tab: chrome.tabs.Tab): tab is IdentifiableHttpTab {
   return (
-    isInactiveUnprotectedHttpTab(tab)
+    isUnselectedUnprotectedHttpTab(tab)
     && tab.discarded === true
   );
 }
