@@ -66,7 +66,7 @@ export async function previewAutomaticSleep(
 
   const now = options.now ?? Date.now();
   const cutoff = now - policy.automaticSleepAfterDays * DAY_MS;
-  const tabs = await browser.tabs.query({});
+  const tabs = await browser.tabs.query({ windowType: 'normal' });
   return {
     eligibleTabCount: tabs.filter((tab) => isEligibleTab(tab, cutoff, now)).length,
   };
@@ -111,7 +111,7 @@ export async function runAutomaticSleepScan(
 
   const now = options.now ?? Date.now();
   const cutoff = now - policy.automaticSleepAfterDays * DAY_MS;
-  const candidates = (await browser.tabs.query({}))
+  const candidates = (await browser.tabs.query({ windowType: 'normal' }))
     .filter((tab) => isEligibleTab(tab, cutoff, now))
     .sort((left, right) => left.lastAccessed - right.lastAccessed);
   const shouldContinue = options.shouldContinue ?? (() => true);

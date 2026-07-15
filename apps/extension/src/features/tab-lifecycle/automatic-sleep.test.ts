@@ -55,7 +55,7 @@ describe('automatic sleep', () => {
     await expect(
       previewAutomaticSleep(ENABLED_POLICY, { now: NOW }),
     ).resolves.toEqual({ eligibleTabCount: 2 });
-    expect(browserMocks.tabs.query).toHaveBeenCalledWith({});
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
     expect(browserMocks.tabs.get).not.toHaveBeenCalled();
     expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
   });
@@ -141,7 +141,7 @@ describe('automatic sleep', () => {
       skippedTabIds: [],
       failures: [],
     });
-    expect(browserMocks.tabs.query).toHaveBeenCalledWith({});
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
     expect(browserMocks.tabs.get.mock.calls).toEqual([[21], [22]]);
     expect(browserMocks.tabs.discard.mock.calls).toEqual([[21], [22]]);
   });
