@@ -394,6 +394,36 @@ describe('sleep observations', () => {
     ]);
   });
 
+  it('defers a restored-tab event until full restart reconciliation', async () => {
+    stored.set(SESSION_KEY, 'new-session');
+    stored.set(LOCAL_KEY, {
+      schemaVersion: 1,
+      records: [storedObservation({ browserSessionId: 'old-session' })],
+    });
+    const tab = sleepingTab({ id: 77 });
+    const {
+      observeDiscardedTab,
+      reconcileSleepObservations,
+    } = await import('./sleep-observations');
+
+    await expect(observeDiscardedTab(tab, 2_000)).resolves.toBeNull();
+    expect(stored.get(LOCAL_KEY)).toEqual({
+      schemaVersion: 1,
+      records: [storedObservation({ browserSessionId: 'old-session' })],
+    });
+
+    await expect(
+      reconcileSleepObservations([tab], 2_500),
+    ).resolves.toEqual([
+      expect.objectContaining({
+        observationId: 'stored-observation',
+        browserSessionId: 'new-session',
+        tabId: 77,
+        observedSleepingSince: 1_200,
+      }),
+    ]);
+  });
+
   it('resets ambiguous duplicate URLs after a browser restart', async () => {
     stored.set(SESSION_KEY, 'new-session');
     stored.set(LOCAL_KEY, {

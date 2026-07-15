@@ -231,6 +231,16 @@ export async function observeDiscardedTab(
         && record.urlFingerprint === urlFingerprint
         && canContinueObservedSleepPeriod(record, lastAccessed),
     );
+    if (
+      !existing
+      && records.some(
+        (record) =>
+          record.browserSessionId !== browserSessionId
+          && record.urlFingerprint === urlFingerprint,
+      )
+    ) {
+      return null;
+    }
     const observation: SleepObservation = {
       observationId: existing?.observationId ?? crypto.randomUUID(),
       tabId: tab.id,
