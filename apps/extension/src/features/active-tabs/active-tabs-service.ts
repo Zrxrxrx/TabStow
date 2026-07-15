@@ -70,8 +70,8 @@ export async function focusActiveTab(
   windowId: number,
 ): Promise<AppResult<{ focused: true }>> {
   try {
-    await browser.windows.update(windowId, { focused: true });
-    await browser.tabs.update(tabId, { active: true });
+    const tab = await browser.tabs.update(tabId, { active: true });
+    await browser.windows.update(tab?.windowId ?? windowId, { focused: true });
     return ok({ focused: true });
   } catch (error) {
     return err('chrome-tabs-error', toErrorMessage(error));

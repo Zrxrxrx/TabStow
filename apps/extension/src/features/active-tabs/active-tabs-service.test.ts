@@ -183,6 +183,20 @@ describe('active tabs service', () => {
     expect(result).toEqual({ ok: true, data: { focused: true } });
   });
 
+  it('focuses the tab current window when a suggestion snapshot is stale', async () => {
+    browserMocks.tabs.update.mockResolvedValue({ id: 5, windowId: 11 });
+    const { focusActiveTab } = await import('./active-tabs-service');
+
+    await expect(focusActiveTab(5, 8)).resolves.toEqual({
+      ok: true,
+      data: { focused: true },
+    });
+
+    expect(browserMocks.tabs.update).toHaveBeenCalledWith(5, { active: true });
+    expect(browserMocks.windows.update).toHaveBeenCalledWith(11, { focused: true });
+    expect(browserMocks.windows.update).not.toHaveBeenCalledWith(8, { focused: true });
+  });
+
   it('closes requested tabs', async () => {
     const { closeActiveTabs } = await import('./active-tabs-service');
     const result = await closeActiveTabs([3, 4]);
