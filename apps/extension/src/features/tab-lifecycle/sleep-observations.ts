@@ -183,6 +183,27 @@ function retainCurrentAndFreshUnmatched(
   );
 }
 
+async function mutateRetainedObservations<T>(
+  now: number,
+  mutate: (
+    records: SleepObservation[],
+    browserSessionId: string,
+  ) => { records: SleepObservation[]; result: T },
+): Promise<T> {
+  return runSerialized(async () => {
+    const [records, browserSessionId] = await Promise.all([
+      readStoredObservations(now),
+      getBrowserSessionId(),
+    ]);
+    const mutation = mutate(
+      retainCurrentAndFreshUnmatched(records, browserSessionId, now),
+      browserSessionId,
+    );
+    await writeStoredObservations(mutation.records);
+    return mutation.result;
+  });
+}
+
 function buildLiveObservation({
   existing,
   tabId,
@@ -374,33 +395,25 @@ export async function reconcileSleepObservations(
 export async function listSleepObservations(
   now = Date.now(),
 ): Promise<SleepObservation[]> {
-  return runSerialized(async () => {
-    const [records, browserSessionId] = await Promise.all([
-      readStoredObservations(now),
-      getBrowserSessionId(),
-    ]);
-    const retained = retainCurrentAndFreshUnmatched(records, browserSessionId, now);
-    await writeStoredObservations(retained);
-    return retained.filter((record) => record.browserSessionId === browserSessionId);
-  });
+  return mutateRetainedObservations(now, (records, browserSessionId) => ({
+    records,
+    result: records.filter(
+      (record) => record.browserSessionId === browserSessionId,
+    ),
+  }));
 }
 
 export async function removeSleepObservation(
   tabId: number,
   now = Date.now(),
 ): Promise<void> {
-  return runSerialized(async () => {
-    const [records, browserSessionId] = await Promise.all([
-      readStoredObservations(now),
-      getBrowserSessionId(),
-    ]);
-    const retained = retainCurrentAndFreshUnmatched(records, browserSessionId, now)
-      .filter(
-        (record) =>
-          record.browserSessionId !== browserSessionId || record.tabId !== tabId,
-      );
-    await writeStoredObservations(retained);
-  });
+  return mutateRetainedObservations(now, (records, browserSessionId) => ({
+    records: records.filter(
+      (record) =>
+        record.browserSessionId !== browserSessionId || record.tabId !== tabId,
+    ),
+    result: undefined,
+  }));
 }
 
 export async function snoozeSleepObservations(
@@ -411,26 +424,20 @@ export async function snoozeSleepObservations(
   if (!Number.isFinite(snoozedUntil) || snoozedUntil <= now) {
     throw new RangeError('snoozedUntil must be a future timestamp.');
   }
-  return runSerialized(async () => {
-    const [records, browserSessionId] = await Promise.all([
-      readStoredObservations(now),
-      getBrowserSessionId(),
-    ]);
-    const ids = new Set(observationIds);
+  const ids = new Set(observationIds);
+  return mutateRetainedObservations(now, (records, browserSessionId) => {
     let updatedObservationCount = 0;
-    const retained = retainCurrentAndFreshUnmatched(records, browserSessionId, now)
-      .map((record) => {
-        if (
-          record.browserSessionId !== browserSessionId
-          || !ids.has(record.observationId)
-        ) {
-          return record;
-        }
-        updatedObservationCount += 1;
-        return { ...record, snoozedUntil };
-      });
-    await writeStoredObservations(retained);
-    return updatedObservationCount;
+    const updatedRecords = records.map((record) => {
+      if (
+        record.browserSessionId !== browserSessionId
+        || !ids.has(record.observationId)
+      ) {
+        return record;
+      }
+      updatedObservationCount += 1;
+      return { ...record, snoozedUntil };
+    });
+    return { records: updatedRecords, result: updatedObservationCount };
   });
 }
 
@@ -438,26 +445,20 @@ export async function suppressSleepObservations(
   observationIds: readonly string[],
   now = Date.now(),
 ): Promise<number> {
-  return runSerialized(async () => {
-    const [records, browserSessionId] = await Promise.all([
-      readStoredObservations(now),
-      getBrowserSessionId(),
-    ]);
-    const ids = new Set(observationIds);
+  const ids = new Set(observationIds);
+  return mutateRetainedObservations(now, (records, browserSessionId) => {
     let updatedObservationCount = 0;
-    const retained = retainCurrentAndFreshUnmatched(records, browserSessionId, now)
-      .map((record): SleepObservation => {
-        if (
-          record.browserSessionId !== browserSessionId
-          || !ids.has(record.observationId)
-        ) {
-          return record;
-        }
-        updatedObservationCount += 1;
-        return { ...record, suppressedUntilWake: true };
-      });
-    await writeStoredObservations(retained);
-    return updatedObservationCount;
+    const updatedRecords = records.map((record): SleepObservation => {
+      if (
+        record.browserSessionId !== browserSessionId
+        || !ids.has(record.observationId)
+      ) {
+        return record;
+      }
+      updatedObservationCount += 1;
+      return { ...record, suppressedUntilWake: true };
+    });
+    return { records: updatedRecords, result: updatedObservationCount };
   });
 }
 
