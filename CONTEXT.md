@@ -8,6 +8,14 @@ Tabstow organizes browser tabs into active browser state and durable saved state
 An Active Tab that remains in its browser window while its page memory has been released and will reload when activated.
 _Avoid_: Saved Tab, closed tab
 
+**Observed Sleep Period**:
+A continuous period during which this device has reliably observed the same Active Tab remain a Sleeping Tab; time before the first reliable observation is never inferred.
+_Avoid_: Exact sleep duration, discarded-at time, tab age
+
+**Long-sleeping Tab**:
+A Sleeping Tab whose Observed Sleep Period has crossed the configured threshold for a Saved for Later suggestion.
+_Avoid_: Stale tab, old tab
+
 ## Saved tabs
 
 **Saved for Later**:
@@ -69,7 +77,7 @@ A condition that requires user action before synchronization can continue, while
 _Avoid_: Data loss, application failure
 
 **Device-local State**:
-State that intentionally remains owned by one device, including GitHub authorization, Sync Gist configuration, Replica ID, History, Todos, light/dark theme mode, and language.
+State that intentionally remains owned by one device, including GitHub authorization, Sync Gist configuration, Replica ID, History, Todos, Observed Sleep Period records, light/dark theme mode, and language.
 _Avoid_: Unsynced data, pending data
 
 **Quiet-period synchronization**:

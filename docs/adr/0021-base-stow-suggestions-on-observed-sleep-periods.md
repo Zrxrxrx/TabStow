@@ -1,0 +1,3 @@
+# Base Stow Suggestions on Observed Sleep Periods
+
+Chrome exposes whether a tab is currently discarded but not when it entered that state. Tabstow will therefore consider every eligible Sleeping Tab regardless of whether Tabstow or Chrome initiated the sleep, while basing Saved for Later suggestions only on an Observed Sleep Period owned by the current device. When prior sleep history cannot be established reliably, observation starts at the first reliable sighting and is never backdated; continuity across a browser restart may be retained only when the same tab can be matched unambiguously. These observations remain Device-local State, and product copy must describe a conservative observed duration rather than an exact sleep time.
