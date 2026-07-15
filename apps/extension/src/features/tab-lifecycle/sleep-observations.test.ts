@@ -555,6 +555,59 @@ describe('sleep observations', () => {
     });
   });
 
+  it('retains fresh unmatched records while applying current-session mutations', async () => {
+    const now = 40 * DAY_MS;
+    const current = storedObservation();
+    const freshUnmatched = storedObservation({
+      observationId: 'fresh-unmatched',
+      tabId: 8,
+      browserSessionId: 'old-session',
+      observedSleepingSince: now - 29 * DAY_MS - 1_000,
+      lastObservedAt: now - 29 * DAY_MS,
+    });
+    const expiredUnmatched = storedObservation({
+      observationId: 'expired-unmatched',
+      tabId: 9,
+      browserSessionId: 'older-session',
+      observedSleepingSince: now - 30 * DAY_MS - 1_000,
+      lastObservedAt: now - 30 * DAY_MS,
+    });
+    stored.set(SESSION_KEY, 'browser-session-1');
+    stored.set(LOCAL_KEY, {
+      schemaVersion: 1,
+      records: [current, freshUnmatched, expiredUnmatched],
+    });
+    const {
+      removeSleepObservation,
+      snoozeSleepObservations,
+      suppressSleepObservations,
+    } = await import('./sleep-observations');
+
+    await expect(
+      snoozeSleepObservations(['stored-observation'], now + DAY_MS, now),
+    ).resolves.toBe(1);
+    await expect(
+      suppressSleepObservations(['stored-observation'], now),
+    ).resolves.toBe(1);
+    expect(stored.get(LOCAL_KEY)).toEqual({
+      schemaVersion: 1,
+      records: [
+        {
+          ...current,
+          snoozedUntil: now + DAY_MS,
+          suppressedUntilWake: true,
+        },
+        freshUnmatched,
+      ],
+    });
+
+    await removeSleepObservation(7, now);
+    expect(stored.get(LOCAL_KEY)).toEqual({
+      schemaVersion: 1,
+      records: [freshUnmatched],
+    });
+  });
+
   it('serializes concurrent mutations against the latest durable value', async () => {
     const module = await import('./sleep-observations');
     await module.reconcileSleepObservations([sleepingTab()], 2_000);
