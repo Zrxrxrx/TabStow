@@ -336,8 +336,17 @@ async function stowSuggestedTabsUnlocked(
         );
       if (observationMatches && isCurrentTabLifecycleGeneration(generation)) {
         const currentTab = await readEligibleTab(item.candidate);
+        operationNow = currentTimeAtOrAfter(clock, operationNow);
+        const currentObservationMatches = currentTab
+          && isCurrentTabLifecycleGeneration(generation)
+          && await matchesSleepObservation(
+            item.candidate.observationId,
+            currentTab,
+            operationNow,
+          );
         if (
           currentTab
+          && currentObservationMatches
           && isCurrentTabLifecycleGeneration(generation)
           && currentTab.windowId === item.tab.windowId
           && currentTab.lastAccessed === observedTab.lastAccessed

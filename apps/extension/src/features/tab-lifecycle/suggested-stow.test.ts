@@ -329,6 +329,45 @@ describe('suggested stow', () => {
     expect(browserMocks.tabs.remove.mock.calls).toEqual([[1]]);
   });
 
+  it('keeps a replacement sleep period open when lastAccessed is unavailable', async () => {
+    const tab = sleepingTab({ lastAccessed: undefined });
+    const [record] = await observe([tab]);
+    const observations = await import('./sleep-observations');
+    let currentNow = NOW;
+    let getCount = 0;
+    browserMocks.tabs.get.mockImplementation(async (tabId: number) => {
+      getCount += 1;
+      const currentTab = liveTabs.get(tabId)!;
+      if (getCount === 3) {
+        currentNow = NOW + 1;
+        await observations.removeSleepObservation(tabId, currentNow);
+        await observations.observeDiscardedTab(currentTab, currentNow);
+      }
+      return { ...currentTab };
+    });
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs([record!.observationId], {
+        now: NOW,
+        clock: () => currentNow,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        savedTabCount: 1,
+        createdSessionCount: 1,
+        closedTabCount: 0,
+        skipped: [{
+          observationId: record!.observationId,
+          reason: 'state-changed',
+        }],
+        closeFailures: [],
+      },
+    });
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
   it('uses the advanced reconciliation time for every cleanup in a batch', async () => {
     const records = await observe([
       sleepingTab({ id: 1, index: 0, url: 'https://example.com/first' }),
