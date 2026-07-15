@@ -17,7 +17,7 @@ A Sleeping Tab whose Observed Sleep Period has crossed the configured threshold 
 _Avoid_: Stale tab, old tab
 
 **Tab Lifecycle Policy**:
-The related but independently controlled rules for automatically sleeping eligible Active Tabs and suggesting that eligible Long-sleeping Tabs be placed in Saved for Later.
+The device-local, independently controlled rules for automatically sleeping eligible Active Tabs and suggesting that eligible Long-sleeping Tabs be placed in Saved for Later.
 _Avoid_: Sleep policy, retention policy
 
 **Stow Suggestion**:
@@ -69,7 +69,7 @@ The guarantee that connected replicas reach the same Synchronized State after su
 _Avoid_: Real-time consistency, transactional cloud save
 
 **Synchronized State**:
-Saved for Later, Quick Links, and the tab-behavior preferences shared between connected devices through the Sync File.
+Saved for Later, Quick Links, and the pinned-tab inclusion and closing preferences shared between connected devices through the Sync File.
 _Avoid_: Account data, all settings
 
 **Pending Synchronization**:
@@ -85,7 +85,7 @@ A condition that requires user action before synchronization can continue, while
 _Avoid_: Data loss, application failure
 
 **Device-local State**:
-State that intentionally remains owned by one device, including GitHub authorization, Sync Gist configuration, Replica ID, History, Todos, Observed Sleep Period records, light/dark theme mode, and language.
+State that intentionally remains owned by one device, including GitHub authorization, Sync Gist configuration, Replica ID, History, Todos, the Tab Lifecycle Policy and its Observed Sleep Period records, light/dark theme mode, and language.
 _Avoid_: Unsynced data, pending data
 
 **Quiet-period synchronization**:

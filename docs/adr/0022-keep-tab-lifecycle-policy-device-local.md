@@ -1,0 +1,3 @@
+# Keep the Tab Lifecycle Policy Device-local
+
+The complete Tab Lifecycle Policy, including the automatic-sleep and Stow Suggestion toggles and their thresholds, will remain Device-local State. Memory capacity, browser usage, and acceptable lifecycle behavior differ by device, and synchronization must never enable automatic sleeping on a device where the user did not grant that local consent. Observed Sleep Period records are inherently device-specific as well, so keeping the policy beside them avoids a mixed local-and-synchronized lifecycle model; existing synchronized pinned-tab preferences remain unchanged.

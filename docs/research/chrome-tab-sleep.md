@@ -71,6 +71,7 @@ The two phases form one Tab Lifecycle settings area but retain independent conse
 
 - Automatic sleep is disabled by default and must be enabled explicitly because discarding can lose in-memory page state.
 - Stow Suggestions are enabled by default because they are local, non-destructive prompts; they never save or close a tab without explicit confirmation.
+- The complete Tab Lifecycle Policy, including both toggles and their thresholds, remains Device-local State and is never enabled or changed by synchronization from another device.
 - Stow Suggestions cover eligible Sleeping Tabs regardless of whether Tabstow or Chrome initiated the discard. Suggestion timing uses the conservative Observed Sleep Period defined in [ADR 0021](../adr/0021-base-stow-suggestions-on-observed-sleep-periods.md), never an inferred exact discard time.
 
 ## Minimal Tabstow change shape
