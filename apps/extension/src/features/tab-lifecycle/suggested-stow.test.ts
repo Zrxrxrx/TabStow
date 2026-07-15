@@ -223,17 +223,22 @@ describe('suggested stow', () => {
 
   it('drops a stale observation identity immediately before persistence', async () => {
     const [record] = await observe([sleepingTab()]);
+    let currentNow = NOW;
     settingsMocks.getSettings.mockImplementationOnce(async () => {
       liveTabs.set(1, {
         ...liveTabs.get(1)!,
-        lastAccessed: NOW - DAY_MS,
+        lastAccessed: NOW + 1,
       });
+      currentNow = NOW + 1;
       return { deviceId: 'device-1' };
     });
     const { stowSuggestedTabs } = await import('./suggested-stow');
 
     await expect(
-      stowSuggestedTabs([record!.observationId], { now: NOW }),
+      stowSuggestedTabs([record!.observationId], {
+        now: NOW,
+        clock: () => currentNow,
+      }),
     ).resolves.toEqual({
       ok: true,
       data: {
@@ -249,6 +254,79 @@ describe('suggested stow', () => {
     });
     expect(dbMocks.createSessionsBatch).not.toHaveBeenCalled();
     expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it('keeps the saved copy open when a new sleep period starts after persistence', async () => {
+    const [record] = await observe([sleepingTab()]);
+    let currentNow = NOW;
+    dbMocks.createSessionsBatch.mockImplementationOnce(async (sessions: TabSession[]) => {
+      liveTabs.set(1, {
+        ...liveTabs.get(1)!,
+        lastAccessed: NOW + 1,
+      });
+      currentNow = NOW + 1;
+      return structuredClone(sessions);
+    });
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs([record!.observationId], {
+        now: NOW,
+        clock: () => currentNow,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        savedTabCount: 1,
+        createdSessionCount: 1,
+        closedTabCount: 0,
+        skipped: [{
+          observationId: record!.observationId,
+          reason: 'state-changed',
+        }],
+        closeFailures: [],
+      },
+    });
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
+  });
+
+  it('revalidates each observation again immediately before closing its tab', async () => {
+    const records = await observe([
+      sleepingTab({ id: 1, index: 0, url: 'https://example.com/first' }),
+      sleepingTab({ id: 2, index: 1, url: 'https://example.com/second' }),
+    ]);
+    let currentNow = NOW;
+    browserMocks.tabs.remove.mockImplementation(async (tabId: number) => {
+      liveTabs.delete(tabId);
+      if (tabId === 1) {
+        liveTabs.set(2, {
+          ...liveTabs.get(2)!,
+          lastAccessed: NOW + 1,
+        });
+        currentNow = NOW + 1;
+      }
+    });
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs(records.map(({ observationId }) => observationId), {
+        now: NOW,
+        clock: () => currentNow,
+      }),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        savedTabCount: 2,
+        createdSessionCount: 1,
+        closedTabCount: 1,
+        skipped: [{
+          observationId: records[1]!.observationId,
+          reason: 'state-changed',
+        }],
+        closeFailures: [],
+      },
+    });
+    expect(browserMocks.tabs.remove.mock.calls).toEqual([[1]]);
   });
 
   it('aborts before persistence when lifecycle policy changes during confirmation', async () => {

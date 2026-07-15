@@ -10,6 +10,7 @@ import {
   type AppResult,
 } from '@/lib/errors';
 import {
+  matchesSleepObservation,
   reconcileSleepObservations,
   removeSleepObservation,
   suppressSleepObservations,
@@ -26,6 +27,7 @@ import type {
 } from './types';
 
 type SuggestedStowOptions = {
+  clock?: () => number;
   now?: number;
 };
 
@@ -36,6 +38,11 @@ type PreparedTab = {
 };
 
 let stowInFlight: Promise<AppResult<SuggestedStowResult>> | null = null;
+
+function currentTimeAtOrAfter(clock: () => number, floor: number): number {
+  const current = clock();
+  return Number.isFinite(current) && current >= floor ? current : floor;
+}
 
 function validObservationIds(value: unknown): value is string[] {
   return (
@@ -148,6 +155,7 @@ async function removeObservationBestEffort(tabId: number, now: number): Promise<
 async function stowSuggestedTabsUnlocked(
   observationIds: string[],
   now: number,
+  clock: () => number,
   generation: number,
 ): Promise<AppResult<SuggestedStowResult>> {
   const listResult = await listStowSuggestions({ now });
@@ -207,12 +215,17 @@ async function stowSuggestedTabsUnlocked(
   }
 
   let revalidated: PreparedTab[];
+  let revalidationNow = now;
   try {
     const currentTabs = await browser.tabs.query({ windowType: 'normal' });
     if (!isCurrentTabLifecycleGeneration(generation)) {
       return tabLifecycleSettingsChanged();
     }
-    const currentObservations = await reconcileSleepObservations(currentTabs, now);
+    revalidationNow = currentTimeAtOrAfter(clock, now);
+    const currentObservations = await reconcileSleepObservations(
+      currentTabs,
+      revalidationNow,
+    );
     if (!isCurrentTabLifecycleGeneration(generation)) {
       return tabLifecycleSettingsChanged();
     }
@@ -288,7 +301,10 @@ async function stowSuggestedTabsUnlocked(
     try {
       const tabs = await browser.tabs.query({ windowType: 'normal' });
       if (isCurrentTabLifecycleGeneration(generation)) {
-        const observations = await reconcileSleepObservations(tabs, now);
+        const observations = await reconcileSleepObservations(
+          tabs,
+          currentTimeAtOrAfter(clock, revalidationNow),
+        );
         if (isCurrentTabLifecycleGeneration(generation)) {
           postSaveObservationIds = new Set(
             observations.map(({ observationId }) => observationId),
@@ -301,11 +317,33 @@ async function stowSuggestedTabsUnlocked(
   }
 
   for (const item of represented) {
-    const observationMatches = postSaveObservationIds.has(
-      item.candidate.observationId,
-    );
-    const tab = observationMatches ? await readEligibleTab(item.candidate) : null;
-    if (!tab || tab.windowId !== item.tab.windowId) {
+    let tab: PreparedTab['tab'] | null = null;
+    if (
+      postSaveObservationIds.has(item.candidate.observationId)
+      && isCurrentTabLifecycleGeneration(generation)
+    ) {
+      const observedTab = await readEligibleTab(item.candidate);
+      const observationMatches = observedTab
+        && isCurrentTabLifecycleGeneration(generation)
+        && await matchesSleepObservation(
+          item.candidate.observationId,
+          observedTab,
+          currentTimeAtOrAfter(clock, revalidationNow),
+        );
+      if (observationMatches && isCurrentTabLifecycleGeneration(generation)) {
+        const currentTab = await readEligibleTab(item.candidate);
+        if (
+          currentTab
+          && isCurrentTabLifecycleGeneration(generation)
+          && currentTab.windowId === item.tab.windowId
+          && currentTab.lastAccessed === observedTab.lastAccessed
+        ) {
+          tab = currentTab;
+        }
+      }
+    }
+
+    if (!tab) {
       result.skipped.push({
         observationId: item.candidate.observationId,
         reason: 'state-changed',
@@ -346,9 +384,16 @@ export function stowSuggestedTabs(
     );
   }
 
-  const now = options.now ?? Date.now();
+  const fixedNow = options.now;
+  const clock = options.clock ?? (fixedNow === undefined ? Date.now : () => fixedNow);
+  const now = fixedNow ?? clock();
   const generation = currentTabLifecycleGeneration();
-  stowInFlight = stowSuggestedTabsUnlocked(observationIds, now, generation).finally(() => {
+  stowInFlight = stowSuggestedTabsUnlocked(
+    observationIds,
+    now,
+    clock,
+    generation,
+  ).finally(() => {
     stowInFlight = null;
   });
   return stowInFlight;

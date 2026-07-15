@@ -60,11 +60,7 @@ function canContinueObservedSleepPeriod(
   record: SleepObservation,
   lastAccessed: number | undefined,
 ): boolean {
-  return (
-    record.lastAccessed === undefined
-    || lastAccessed === undefined
-    || record.lastAccessed === lastAccessed
-  );
+  return record.lastAccessed === lastAccessed;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -258,6 +254,31 @@ export async function observeDiscardedTab(
       observation,
     ]);
     return observation;
+  });
+}
+
+export async function matchesSleepObservation(
+  observationId: string,
+  tab: chrome.tabs.Tab,
+  now = Date.now(),
+): Promise<boolean> {
+  return runSerialized(async () => {
+    if (!eligibleSleepingTab(tab)) return false;
+
+    const [records, browserSessionId, urlFingerprint] = await Promise.all([
+      readStoredObservations(now),
+      getBrowserSessionId(),
+      fingerprintUrl(tab.url),
+    ]);
+    const lastAccessed = validLastAccessed(tab.lastAccessed, now);
+    return records.some(
+      (record) =>
+        record.observationId === observationId
+        && record.browserSessionId === browserSessionId
+        && record.tabId === tab.id
+        && record.urlFingerprint === urlFingerprint
+        && canContinueObservedSleepPeriod(record, lastAccessed),
+    );
   });
 }
 

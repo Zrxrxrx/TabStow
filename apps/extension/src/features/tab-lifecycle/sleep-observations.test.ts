@@ -176,6 +176,41 @@ describe('sleep observations', () => {
     });
   });
 
+  it.each([
+    ['missing', undefined],
+    ['in the future', 3_001],
+  ])(
+    'starts a new period when current lastAccessed is %s after valid evidence',
+    async (_label, lastAccessed) => {
+      const { observeDiscardedTab } = await import('./sleep-observations');
+      await observeDiscardedTab(sleepingTab(), 2_000);
+
+      await expect(
+        observeDiscardedTab(sleepingTab({ lastAccessed }), 3_000),
+      ).resolves.toEqual({
+        observationId: 'observation-2',
+        tabId: 7,
+        browserSessionId: 'browser-session-1',
+        urlFingerprint: FINGERPRINT,
+        observedSleepingSince: 3_000,
+        lastObservedAt: 3_000,
+      });
+    },
+  );
+
+  it('preserves a same-session period when lastAccessed is unavailable throughout', async () => {
+    const { observeDiscardedTab } = await import('./sleep-observations');
+    await observeDiscardedTab(sleepingTab({ lastAccessed: undefined }), 2_000);
+
+    await expect(
+      observeDiscardedTab(sleepingTab({ lastAccessed: undefined }), 3_000),
+    ).resolves.toEqual(expect.objectContaining({
+      observationId: 'observation-1',
+      observedSleepingSince: 2_000,
+      lastObservedAt: 3_000,
+    }));
+  });
+
   it('starts a new reconciled observation when lastAccessed proves a missed wake', async () => {
     const { reconcileSleepObservations } = await import('./sleep-observations');
     await reconcileSleepObservations([sleepingTab()], 2_000);
