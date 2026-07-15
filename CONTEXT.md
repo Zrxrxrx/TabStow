@@ -4,6 +4,18 @@ Tabstow organizes browser tabs into active browser state and durable saved state
 
 ## Active tabs
 
+**Active Tab**:
+A tab that currently exists in a Chrome window, whether selected, in the background, or sleeping.
+_Avoid_: Selected Tab, Saved Tab
+
+**Selected Tab**:
+The Active Tab currently selected within its Chrome window; a window has a Selected Tab even when that window is not focused.
+_Avoid_: Active Tab, focused tab
+
+**Tab Inactivity**:
+The elapsed time since an Active Tab last became the Selected Tab in its Chrome window; it is not time since opening and does not prove page interaction.
+_Avoid_: Tab age, open duration
+
 **Sleeping Tab**:
 An Active Tab that remains in its browser window while its page memory has been released and will reload when activated.
 _Avoid_: Saved Tab, closed tab

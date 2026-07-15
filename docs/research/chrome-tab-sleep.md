@@ -70,6 +70,7 @@ If Tabstow relies exclusively on `lastAccessed`, it should either set `minimum_c
 The two phases form one Tab Lifecycle settings area but retain independent consent boundaries:
 
 - Automatic sleep is disabled by default and must be enabled explicitly because discarding can lose in-memory page state.
+- Automatic sleep requires the Chrome 121 `Tab.lastAccessed` capability. Older browsers keep the rest of Tabstow available but expose the automatic-sleep control as unavailable with an upgrade prompt; Tabstow never substitutes opening or first-observed time for Tab Inactivity.
 - Stow Suggestions are enabled by default because they are local, non-destructive prompts; they never save or close a tab without explicit confirmation.
 - The complete Tab Lifecycle Policy, including both toggles and their thresholds, remains Device-local State and is never enabled or changed by synchronization from another device.
 - Stow Suggestions cover eligible Sleeping Tabs regardless of whether Tabstow or Chrome initiated the discard. Suggestion timing uses the conservative Observed Sleep Period defined in [ADR 0021](../adr/0021-base-stow-suggestions-on-observed-sleep-periods.md), never an inferred exact discard time.
