@@ -338,8 +338,12 @@ describe('sleep observations', () => {
       2_000,
     );
 
-    await snoozeSleepObservations(['observation-1', 'unknown'], 10_000, 2_500);
-    await suppressSleepObservations(['observation-1'], 2_500);
+    await expect(
+      snoozeSleepObservations(['observation-1', 'unknown'], 10_000, 2_500),
+    ).resolves.toBe(1);
+    await expect(
+      suppressSleepObservations(['observation-1'], 2_500),
+    ).resolves.toBe(1);
 
     await expect(listSleepObservations(2_500)).resolves.toEqual([
       expect.objectContaining({

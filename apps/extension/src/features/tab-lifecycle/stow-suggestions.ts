@@ -200,7 +200,7 @@ export async function listStowSuggestions(
 
 async function mutateCurrentObservations(
   observationIds: readonly string[],
-  mutation: (ids: string[], now: number) => Promise<void>,
+  mutation: (ids: string[], now: number) => Promise<number>,
   now: number,
   clock: () => number,
 ): Promise<AppResult<StowSuggestionMutationResult>> {
@@ -233,12 +233,12 @@ async function mutateCurrentObservations(
     if (!isCurrentTabLifecycleGeneration(generation)) {
       return tabLifecycleSettingsChanged();
     }
-    await mutation(
+    const updatedObservationCount = await mutation(
       currentIds,
       currentTimeAtOrAfter(clock, currentResult.data.observedAt),
     );
     return isCurrentTabLifecycleGeneration(generation)
-      ? ok({ updatedObservationCount: currentIds.length })
+      ? ok({ updatedObservationCount })
       : tabLifecycleSettingsChanged();
   } catch (error) {
     return err('unknown-error', toErrorMessage(error));

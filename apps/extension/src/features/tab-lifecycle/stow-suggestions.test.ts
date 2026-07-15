@@ -22,6 +22,7 @@ vi.mock('@/db/db', () => ({ listSessions: dbMocks.listSessions }));
 
 const DAY_MS = 86_400_000;
 const NOW = Date.UTC(2026, 6, 15, 12);
+const LOCAL_KEY = 'local:tabstow-sleep-observations-v1';
 const POLICY_KEY = 'local:tabstow-tab-lifecycle-policy-v1';
 const SESSION_KEY = 'session:tabstow-browser-session-id-v1';
 
@@ -332,6 +333,46 @@ describe('stow suggestions', () => {
         snoozedUntil: advancedNow + 7 * DAY_MS,
       }),
     ]);
+  });
+
+  it('reports no update when the observation identity changes before mutation', async () => {
+    const tab = sleepingTab();
+    const replacementNow = NOW + 1;
+    const observations = await import('./sleep-observations');
+    const observation = await observations.observeDiscardedTab(
+      tab,
+      NOW - 20 * DAY_MS,
+    );
+    browserMocks.tabs.query.mockResolvedValue([tab]);
+    let clockCalls = 0;
+    const clock = () => {
+      clockCalls += 1;
+      if (clockCalls === 2) {
+        stored.set(LOCAL_KEY, {
+          schemaVersion: 1,
+          records: [{
+            ...observation!,
+            observationId: 'replacement-observation',
+            observedSleepingSince: replacementNow,
+            lastObservedAt: replacementNow,
+          }],
+        });
+        return replacementNow;
+      }
+      return NOW;
+    };
+
+    const { snoozeStowSuggestions } = await import('./stow-suggestions');
+    await expect(
+      snoozeStowSuggestions([observation!.observationId], { now: NOW, clock }),
+    ).resolves.toEqual({ ok: true, data: { updatedObservationCount: 0 } });
+    const currentObservations = await observations.listSleepObservations(replacementNow);
+    expect(currentObservations).toEqual([
+      expect.objectContaining({
+        observationId: 'replacement-observation',
+      }),
+    ]);
+    expect(currentObservations[0]).not.toHaveProperty('snoozedUntil');
   });
 
   it('returns a Chrome error when current tabs cannot be reconciled', async () => {

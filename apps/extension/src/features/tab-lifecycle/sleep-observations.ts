@@ -417,7 +417,7 @@ export async function snoozeSleepObservations(
   observationIds: readonly string[],
   snoozedUntil: number,
   now = Date.now(),
-): Promise<void> {
+): Promise<number> {
   if (!Number.isFinite(snoozedUntil) || snoozedUntil <= now) {
     throw new RangeError('snoozedUntil must be a future timestamp.');
   }
@@ -427,33 +427,47 @@ export async function snoozeSleepObservations(
       getBrowserSessionId(),
     ]);
     const ids = new Set(observationIds);
+    let updatedObservationCount = 0;
     const retained = retainCurrentAndFreshUnmatched(records, browserSessionId, now)
-      .map((record) =>
-        record.browserSessionId === browserSessionId && ids.has(record.observationId)
-          ? { ...record, snoozedUntil }
-          : record,
-      );
+      .map((record) => {
+        if (
+          record.browserSessionId !== browserSessionId
+          || !ids.has(record.observationId)
+        ) {
+          return record;
+        }
+        updatedObservationCount += 1;
+        return { ...record, snoozedUntil };
+      });
     await writeStoredObservations(retained);
+    return updatedObservationCount;
   });
 }
 
 export async function suppressSleepObservations(
   observationIds: readonly string[],
   now = Date.now(),
-): Promise<void> {
+): Promise<number> {
   return runSerialized(async () => {
     const [records, browserSessionId] = await Promise.all([
       readStoredObservations(now),
       getBrowserSessionId(),
     ]);
     const ids = new Set(observationIds);
+    let updatedObservationCount = 0;
     const retained = retainCurrentAndFreshUnmatched(records, browserSessionId, now)
-      .map((record): SleepObservation =>
-        record.browserSessionId === browserSessionId && ids.has(record.observationId)
-          ? { ...record, suppressedUntilWake: true }
-          : record,
-      );
+      .map((record): SleepObservation => {
+        if (
+          record.browserSessionId !== browserSessionId
+          || !ids.has(record.observationId)
+        ) {
+          return record;
+        }
+        updatedObservationCount += 1;
+        return { ...record, suppressedUntilWake: true };
+      });
     await writeStoredObservations(retained);
+    return updatedObservationCount;
   });
 }
 
