@@ -6,7 +6,7 @@ import {
   type TabLifecyclePolicy,
 } from './types';
 import {
-  isInactiveUnprotectedHttpTab,
+  isUnselectedUnprotectedHttpTab,
   validLastAccessed,
 } from './tab-lifecycle-eligibility';
 
@@ -44,7 +44,7 @@ function isEligibleTab(
 ): tab is EligibleAutomaticSleepTab {
   const lastAccessed = validLastAccessed(tab.lastAccessed, now);
   return (
-    isInactiveUnprotectedHttpTab(tab)
+    isUnselectedUnprotectedHttpTab(tab)
     && !tab.discarded
     && lastAccessed !== undefined
     && lastAccessed <= cutoff
