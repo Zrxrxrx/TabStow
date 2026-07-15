@@ -93,7 +93,7 @@ A successful policy update invalidates older in-flight lifecycle work before rec
 - An eligible discarded HTTP(S) tab with no matching record starts a new period at the current time. Existing time is never backdated.
 - A successful manual or automatic discard records the transition directly; tab events provide a second authoritative signal.
 - Repeated observations of the same eligible Sleeping Tab preserve the original start.
-- Two differing valid `lastAccessed` values prove that the tab became active between observations and start a new period, recovering a missed wake event conservatively.
+- `lastAccessed` continues a period only when it matches the recorded value: a differing valid value proves a missed activation, while a missing, invalid, or future value resets conservatively when the record previously held valid evidence. Two unavailable values may continue within the same browser session.
 - Waking, activation, removal, URL change, tab replacement, or transition into a lifecycle-protected state ends the current record. Re-qualifying later starts a new period.
 - Disabling Stow Suggestions clears observation, snooze, and suppression data. Re-enabling starts currently eligible Sleeping Tabs at the next observation time.
 - Malformed records and future timestamps reset conservatively.
