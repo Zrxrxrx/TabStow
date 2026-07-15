@@ -103,6 +103,29 @@ describe('tab lifecycle coordinator', () => {
     expect(browserMocks.alarms.clear).toHaveBeenCalledWith(TAB_LIFECYCLE_ALARM_NAME);
   });
 
+  it('does not schedule automatic sleep on unsupported or transiently unavailable Chrome APIs', async () => {
+    const { reconcileTabLifecycleAlarm, TAB_LIFECYCLE_ALARM_NAME } = await import(
+      './tab-lifecycle-coordinator'
+    );
+    browserMocks.tabs.query.mockResolvedValue([{ id: 1 }]);
+
+    await reconcileTabLifecycleAlarm();
+
+    expect(browserMocks.alarms.clear).toHaveBeenCalledWith(TAB_LIFECYCLE_ALARM_NAME);
+    expect(browserMocks.alarms.create).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    storageMocks.getItem.mockImplementation(async (key: string) =>
+      key === POLICY_KEY ? storedPolicy(true) : undefined,
+    );
+    browserMocks.tabs.query.mockRejectedValue(new Error('Tabs unavailable'));
+
+    await reconcileTabLifecycleAlarm();
+
+    expect(browserMocks.alarms.clear).not.toHaveBeenCalled();
+    expect(browserMocks.alarms.create).not.toHaveBeenCalled();
+  });
+
   it('keeps an existing correct alarm and repairs a wrong cadence', async () => {
     const { reconcileTabLifecycleAlarm, TAB_LIFECYCLE_ALARM_NAME } = await import(
       './tab-lifecycle-coordinator'

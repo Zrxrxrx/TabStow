@@ -28,10 +28,14 @@ export async function reconcileTabLifecycleAlarm(): Promise<void> {
   const state = await getTabLifecycleState();
   if (!state.ok) return;
 
-  if (!state.data.policy.automaticSleepEnabled) {
+  if (
+    !state.data.policy.automaticSleepEnabled
+    || state.data.automaticSleepCapability.status === 'unsupported'
+  ) {
     await browser.alarms.clear(TAB_LIFECYCLE_ALARM_NAME);
     return;
   }
+  if (state.data.automaticSleepCapability.status === 'unavailable') return;
 
   const existing = await browser.alarms.get(TAB_LIFECYCLE_ALARM_NAME);
   if (existing?.periodInMinutes === SCAN_PERIOD_MINUTES) return;
