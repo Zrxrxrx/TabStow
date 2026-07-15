@@ -1,0 +1,3 @@
+# Make Suggested Stows Save-first
+
+A confirmed Stow Suggestion will persist every resulting Tab Session in one local transaction before attempting to close any browser tab. If persistence fails, no selected tab closes; after persistence succeeds, Tabstow will re-read each candidate and close it only if its identity, URL, Sleeping state, and lifecycle eligibility still match the reviewed item. A tab that changed or cannot be closed remains open while its Saved copy stays durable, and the result reports saved, closed, skipped, and failed counts separately. This deliberately favors a harmless duplicate over losing a tab or closing something the user did not confirm.

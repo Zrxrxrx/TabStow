@@ -31,7 +31,7 @@ The set of Tab Sessions retained for future reopening and eligible for cross-dev
 _Avoid_: Tag, label, archive
 
 **Stow**:
-The safe transition requested for one or more Active Tabs: preserve them as Saved Tabs in a Tab Session before attempting to close their browser copies. A multi-window selection creates one Tab Session per source window.
+The safe transition requested for one or more Active Tabs: preserve them as Saved Tabs before attempting to close their browser copies. Every Tab Session produced by one confirmed batch becomes durable before any browser copy may close, and a multi-window selection creates one session per source window.
 _Avoid_: Move, archive, close
 
 **Tab Session**:
