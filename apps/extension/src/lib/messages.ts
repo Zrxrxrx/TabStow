@@ -16,6 +16,8 @@ import type {
 } from '@/features/sync/sync-types';
 import type {
   AutomaticSleepDays,
+  StowSuggestionList,
+  StowSuggestionMutationResult,
   TabLifecyclePolicy,
   TabLifecycleState,
 } from '@/features/tab-lifecycle/types';
@@ -60,6 +62,9 @@ export type ExtensionMessage =
   | { type: 'tab-lifecycle:get-state' }
   | { type: 'tab-lifecycle:update-policy'; policy: TabLifecyclePolicy }
   | { type: 'tab-lifecycle:preview-auto-sleep'; afterDays: AutomaticSleepDays }
+  | { type: 'tab-lifecycle:list-suggestions' }
+  | { type: 'tab-lifecycle:snooze-suggestions'; observationIds: string[] }
+  | { type: 'tab-lifecycle:suppress-suggestions'; observationIds: string[] }
   | { type: 'quick-links:add'; link: QuickLink }
   | { type: 'quick-links:list' }
   | { type: 'quick-links:update'; linkId: string; patch: { label?: string; icon?: QuickLinkIcon | null } }
@@ -98,6 +103,8 @@ export type ExtensionMessageResponse =
   | AppResult<ActiveTabsSleepResult>
   | AppResult<ActiveTabsSnapshot>
   | AppResult<TabLifecycleState>
+  | AppResult<StowSuggestionList>
+  | AppResult<StowSuggestionMutationResult>
   | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>
   | AppResult<ConnectionView>

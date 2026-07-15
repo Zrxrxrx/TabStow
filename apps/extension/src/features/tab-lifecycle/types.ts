@@ -21,6 +21,27 @@ export type TabLifecycleState = {
   automaticSleepCapability: AutomaticSleepCapability;
 };
 
+export type StowSuggestionCandidate = {
+  observationId: string;
+  tabId: number;
+  windowId: number;
+  index: number;
+  title: string;
+  url: string;
+  favIconUrl?: string;
+  observedSleepingSince: number;
+  observedSleepingDays: number;
+};
+
+export type StowSuggestionList = {
+  afterDays: StowSuggestionDays;
+  candidates: StowSuggestionCandidate[];
+};
+
+export type StowSuggestionMutationResult = {
+  updatedObservationCount: number;
+};
+
 export const DEFAULT_TAB_LIFECYCLE_POLICY: TabLifecyclePolicy = {
   automaticSleepEnabled: false,
   automaticSleepAfterDays: 7,

@@ -42,6 +42,11 @@ import {
 import { registerTabLifecycleEventHandlers } from '@/features/tab-lifecycle/tab-lifecycle-events';
 import { previewAutomaticSleepRule } from '@/features/tab-lifecycle/automatic-sleep';
 import {
+  listStowSuggestions,
+  snoozeStowSuggestions,
+  suppressStowSuggestions,
+} from '@/features/tab-lifecycle/stow-suggestions';
+import {
   cancelGitHubOAuth,
   chooseAnotherGist,
   rescanGists,
@@ -112,6 +117,10 @@ function noteSynchronizedMutationBestEffort(): void {
 
 function hasId(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
+}
+
+function hasObservationIds(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every(hasId);
 }
 
 function isValidSavedMoveRequest(request: unknown): request is MoveSavedTabRequest {
@@ -242,6 +251,14 @@ async function routeMessage(
       }
       case 'tab-lifecycle:preview-auto-sleep':
         return previewAutomaticSleepRule(message.afterDays);
+      case 'tab-lifecycle:list-suggestions':
+        return listStowSuggestions();
+      case 'tab-lifecycle:snooze-suggestions':
+        if (!hasObservationIds(message.observationIds)) return invalidMessage(message.type);
+        return snoozeStowSuggestions(message.observationIds);
+      case 'tab-lifecycle:suppress-suggestions':
+        if (!hasObservationIds(message.observationIds)) return invalidMessage(message.type);
+        return suppressStowSuggestions(message.observationIds);
       case 'quick-links:add':
         return ok(await updateQuickLinks((links) => [...links, message.link]));
       case 'quick-links:list':
