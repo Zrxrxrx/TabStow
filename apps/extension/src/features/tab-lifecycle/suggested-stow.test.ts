@@ -404,6 +404,30 @@ describe('suggested stow', () => {
     ]);
   });
 
+  it('keeps time monotonic across listing and confirmation', async () => {
+    const [record] = await observe([sleepingTab()]);
+    let clockCalls = 0;
+    const clock = () => {
+      clockCalls += 1;
+      return clockCalls === 1 ? NOW + 5 : NOW + 1;
+    };
+    const { stowSuggestedTabs } = await import('./suggested-stow');
+
+    await expect(
+      stowSuggestedTabs([record!.observationId], { now: NOW, clock }),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        savedTabCount: 1,
+        createdSessionCount: 1,
+        closedTabCount: 1,
+        skipped: [],
+        closeFailures: [],
+      },
+    });
+    expect(clockCalls).toBeGreaterThan(1);
+  });
+
   it('aborts before persistence when lifecycle policy changes during confirmation', async () => {
     const [record] = await observe([sleepingTab()]);
     settingsMocks.getSettings.mockImplementationOnce(async () => {
