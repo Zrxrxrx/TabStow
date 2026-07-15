@@ -34,7 +34,6 @@ import {
 import {
   bootstrapTabLifecycleCoordinator,
   handleTabLifecycleAlarm,
-  invalidateAutomaticSleepScans,
   reconcileTabLifecycleAlarm,
   reconcileTabLifecycleObservations,
   TAB_LIFECYCLE_ALARM_NAME,
@@ -263,7 +262,6 @@ async function routeMessage(
         const result = await updateTabLifecyclePolicy(message.policy);
         if (result.ok) {
           invalidateTabLifecycleGeneration();
-          invalidateAutomaticSleepScans();
           await runBestEffort(reconcileTabLifecycleAlarm);
           await runBestEffort(reconcileTabLifecycleObservations);
         }

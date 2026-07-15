@@ -57,7 +57,6 @@ const tabLifecycleMocks = vi.hoisted(() => ({
 const tabLifecycleCoordinatorMocks = vi.hoisted(() => ({
   bootstrapTabLifecycleCoordinator: vi.fn(),
   handleTabLifecycleAlarm: vi.fn(),
-  invalidateAutomaticSleepScans: vi.fn(),
   reconcileTabLifecycleAlarm: vi.fn(),
   reconcileTabLifecycleObservations: vi.fn(),
 }));
@@ -450,8 +449,6 @@ describe('background message routing', () => {
 
     expect(tabLifecycleMocks.updateTabLifecyclePolicy).toHaveBeenCalledWith(policy);
     expect(response).toBe(result);
-    expect(tabLifecycleCoordinatorMocks.invalidateAutomaticSleepScans)
-      .toHaveBeenCalledTimes(1);
     expect(tabLifecycleGenerationMocks.invalidateTabLifecycleGeneration)
       .toHaveBeenCalledTimes(1);
     expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleAlarm)
