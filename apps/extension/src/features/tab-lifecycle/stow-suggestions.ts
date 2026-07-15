@@ -20,6 +20,10 @@ import {
   suppressSleepObservations,
   type SleepObservation,
 } from './sleep-observations';
+import {
+  createLifecycleOperationClock,
+  type LifecycleClockOptions,
+} from './tab-lifecycle-clock';
 import type {
   StowSuggestionCandidate,
   StowSuggestionList,
@@ -29,24 +33,7 @@ import type {
 const DAY_MS = 86_400_000;
 const SNOOZE_DAYS = 7;
 
-type SuggestionOptions = {
-  clock?: () => number;
-  now?: number;
-};
-
-function currentTimeAtOrAfter(clock: () => number, floor: number): number {
-  const current = clock();
-  return Number.isFinite(current) && current >= floor ? current : floor;
-}
-
-function resolveSuggestionTime(options: SuggestionOptions): {
-  clock: () => number;
-  now: number;
-} {
-  const fixedNow = options.now;
-  const clock = options.clock ?? (fixedNow === undefined ? Date.now : () => fixedNow);
-  return { clock, now: fixedNow ?? clock() };
-}
+type SuggestionOptions = LifecycleClockOptions;
 
 async function queryNormalTabs(): Promise<AppResult<chrome.tabs.Tab[]>> {
   try {
@@ -57,9 +44,8 @@ async function queryNormalTabs(): Promise<AppResult<chrome.tabs.Tab[]>> {
 }
 
 async function reconcileCurrentObservations(
-  now: number,
   generation: number,
-  clock: () => number,
+  readCurrentTime: () => number,
 ): Promise<AppResult<{
   tabs: chrome.tabs.Tab[];
   observations: SleepObservation[];
@@ -72,7 +58,7 @@ async function reconcileCurrentObservations(
   }
 
   try {
-    const observedAt = currentTimeAtOrAfter(clock, now);
+    const observedAt = readCurrentTime();
     const result = {
       tabs: tabsResult.data,
       observations: await reconcileSleepObservations(tabsResult.data, observedAt),
@@ -101,7 +87,7 @@ function compareCandidates(
 export async function listStowSuggestions(
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionList>> {
-  const { clock, now } = resolveSuggestionTime(options);
+  const operationClock = createLifecycleOperationClock(options);
   const generation = currentTabLifecycleGeneration();
   const policyResult = await getTabLifecyclePolicy();
   if (!isCurrentTabLifecycleGeneration(generation)) {
@@ -122,7 +108,10 @@ export async function listStowSuggestions(
     }
   }
 
-  const currentResult = await reconcileCurrentObservations(now, generation, clock);
+  const currentResult = await reconcileCurrentObservations(
+    generation,
+    operationClock.read,
+  );
   if (!currentResult.ok) return currentResult;
 
   let savedUrls: Set<string>;
@@ -143,7 +132,7 @@ export async function listStowSuggestions(
   const observationsByTabId = new Map(
     currentResult.data.observations.map((observation) => [observation.tabId, observation]),
   );
-  const currentNow = currentTimeAtOrAfter(clock, currentResult.data.observedAt);
+  const currentNow = operationClock.read();
   const cutoff = currentNow - policy.stowSuggestionAfterDays * DAY_MS;
   const candidates = currentResult.data.tabs
     .map((tab): StowSuggestionCandidate | null => {
@@ -201,8 +190,7 @@ export async function listStowSuggestions(
 async function mutateCurrentObservations(
   observationIds: readonly string[],
   mutation: (ids: string[], now: number) => Promise<number>,
-  now: number,
-  clock: () => number,
+  readCurrentTime: () => number,
 ): Promise<AppResult<StowSuggestionMutationResult>> {
   const generation = currentTabLifecycleGeneration();
   const policyResult = await getTabLifecyclePolicy();
@@ -222,7 +210,10 @@ async function mutateCurrentObservations(
     }
   }
 
-  const currentResult = await reconcileCurrentObservations(now, generation, clock);
+  const currentResult = await reconcileCurrentObservations(
+    generation,
+    readCurrentTime,
+  );
   if (!currentResult.ok) return currentResult;
   const requestedIds = new Set(observationIds);
   const currentIds = currentResult.data.observations
@@ -235,7 +226,7 @@ async function mutateCurrentObservations(
     }
     const updatedObservationCount = await mutation(
       currentIds,
-      currentTimeAtOrAfter(clock, currentResult.data.observedAt),
+      readCurrentTime(),
     );
     return isCurrentTabLifecycleGeneration(generation)
       ? ok({ updatedObservationCount })
@@ -249,7 +240,7 @@ export function snoozeStowSuggestions(
   observationIds: readonly string[],
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionMutationResult>> {
-  const { clock, now } = resolveSuggestionTime(options);
+  const operationClock = createLifecycleOperationClock(options);
   return mutateCurrentObservations(
     observationIds,
     (currentIds, mutationNow) => snoozeSleepObservations(
@@ -257,8 +248,7 @@ export function snoozeStowSuggestions(
       mutationNow + SNOOZE_DAYS * DAY_MS,
       mutationNow,
     ),
-    now,
-    clock,
+    operationClock.read,
   );
 }
 
@@ -266,14 +256,13 @@ export function suppressStowSuggestions(
   observationIds: readonly string[],
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionMutationResult>> {
-  const { clock, now } = resolveSuggestionTime(options);
+  const operationClock = createLifecycleOperationClock(options);
   return mutateCurrentObservations(
     observationIds,
     (currentIds, mutationNow) => suppressSleepObservations(
       currentIds,
       mutationNow,
     ),
-    now,
-    clock,
+    operationClock.read,
   );
 }
