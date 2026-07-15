@@ -1,7 +1,11 @@
 import { browser } from '@/lib/browser';
 import { isOpenableTabUrl } from '@/features/tabs/tab-filter';
-import { toErrorMessage } from '@/lib/errors';
-import type { TabLifecyclePolicy } from './types';
+import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
+import {
+  AUTOMATIC_SLEEP_DAY_PRESETS,
+  type AutomaticSleepDays,
+  type TabLifecyclePolicy,
+} from './types';
 
 const DAY_MS = 86_400_000;
 
@@ -66,6 +70,32 @@ export async function previewAutomaticSleep(
   return {
     eligibleTabCount: tabs.filter((tab) => isEligibleTab(tab, cutoff, now)).length,
   };
+}
+
+export async function previewAutomaticSleepRule(
+  afterDays: unknown,
+  options: AutomaticSleepOptions = {},
+): Promise<AppResult<{ eligibleTabCount: number }>> {
+  if (
+    typeof afterDays !== 'number'
+    || !AUTOMATIC_SLEEP_DAY_PRESETS.includes(afterDays as AutomaticSleepDays)
+  ) {
+    return err(
+      'invalid-tab-lifecycle-policy',
+      'Automatic sleep threshold is invalid.',
+    );
+  }
+
+  try {
+    return ok(
+      await previewAutomaticSleep(
+        { automaticSleepEnabled: true, automaticSleepAfterDays: afterDays as AutomaticSleepDays },
+        options,
+      ),
+    );
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
 }
 
 export async function runAutomaticSleepScan(

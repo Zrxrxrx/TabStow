@@ -61,6 +61,10 @@ const tabLifecycleCoordinatorMocks = vi.hoisted(() => ({
   reconcileTabLifecycleAlarm: vi.fn(),
 }));
 
+const automaticSleepMocks = vi.hoisted(() => ({
+  previewAutomaticSleepRule: vi.fn(),
+}));
+
 const connectionServiceMocks = vi.hoisted(() => ({
   cancelGitHubOAuth: vi.fn(),
   chooseAnotherGist: vi.fn(),
@@ -138,6 +142,7 @@ vi.mock('@/features/tab-lifecycle/tab-lifecycle-coordinator', () => ({
   ...tabLifecycleCoordinatorMocks,
   TAB_LIFECYCLE_ALARM_NAME: 'tabstow-tab-lifecycle-v1',
 }));
+vi.mock('@/features/tab-lifecycle/automatic-sleep', () => automaticSleepMocks);
 vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
 vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
 vi.mock('@/features/sync/sync-coordinator', () => ({
@@ -424,6 +429,21 @@ describe('background message routing', () => {
       .toHaveBeenCalledTimes(1);
     expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleAlarm)
       .toHaveBeenCalledTimes(1);
+    expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
+  });
+
+  it('previews a device-local automatic sleep rule without scheduling synchronized work', async () => {
+    const result = { ok: true, data: { eligibleTabCount: 4 } };
+    automaticSleepMocks.previewAutomaticSleepRule.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:preview-auto-sleep',
+      afterDays: 7,
+    });
+
+    expect(automaticSleepMocks.previewAutomaticSleepRule).toHaveBeenCalledWith(7);
+    expect(response).toBe(result);
     expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });
 

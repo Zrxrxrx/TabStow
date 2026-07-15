@@ -60,6 +60,24 @@ describe('automatic sleep', () => {
     expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
   });
 
+  it('validates an untrusted preview threshold before querying Chrome', async () => {
+    browserMocks.tabs.query.mockResolvedValue([makeTab({ id: 1 })]);
+    const { previewAutomaticSleepRule } = await import('./automatic-sleep');
+
+    await expect(previewAutomaticSleepRule(7, { now: NOW })).resolves.toEqual({
+      ok: true,
+      data: { eligibleTabCount: 1 },
+    });
+    await expect(previewAutomaticSleepRule(4, { now: NOW })).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'invalid-tab-lifecycle-policy',
+        message: 'Automatic sleep threshold is invalid.',
+      },
+    });
+    expect(browserMocks.tabs.query).toHaveBeenCalledTimes(1);
+  });
+
   it('previews only eligible HTTP(S) tabs with trustworthy inactivity timestamps', async () => {
     browserMocks.tabs.query.mockResolvedValue([
       makeTab({ id: 1, url: 'http://example.com/', lastAccessed: 0 }),

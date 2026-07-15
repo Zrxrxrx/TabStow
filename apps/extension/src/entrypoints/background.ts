@@ -38,6 +38,7 @@ import {
   reconcileTabLifecycleAlarm,
   TAB_LIFECYCLE_ALARM_NAME,
 } from '@/features/tab-lifecycle/tab-lifecycle-coordinator';
+import { previewAutomaticSleepRule } from '@/features/tab-lifecycle/automatic-sleep';
 import {
   cancelGitHubOAuth,
   chooseAnotherGist,
@@ -236,6 +237,8 @@ async function routeMessage(
         }
         return result;
       }
+      case 'tab-lifecycle:preview-auto-sleep':
+        return previewAutomaticSleepRule(message.afterDays);
       case 'quick-links:add':
         return ok(await updateQuickLinks((links) => [...links, message.link]));
       case 'quick-links:list':
