@@ -253,6 +253,189 @@ describe('session database', () => {
     expect(saved.tabs.map(({ id }) => id)).toEqual(['last-tab']);
   });
 
+  it('creates a multi-session batch atomically and reconciles sync state once', async () => {
+    const first = makeSession(
+      'first',
+      'https://example.com/first',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const second = makeSession(
+      'second',
+      'https://example.com/second',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const { createSessionsBatch, db, listSessions } = await importDatabase();
+
+    const created = await createSessionsBatch([first, second]);
+
+    expect(created.map(({ id, sortOrder }) => [id, sortOrder])).toEqual([
+      ['first', 0],
+      ['second', 1],
+    ]);
+    expect((await listSessions()).map(({ id }) => id)).toEqual(['first', 'second']);
+    expect((await db.syncSessions.toArray()).map(({ id }) => id).sort()).toEqual([
+      'first',
+      'second',
+    ]);
+    expect((await db.syncMeta.get('state'))?.pendingGeneration).toBe(1);
+  });
+
+  it('preserves existing Saved URLs and keeps the first normalized URL in a batch', async () => {
+    const existing = makeSession(
+      'existing',
+      'https://example.com/already-saved#existing',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const first = makeSession(
+      'first',
+      'https://example.com/already-saved#incoming',
+      '2026-07-02T00:00:00.000Z',
+    );
+    first.tabs.push(
+      makeTab(
+        'first-unique',
+        'https://example.com/new#first',
+        '2026-07-02T01:00:00.000Z',
+      ),
+    );
+    const second = makeSession(
+      'second',
+      'https://example.com/new#second',
+      '2026-07-03T00:00:00.000Z',
+    );
+    second.tabs.push(
+      makeTab(
+        'second-unique',
+        'https://example.com/another',
+        '2026-07-03T01:00:00.000Z',
+      ),
+    );
+    const { createSession, createSessionsBatch, getSession } = await importDatabase();
+    await createSession(existing);
+
+    const created = await createSessionsBatch([first, second]);
+
+    expect(created.map(({ id }) => id)).toEqual(['first', 'second']);
+    expect(created[0]?.tabs.map(({ id }) => id)).toEqual(['first-unique']);
+    expect(created[1]?.tabs.map(({ id }) => id)).toEqual(['second-unique']);
+    expect((await getSession('existing'))?.tabs).toEqual(existing.tabs);
+  });
+
+  it('does not create sessions whose batch contribution is empty', async () => {
+    const existing = makeSession(
+      'existing',
+      'https://example.com/already-saved',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const duplicateOnly = makeSession(
+      'duplicate-only',
+      'https://example.com/already-saved#fragment',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const empty = {
+      ...makeSession(
+        'empty',
+        'https://example.com/removed',
+        '2026-07-03T00:00:00.000Z',
+      ),
+      tabs: [],
+    };
+    const { createSession, createSessionsBatch, getSession } = await importDatabase();
+    await createSession(existing);
+
+    const created = await createSessionsBatch([duplicateOnly, empty]);
+
+    expect(created).toEqual([]);
+    expect(await getSession('duplicate-only')).toBeUndefined();
+    expect(await getSession('empty')).toBeUndefined();
+    expect((await getSession('existing'))?.tabs).toEqual(existing.tabs);
+  });
+
+  it('validates the complete batch before persisting any session', async () => {
+    const valid = makeSession(
+      'valid',
+      'https://example.com/valid',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const invalid = {
+      ...makeSession(
+        'invalid',
+        'https://example.com/invalid',
+        '2026-07-02T00:00:00.000Z',
+      ),
+      title: '',
+    };
+    const { createSessionsBatch, listSessions } = await importDatabase();
+
+    await expect(createSessionsBatch([valid, invalid])).rejects.toThrow();
+
+    expect(await listSessions()).toEqual([]);
+  });
+
+  it('rejects contributing sessions whose session or tab IDs collide', async () => {
+    const existing = makeSession(
+      'existing',
+      'https://example.com/existing',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const collidingSession = makeSession(
+      'existing',
+      'https://example.com/new-session',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const collidingTab = makeSession(
+      'new-session',
+      'https://example.com/new-tab',
+      '2026-07-03T00:00:00.000Z',
+    );
+    collidingTab.tabs[0]!.id = existing.tabs[0]!.id;
+    const { createSession, createSessionsBatch, listSessions } = await importDatabase();
+    await createSession(existing);
+
+    await expect(createSessionsBatch([collidingSession])).rejects.toThrow(
+      'Session ID already exists: existing',
+    );
+    await expect(createSessionsBatch([collidingTab])).rejects.toThrow(
+      'Saved tab ID already exists: existing-tab',
+    );
+
+    expect(await listSessions()).toEqual([{ ...existing, sortOrder: 0 }]);
+  });
+
+  it('rolls back every batch session when sync read-model reconciliation fails', async () => {
+    const existing = makeSession(
+      'existing',
+      'https://example.com/existing',
+      '2026-07-01T00:00:00.000Z',
+    );
+    const first = makeSession(
+      'first',
+      'https://example.com/first',
+      '2026-07-02T00:00:00.000Z',
+    );
+    const second = makeSession(
+      'second',
+      'https://example.com/second',
+      '2026-07-03T00:00:00.000Z',
+    );
+    const { createSession, createSessionsBatch, db, listSessions } = await importDatabase();
+    await createSession(existing);
+    const sessionsBefore = await listSessions();
+    const syncSessionsBefore = await db.syncSessions.toArray();
+    const syncTabsBefore = await db.syncTabs.toArray();
+    vi.spyOn(db.syncSessions, 'put').mockRejectedValueOnce(
+      new Error('sync reconciliation failed'),
+    );
+
+    await expect(createSessionsBatch([first, second])).rejects.toThrow(
+      'sync reconciliation failed',
+    );
+
+    expect(await listSessions()).toEqual(sessionsBefore);
+    expect(await db.syncSessions.toArray()).toEqual(syncSessionsBefore);
+    expect(await db.syncTabs.toArray()).toEqual(syncTabsBefore);
+  });
+
   it('persists explicit session reorder', async () => {
     const first = makeSession(
       'first',

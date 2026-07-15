@@ -512,6 +512,77 @@ export async function createSession(session: TabSession): Promise<TabSession> {
   return insertNewestSession({ ...parsed, tabs: uniqueIncomingTabs });
 }
 
+export async function createSessionsBatch(
+  sessions: TabSession[],
+): Promise<TabSession[]> {
+  const parsed = tabSessionSchema.array().parse(sessions);
+  const incomingSessionIds = new Set<string>();
+  for (const session of parsed) {
+    if (incomingSessionIds.has(session.id)) {
+      throw new Error('Session IDs must be unique within a batch.');
+    }
+    incomingSessionIds.add(session.id);
+  }
+
+  if (parsed.length === 0) return [];
+
+  return db.transaction(
+    'rw',
+    [db.sessions, db.syncSessions, db.syncTabs, db.syncDeletions, db.syncMeta],
+    async () => {
+      const existingSessions = sortSessionsForDisplay(await db.sessions.toArray());
+      const existingSessionIds = new Set(existingSessions.map(({ id }) => id));
+      const reservedTabIds = new Set(
+        existingSessions.flatMap(({ tabs }) => tabs.map(({ id }) => id)),
+      );
+      const reservedUrls = new Set(
+        existingSessions.flatMap(({ tabs }) =>
+          tabs
+            .map(({ url }) => normalizeSavedTabUrl(url))
+            .filter((url): url is string => url !== null),
+        ),
+      );
+      const created: TabSession[] = [];
+
+      for (const session of parsed) {
+        if (existingSessionIds.has(session.id)) {
+          throw new Error(`Session ID already exists: ${session.id}`);
+        }
+
+        const tabs = session.tabs.filter((tab) => {
+          const normalizedUrl = normalizeSavedTabUrl(tab.url);
+          if (normalizedUrl !== null && reservedUrls.has(normalizedUrl)) return false;
+
+          if (reservedTabIds.has(tab.id)) {
+            throw new Error(`Saved tab ID already exists: ${tab.id}`);
+          }
+
+          reservedTabIds.add(tab.id);
+          if (normalizedUrl !== null) reservedUrls.add(normalizedUrl);
+          return true;
+        });
+
+        if (tabs.length === 0) continue;
+        created.push({ ...session, tabs, sortOrder: created.length });
+      }
+
+      if (created.length === 0) return [];
+
+      const shiftedExisting = existingSessions.map((session, index) => ({
+        ...session,
+        sortOrder: created.length + index,
+      }));
+      await db.sessions.clear();
+      await db.sessions.bulkPut([...created, ...shiftedExisting]);
+
+      const meta = await getOrCreateMetaInTransaction(created[0]?.deviceId);
+      await reconcileSessionReadModelInTransaction(meta, new Date().toISOString());
+
+      return created;
+    },
+  );
+}
+
 export async function listSessions(): Promise<TabSession[]> {
   const sessions = await db.sessions.toArray();
   return sortSessionsForDisplay(sessions);
