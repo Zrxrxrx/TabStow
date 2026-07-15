@@ -183,6 +183,38 @@ function retainCurrentAndFreshUnmatched(
   );
 }
 
+function buildLiveObservation({
+  existing,
+  tabId,
+  browserSessionId,
+  urlFingerprint,
+  lastAccessed,
+  now,
+}: {
+  existing?: SleepObservation;
+  tabId: number;
+  browserSessionId: string;
+  urlFingerprint: string;
+  lastAccessed?: number;
+  now: number;
+}): SleepObservation {
+  return {
+    observationId: existing?.observationId ?? crypto.randomUUID(),
+    tabId,
+    browserSessionId,
+    urlFingerprint,
+    ...(lastAccessed === undefined ? {} : { lastAccessed }),
+    observedSleepingSince: existing?.observedSleepingSince ?? now,
+    lastObservedAt: now,
+    ...(existing?.snoozedUntil === undefined
+      ? {}
+      : { snoozedUntil: existing.snoozedUntil }),
+    ...(existing?.suppressedUntilWake === true
+      ? { suppressedUntilWake: true as const }
+      : {}),
+  };
+}
+
 export async function observeDiscardedTab(
   tab: chrome.tabs.Tab,
   now = Date.now(),
@@ -213,21 +245,14 @@ export async function observeDiscardedTab(
     ) {
       return null;
     }
-    const observation: SleepObservation = {
-      observationId: existing?.observationId ?? crypto.randomUUID(),
+    const observation = buildLiveObservation({
+      existing,
       tabId: tab.id,
       browserSessionId,
       urlFingerprint,
-      ...(lastAccessed === undefined ? {} : { lastAccessed }),
-      observedSleepingSince: existing?.observedSleepingSince ?? now,
-      lastObservedAt: now,
-      ...(existing?.snoozedUntil === undefined
-        ? {}
-        : { snoozedUntil: existing.snoozedUntil }),
-      ...(existing?.suppressedUntilWake === true
-        ? { suppressedUntilWake: true as const }
-        : {}),
-    };
+      lastAccessed,
+      now,
+    });
     await writeStoredObservations([
       ...records.filter(
         (record) =>
@@ -322,21 +347,14 @@ export async function reconcileSleepObservations(
           : undefined;
       const existing = sameSession ?? previousSession;
       if (existing) consumedObservationIds.add(existing.observationId);
-      return {
-        observationId: existing?.observationId ?? crypto.randomUUID(),
+      return buildLiveObservation({
+        existing,
         tabId: tab.id,
         browserSessionId,
         urlFingerprint,
-        ...(lastAccessed === undefined ? {} : { lastAccessed }),
-        observedSleepingSince: existing?.observedSleepingSince ?? now,
-        lastObservedAt: now,
-        ...(existing?.snoozedUntil === undefined
-          ? {}
-          : { snoozedUntil: existing.snoozedUntil }),
-        ...(existing?.suppressedUntilWake === true
-          ? { suppressedUntilWake: true as const }
-          : {}),
-      };
+        lastAccessed,
+        now,
+      });
     });
     const liveFingerprints = new Set(identifiableFingerprints);
     await writeStoredObservations([
