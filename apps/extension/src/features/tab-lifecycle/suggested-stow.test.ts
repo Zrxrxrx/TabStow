@@ -1,5 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
+import {
+  DAY_MS,
+  NOW,
+  sleepingTab,
+  storedLifecyclePolicy,
+} from './tab-lifecycle-test-support';
 
 const storageMocks = vi.hoisted(() => ({
   getItem: vi.fn(),
@@ -31,30 +37,8 @@ vi.mock('@/lib/browser', () => ({ browser: browserMocks }));
 vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
 
-const DAY_MS = 86_400_000;
-const NOW = Date.UTC(2026, 6, 15, 12);
 const POLICY_KEY = 'local:tabstow-tab-lifecycle-policy-v1';
 const SESSION_KEY = 'session:tabstow-browser-session-id-v1';
-
-function sleepingTab(overrides: Partial<chrome.tabs.Tab> = {}): chrome.tabs.Tab {
-  return {
-    id: 1,
-    index: 0,
-    windowId: 1,
-    highlighted: false,
-    active: false,
-    pinned: false,
-    incognito: false,
-    discarded: true,
-    autoDiscardable: true,
-    audible: false,
-    url: 'https://example.com/one',
-    title: 'Example one',
-    favIconUrl: 'https://example.com/favicon.ico',
-    lastAccessed: NOW - 30 * DAY_MS,
-    ...overrides,
-  } as chrome.tabs.Tab;
-}
 
 describe('suggested stow', () => {
   let stored: Map<string, unknown>;
@@ -66,13 +50,7 @@ describe('suggested stow', () => {
     vi.resetModules();
     uuid = 0;
     stored = new Map<string, unknown>([
-      [POLICY_KEY, {
-        schemaVersion: 1,
-        automaticSleepEnabled: false,
-        automaticSleepAfterDays: 7,
-        stowSuggestionsEnabled: true,
-        stowSuggestionAfterDays: 14,
-      }],
+      [POLICY_KEY, storedLifecyclePolicy()],
       [SESSION_KEY, 'browser-session-1'],
     ]);
     liveTabs = new Map();
