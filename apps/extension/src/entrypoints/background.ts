@@ -28,6 +28,10 @@ import { collapseChromeTabGroups } from '@/features/chrome-tab-groups/chrome-tab
 import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import {
+  getTabLifecycleState,
+  updateTabLifecyclePolicy,
+} from '@/features/tab-lifecycle/tab-lifecycle-policy';
+import {
   cancelGitHubOAuth,
   chooseAnotherGist,
   rescanGists,
@@ -215,6 +219,10 @@ async function routeMessage(
         return sleepActiveTabs(message.tabIds);
       case 'active-tabs:search':
         return runDefaultSearch(message.query);
+      case 'tab-lifecycle:get-state':
+        return getTabLifecycleState();
+      case 'tab-lifecycle:update-policy':
+        return updateTabLifecyclePolicy(message.policy);
       case 'quick-links:add':
         return ok(await updateQuickLinks((links) => [...links, message.link]));
       case 'quick-links:list':

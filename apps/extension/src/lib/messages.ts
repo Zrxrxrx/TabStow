@@ -14,6 +14,10 @@ import type {
   SyncResult,
   SyncStatusView,
 } from '@/features/sync/sync-types';
+import type {
+  TabLifecyclePolicy,
+  TabLifecycleState,
+} from '@/features/tab-lifecycle/types';
 import { err, toErrorMessage, type AppResult } from './errors';
 import { browser } from './browser';
 
@@ -52,6 +56,8 @@ export type ExtensionMessage =
   | { type: 'active-tabs:close'; tabIds: number[] }
   | { type: 'active-tabs:sleep'; tabIds: number[] }
   | { type: 'active-tabs:search'; query: string }
+  | { type: 'tab-lifecycle:get-state' }
+  | { type: 'tab-lifecycle:update-policy'; policy: TabLifecyclePolicy }
   | { type: 'quick-links:add'; link: QuickLink }
   | { type: 'quick-links:list' }
   | { type: 'quick-links:update'; linkId: string; patch: { label?: string; icon?: QuickLinkIcon | null } }
@@ -89,6 +95,7 @@ export type ExtensionMessageResponse =
   | AppResult<ActiveTabsMoveResult>
   | AppResult<ActiveTabsSleepResult>
   | AppResult<ActiveTabsSnapshot>
+  | AppResult<TabLifecycleState>
   | AppResult<QuickLink[]>
   | AppResult<ExtensionSettings>
   | AppResult<ConnectionView>

@@ -49,6 +49,11 @@ const settingsMocks = vi.hoisted(() => ({
   updateSettings: vi.fn(),
 }));
 
+const tabLifecycleMocks = vi.hoisted(() => ({
+  getTabLifecycleState: vi.fn(),
+  updateTabLifecyclePolicy: vi.fn(),
+}));
+
 const connectionServiceMocks = vi.hoisted(() => ({
   cancelGitHubOAuth: vi.fn(),
   chooseAnotherGist: vi.fn(),
@@ -121,6 +126,7 @@ vi.mock('@/features/action-feedback/action-feedback', () => actionFeedbackMocks)
 vi.mock('@/features/context-menu/context-menu', () => contextMenuMocks);
 vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
+vi.mock('@/features/tab-lifecycle/tab-lifecycle-policy', () => tabLifecycleMocks);
 vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
 vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
 vi.mock('@/features/sync/sync-coordinator', () => ({
@@ -341,6 +347,56 @@ describe('background message routing', () => {
       ok: true,
       data: { sleptTabIds: [11], skippedTabIds: [12], failures: [] },
     });
+    expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
+  });
+
+  it('gets device-local tab lifecycle state without scheduling synchronized work', async () => {
+    const result = {
+      ok: true,
+      data: {
+        policy: {
+          automaticSleepEnabled: false,
+          automaticSleepAfterDays: 7,
+          stowSuggestionsEnabled: true,
+          stowSuggestionAfterDays: 14,
+        },
+        automaticSleepCapability: { status: 'supported' as const },
+      },
+    };
+    tabLifecycleMocks.getTabLifecycleState.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({ type: 'tab-lifecycle:get-state' });
+
+    expect(tabLifecycleMocks.getTabLifecycleState).toHaveBeenCalledTimes(1);
+    expect(response).toBe(result);
+    expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
+  });
+
+  it('updates device-local tab lifecycle policy without scheduling synchronized work', async () => {
+    const policy = {
+      automaticSleepEnabled: true,
+      automaticSleepAfterDays: 3,
+      stowSuggestionsEnabled: false,
+      stowSuggestionAfterDays: 30,
+    } as const;
+    const result = {
+      ok: true,
+      data: {
+        policy,
+        automaticSleepCapability: { status: 'supported' as const },
+      },
+    };
+    tabLifecycleMocks.updateTabLifecyclePolicy.mockResolvedValue(result);
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:update-policy',
+      policy,
+    });
+
+    expect(tabLifecycleMocks.updateTabLifecyclePolicy).toHaveBeenCalledWith(policy);
+    expect(response).toBe(result);
     expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });
 
