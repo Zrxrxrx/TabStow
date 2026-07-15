@@ -158,7 +158,7 @@ async function stowSuggestedTabsUnlocked(
   clock: () => number,
   generation: number,
 ): Promise<AppResult<SuggestedStowResult>> {
-  const listResult = await listStowSuggestions({ now });
+  const listResult = await listStowSuggestions({ now, clock });
   if (!isCurrentTabLifecycleGeneration(generation)) {
     return tabLifecycleSettingsChanged();
   }

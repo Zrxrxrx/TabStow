@@ -163,6 +163,36 @@ describe('stow suggestions', () => {
     expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
   });
 
+  it('uses a fresh reconciliation time after an asynchronous tab query', async () => {
+    const tab = sleepingTab();
+    const advancedNow = NOW + 2 * DAY_MS;
+    const observations = await import('./sleep-observations');
+    const observation = await observations.observeDiscardedTab(
+      tab,
+      NOW - 20 * DAY_MS,
+    );
+    browserMocks.tabs.query.mockImplementation(async () => {
+      await observations.observeDiscardedTab(tab, advancedNow);
+      return [tab];
+    });
+
+    const { listStowSuggestions } = await import('./stow-suggestions');
+    await expect(
+      listStowSuggestions({ now: NOW, clock: () => advancedNow }),
+    ).resolves.toEqual({
+      ok: true,
+      data: {
+        afterDays: 14,
+        candidates: [
+          expect.objectContaining({
+            observationId: observation!.observationId,
+            observedSleepingDays: 22,
+          }),
+        ],
+      },
+    });
+  });
+
   it('excludes saved URLs, live duplicates, snoozes, suppressions, and protected tabs', async () => {
     const duplicateWinner = sleepingTab({
       id: 1,
@@ -274,6 +304,32 @@ describe('stow suggestions', () => {
       expect.objectContaining({
         observationId: secondRecord!.observationId,
         suppressedUntilWake: true,
+      }),
+    ]);
+  });
+
+  it('starts a snooze from the fresh mutation time', async () => {
+    const tab = sleepingTab();
+    const advancedNow = NOW + 2 * DAY_MS;
+    const observations = await import('./sleep-observations');
+    const observation = await observations.observeDiscardedTab(
+      tab,
+      NOW - 20 * DAY_MS,
+    );
+    browserMocks.tabs.query.mockResolvedValue([tab]);
+
+    const { snoozeStowSuggestions } = await import('./stow-suggestions');
+    await expect(
+      snoozeStowSuggestions(
+        [observation!.observationId],
+        { now: NOW, clock: () => advancedNow },
+      ),
+    ).resolves.toEqual({ ok: true, data: { updatedObservationCount: 1 } });
+
+    await expect(observations.listSleepObservations(advancedNow)).resolves.toEqual([
+      expect.objectContaining({
+        observationId: observation!.observationId,
+        snoozedUntil: advancedNow + 7 * DAY_MS,
       }),
     ]);
   });

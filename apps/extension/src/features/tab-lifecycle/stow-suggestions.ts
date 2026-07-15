@@ -30,8 +30,23 @@ const DAY_MS = 86_400_000;
 const SNOOZE_DAYS = 7;
 
 type SuggestionOptions = {
+  clock?: () => number;
   now?: number;
 };
+
+function currentTimeAtOrAfter(clock: () => number, floor: number): number {
+  const current = clock();
+  return Number.isFinite(current) && current >= floor ? current : floor;
+}
+
+function resolveSuggestionTime(options: SuggestionOptions): {
+  clock: () => number;
+  now: number;
+} {
+  const fixedNow = options.now;
+  const clock = options.clock ?? (fixedNow === undefined ? Date.now : () => fixedNow);
+  return { clock, now: fixedNow ?? clock() };
+}
 
 async function queryNormalTabs(): Promise<AppResult<chrome.tabs.Tab[]>> {
   try {
@@ -44,7 +59,12 @@ async function queryNormalTabs(): Promise<AppResult<chrome.tabs.Tab[]>> {
 async function reconcileCurrentObservations(
   now: number,
   generation: number,
-): Promise<AppResult<{ tabs: chrome.tabs.Tab[]; observations: SleepObservation[] }>> {
+  clock: () => number,
+): Promise<AppResult<{
+  tabs: chrome.tabs.Tab[];
+  observations: SleepObservation[];
+  observedAt: number;
+}>> {
   const tabsResult = await queryNormalTabs();
   if (!tabsResult.ok) return tabsResult;
   if (!isCurrentTabLifecycleGeneration(generation)) {
@@ -52,9 +72,11 @@ async function reconcileCurrentObservations(
   }
 
   try {
+    const observedAt = currentTimeAtOrAfter(clock, now);
     const result = {
       tabs: tabsResult.data,
-      observations: await reconcileSleepObservations(tabsResult.data, now),
+      observations: await reconcileSleepObservations(tabsResult.data, observedAt),
+      observedAt,
     };
     return isCurrentTabLifecycleGeneration(generation)
       ? ok(result)
@@ -79,7 +101,7 @@ function compareCandidates(
 export async function listStowSuggestions(
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionList>> {
-  const now = options.now ?? Date.now();
+  const { clock, now } = resolveSuggestionTime(options);
   const generation = currentTabLifecycleGeneration();
   const policyResult = await getTabLifecyclePolicy();
   if (!isCurrentTabLifecycleGeneration(generation)) {
@@ -100,7 +122,7 @@ export async function listStowSuggestions(
     }
   }
 
-  const currentResult = await reconcileCurrentObservations(now, generation);
+  const currentResult = await reconcileCurrentObservations(now, generation, clock);
   if (!currentResult.ok) return currentResult;
 
   let savedUrls: Set<string>;
@@ -121,7 +143,8 @@ export async function listStowSuggestions(
   const observationsByTabId = new Map(
     currentResult.data.observations.map((observation) => [observation.tabId, observation]),
   );
-  const cutoff = now - policy.stowSuggestionAfterDays * DAY_MS;
+  const currentNow = currentTimeAtOrAfter(clock, currentResult.data.observedAt);
+  const cutoff = currentNow - policy.stowSuggestionAfterDays * DAY_MS;
   const candidates = currentResult.data.tabs
     .map((tab): StowSuggestionCandidate | null => {
       if (
@@ -136,7 +159,7 @@ export async function listStowSuggestions(
       if (
         !observation
         || observation.observedSleepingSince > cutoff
-        || (observation.snoozedUntil !== undefined && observation.snoozedUntil > now)
+        || (observation.snoozedUntil !== undefined && observation.snoozedUntil > currentNow)
         || observation.suppressedUntilWake === true
       ) {
         return null;
@@ -154,7 +177,7 @@ export async function listStowSuggestions(
         ...(tab.favIconUrl ? { favIconUrl: tab.favIconUrl } : {}),
         observedSleepingSince: observation.observedSleepingSince,
         observedSleepingDays: Math.floor(
-          (now - observation.observedSleepingSince) / DAY_MS,
+          (currentNow - observation.observedSleepingSince) / DAY_MS,
         ),
       };
     })
@@ -177,8 +200,9 @@ export async function listStowSuggestions(
 
 async function mutateCurrentObservations(
   observationIds: readonly string[],
-  mutation: (ids: string[]) => Promise<void>,
+  mutation: (ids: string[], now: number) => Promise<void>,
   now: number,
+  clock: () => number,
 ): Promise<AppResult<StowSuggestionMutationResult>> {
   const generation = currentTabLifecycleGeneration();
   const policyResult = await getTabLifecyclePolicy();
@@ -198,7 +222,7 @@ async function mutateCurrentObservations(
     }
   }
 
-  const currentResult = await reconcileCurrentObservations(now, generation);
+  const currentResult = await reconcileCurrentObservations(now, generation, clock);
   if (!currentResult.ok) return currentResult;
   const requestedIds = new Set(observationIds);
   const currentIds = currentResult.data.observations
@@ -209,7 +233,10 @@ async function mutateCurrentObservations(
     if (!isCurrentTabLifecycleGeneration(generation)) {
       return tabLifecycleSettingsChanged();
     }
-    await mutation(currentIds);
+    await mutation(
+      currentIds,
+      currentTimeAtOrAfter(clock, currentResult.data.observedAt),
+    );
     return isCurrentTabLifecycleGeneration(generation)
       ? ok({ updatedObservationCount: currentIds.length })
       : tabLifecycleSettingsChanged();
@@ -222,15 +249,16 @@ export function snoozeStowSuggestions(
   observationIds: readonly string[],
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionMutationResult>> {
-  const now = options.now ?? Date.now();
+  const { clock, now } = resolveSuggestionTime(options);
   return mutateCurrentObservations(
     observationIds,
-    (currentIds) => snoozeSleepObservations(
+    (currentIds, mutationNow) => snoozeSleepObservations(
       currentIds,
-      now + SNOOZE_DAYS * DAY_MS,
-      now,
+      mutationNow + SNOOZE_DAYS * DAY_MS,
+      mutationNow,
     ),
     now,
+    clock,
   );
 }
 
@@ -238,10 +266,14 @@ export function suppressStowSuggestions(
   observationIds: readonly string[],
   options: SuggestionOptions = {},
 ): Promise<AppResult<StowSuggestionMutationResult>> {
-  const now = options.now ?? Date.now();
+  const { clock, now } = resolveSuggestionTime(options);
   return mutateCurrentObservations(
     observationIds,
-    (currentIds) => suppressSleepObservations(currentIds, now),
+    (currentIds, mutationNow) => suppressSleepObservations(
+      currentIds,
+      mutationNow,
+    ),
     now,
+    clock,
   );
 }
