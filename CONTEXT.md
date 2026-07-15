@@ -30,6 +30,10 @@ _Avoid_: Auto-archive, automatic close
 The set of Tab Sessions retained for future reopening and eligible for cross-device synchronization.
 _Avoid_: Tag, label, archive
 
+**Stow**:
+The safe transition requested for one or more Active Tabs: preserve them as Saved Tabs in a Tab Session before attempting to close their browser copies. A multi-window selection creates one Tab Session per source window.
+_Avoid_: Move, archive, close
+
 **Tab Session**:
 An ordered group of Saved Tabs captured together.
 _Avoid_: Tag group, bookmark folder

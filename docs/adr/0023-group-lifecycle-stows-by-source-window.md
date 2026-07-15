@@ -1,0 +1,3 @@
+# Group Lifecycle Stows by Source Window
+
+When a user confirms a Stow Suggestion containing tabs from multiple Chrome windows, Tabstow will create one Tab Session per source window and preserve the selected tab order within each window. Combining every selected tab into one session would erase useful working-context boundaries and assign an inaccurate single source window, while creating one session per tab would produce unnecessary clutter. The review will state how many tabs and sessions the action will create; restoring a session does not promise to reconstruct the original Chrome window or tab-group layout.

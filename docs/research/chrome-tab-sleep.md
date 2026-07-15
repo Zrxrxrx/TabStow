@@ -73,6 +73,7 @@ The two phases form one Tab Lifecycle settings area but retain independent conse
 - Stow Suggestions are enabled by default because they are local, non-destructive prompts; they never save or close a tab without explicit confirmation.
 - The complete Tab Lifecycle Policy, including both toggles and their thresholds, remains Device-local State and is never enabled or changed by synchronization from another device.
 - Stow Suggestions cover eligible Sleeping Tabs regardless of whether Tabstow or Chrome initiated the discard. Suggestion timing uses the conservative Observed Sleep Period defined in [ADR 0021](../adr/0021-base-stow-suggestions-on-observed-sleep-periods.md), never an inferred exact discard time.
+- Confirming a multi-window Stow Suggestion creates one Tab Session per source Chrome window and preserves the selected tabs' order within that window. The review must state both the tab count and resulting session count, and it must not promise reconstruction of Chrome windows or tab groups.
 
 ## Minimal Tabstow change shape
 
