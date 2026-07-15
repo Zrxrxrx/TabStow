@@ -6,6 +6,9 @@ const browserMocks = vi.hoisted(() => ({
     get: vi.fn(),
     query: vi.fn(),
   },
+  windows: {
+    get: vi.fn(),
+  },
 }));
 
 vi.mock('@/lib/browser', () => ({ browser: browserMocks }));
@@ -42,6 +45,11 @@ function makeTab(overrides: Partial<chrome.tabs.Tab> = {}): chrome.tabs.Tab {
 describe('automatic sleep', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserMocks.windows.get.mockResolvedValue({
+      id: 1,
+      incognito: false,
+      type: 'normal',
+    });
   });
 
   it('previews tabs at or beyond the inactivity threshold without mutating them', async () => {
@@ -144,6 +152,28 @@ describe('automatic sleep', () => {
     expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
     expect(browserMocks.tabs.get.mock.calls).toEqual([[21], [22]]);
     expect(browserMocks.tabs.discard.mock.calls).toEqual([[21], [22]]);
+  });
+
+  it('skips a candidate moved into a non-normal window before discard', async () => {
+    const candidate = makeTab({ id: 24 });
+    browserMocks.tabs.query.mockResolvedValue([candidate]);
+    browserMocks.tabs.get.mockResolvedValue({ ...candidate, windowId: 2 });
+    browserMocks.windows.get.mockResolvedValue({
+      id: 2,
+      incognito: false,
+      type: 'popup',
+    });
+    const { runAutomaticSleepScan } = await import('./automatic-sleep');
+
+    await expect(
+      runAutomaticSleepScan(ENABLED_POLICY, { now: NOW }),
+    ).resolves.toEqual({
+      sleptTabIds: [],
+      skippedTabIds: [24],
+      failures: [],
+    });
+    expect(browserMocks.windows.get).toHaveBeenCalledWith(2);
+    expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
   });
 
   it('stops before discard when the coordinator invalidates an in-flight scan', async () => {

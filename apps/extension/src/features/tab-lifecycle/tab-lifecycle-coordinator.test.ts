@@ -16,6 +16,9 @@ const browserMocks = vi.hoisted(() => ({
     get: vi.fn(),
     query: vi.fn(),
   },
+  windows: {
+    get: vi.fn(),
+  },
 }));
 
 const observationMocks = vi.hoisted(() => ({
@@ -76,6 +79,11 @@ describe('tab lifecycle coordinator', () => {
     browserMocks.tabs.query.mockResolvedValue([eligibleTab()]);
     browserMocks.tabs.get.mockResolvedValue(eligibleTab());
     browserMocks.tabs.discard.mockResolvedValue({ id: 7, discarded: true });
+    browserMocks.windows.get.mockResolvedValue({
+      id: 1,
+      incognito: false,
+      type: 'normal',
+    });
     observationMocks.clearSleepObservations.mockResolvedValue(undefined);
     observationMocks.reconcileSleepObservations.mockResolvedValue([]);
   });

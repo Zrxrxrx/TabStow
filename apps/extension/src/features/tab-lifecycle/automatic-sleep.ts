@@ -132,6 +132,11 @@ export async function runAutomaticSleepScan(
         result.skippedTabIds.push(candidate.id);
         continue;
       }
+      const currentWindow = await browser.windows.get(current.windowId);
+      if (currentWindow.type !== 'normal' || currentWindow.incognito === true) {
+        result.skippedTabIds.push(candidate.id);
+        continue;
+      }
 
       if (!shouldContinue()) {
         result.skippedTabIds.push(...candidates.slice(index).map((tab) => tab.id));
