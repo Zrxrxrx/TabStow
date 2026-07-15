@@ -86,12 +86,14 @@ Each record contains only the minimum durable identity and timing data:
 - Optional per-observation `snoozedUntil` and `suppressedUntilWake` state.
 
 All read-modify-write operations pass through one serialized storage queue. Service-worker globals may coalesce active work but are never the durable source of truth.
+A successful policy update invalidates older in-flight lifecycle work before reconciliation, so stale event or query results cannot repopulate observations after Stow Suggestions are disabled.
 
 ### Starting and ending a period
 
 - An eligible discarded HTTP(S) tab with no matching record starts a new period at the current time. Existing time is never backdated.
 - A successful manual or automatic discard records the transition directly; tab events provide a second authoritative signal.
 - Repeated observations of the same eligible Sleeping Tab preserve the original start.
+- Two differing valid `lastAccessed` values prove that the tab became active between observations and start a new period, recovering a missed wake event conservatively.
 - Waking, activation, removal, URL change, tab replacement, or transition into a lifecycle-protected state ends the current record. Re-qualifying later starts a new period.
 - Disabling Stow Suggestions clears observation, snooze, and suppression data. Re-enabling starts currently eligible Sleeping Tabs at the next observation time.
 - Malformed records and future timestamps reset conservatively.
