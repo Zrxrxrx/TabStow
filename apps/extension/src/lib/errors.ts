@@ -12,6 +12,8 @@ export type AppErrorCode =
   | 'invalid-saved-move'
   | 'operation-in-progress'
   | 'empty-session'
+  | 'automatic-sleep-unavailable'
+  | 'invalid-tab-lifecycle-policy'
   | 'unknown-error';
 
 export type AppError = {
