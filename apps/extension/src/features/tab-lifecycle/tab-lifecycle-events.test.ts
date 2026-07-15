@@ -103,6 +103,30 @@ describe('tab lifecycle events', () => {
     expect(observationMocks.removeSleepObservation).not.toHaveBeenCalled();
   });
 
+  it('drops event work whose enabled policy read becomes stale', async () => {
+    let resolvePolicy!: (value: {
+      ok: true;
+      data: typeof ENABLED_POLICY;
+    }) => void;
+    policyMocks.getTabLifecyclePolicy.mockReturnValue(new Promise((resolve) => {
+      resolvePolicy = resolve;
+    }));
+    const { reconcileTabLifecycleTab } = await import('./tab-lifecycle-events');
+    const { invalidateTabLifecycleGeneration } = await import(
+      './tab-lifecycle-generation'
+    );
+
+    const pending = reconcileTabLifecycleTab(sleepingTab());
+    await vi.waitFor(() => expect(policyMocks.getTabLifecyclePolicy).toHaveBeenCalledTimes(1));
+    invalidateTabLifecycleGeneration();
+    resolvePolicy({ ok: true, data: ENABLED_POLICY });
+    await pending;
+
+    expect(observationMocks.observeDiscardedTab).not.toHaveBeenCalled();
+    expect(observationMocks.removeSleepObservation).not.toHaveBeenCalled();
+    expect(observationMocks.clearSleepObservations).not.toHaveBeenCalled();
+  });
+
   it('routes relevant create, update, activation, removal, and replacement events', async () => {
     const { registerTabLifecycleEventHandlers } = await import('./tab-lifecycle-events');
     registerTabLifecycleEventHandlers();

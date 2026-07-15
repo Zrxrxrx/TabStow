@@ -40,6 +40,7 @@ import {
   TAB_LIFECYCLE_ALARM_NAME,
 } from '@/features/tab-lifecycle/tab-lifecycle-coordinator';
 import { registerTabLifecycleEventHandlers } from '@/features/tab-lifecycle/tab-lifecycle-events';
+import { invalidateTabLifecycleGeneration } from '@/features/tab-lifecycle/tab-lifecycle-generation';
 import { previewAutomaticSleepRule } from '@/features/tab-lifecycle/automatic-sleep';
 import {
   listStowSuggestions,
@@ -261,6 +262,7 @@ async function routeMessage(
       case 'tab-lifecycle:update-policy': {
         const result = await updateTabLifecyclePolicy(message.policy);
         if (result.ok) {
+          invalidateTabLifecycleGeneration();
           invalidateAutomaticSleepScans();
           await runBestEffort(reconcileTabLifecycleAlarm);
           await runBestEffort(reconcileTabLifecycleObservations);

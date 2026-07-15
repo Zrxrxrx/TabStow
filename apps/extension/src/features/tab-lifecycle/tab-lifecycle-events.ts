@@ -4,6 +4,10 @@ import {
   observeDiscardedTab,
   removeSleepObservation,
 } from './sleep-observations';
+import {
+  currentTabLifecycleGeneration,
+  isCurrentTabLifecycleGeneration,
+} from './tab-lifecycle-generation';
 import { getTabLifecyclePolicy } from './tab-lifecycle-policy';
 
 const RELEVANT_UPDATE_FIELDS = [
@@ -15,8 +19,9 @@ const RELEVANT_UPDATE_FIELDS = [
 ] as const;
 
 async function withEnabledSuggestions(operation: () => Promise<void>): Promise<void> {
+  const generation = currentTabLifecycleGeneration();
   const result = await getTabLifecyclePolicy();
-  if (!result.ok) return;
+  if (!result.ok || !isCurrentTabLifecycleGeneration(generation)) return;
   if (!result.data.stowSuggestionsEnabled) {
     await clearSleepObservations();
     return;

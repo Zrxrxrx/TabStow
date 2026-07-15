@@ -66,6 +66,10 @@ const tabLifecycleEventMocks = vi.hoisted(() => ({
   registerTabLifecycleEventHandlers: vi.fn(),
 }));
 
+const tabLifecycleGenerationMocks = vi.hoisted(() => ({
+  invalidateTabLifecycleGeneration: vi.fn(),
+}));
+
 const automaticSleepMocks = vi.hoisted(() => ({
   previewAutomaticSleepRule: vi.fn(),
 }));
@@ -158,6 +162,7 @@ vi.mock('@/features/tab-lifecycle/tab-lifecycle-coordinator', () => ({
   TAB_LIFECYCLE_ALARM_NAME: 'tabstow-tab-lifecycle-v1',
 }));
 vi.mock('@/features/tab-lifecycle/tab-lifecycle-events', () => tabLifecycleEventMocks);
+vi.mock('@/features/tab-lifecycle/tab-lifecycle-generation', () => tabLifecycleGenerationMocks);
 vi.mock('@/features/tab-lifecycle/automatic-sleep', () => automaticSleepMocks);
 vi.mock('@/features/tab-lifecycle/stow-suggestions', () => stowSuggestionMocks);
 vi.mock('@/features/tab-lifecycle/suggested-stow', () => suggestedStowMocks);
@@ -447,10 +452,17 @@ describe('background message routing', () => {
     expect(response).toBe(result);
     expect(tabLifecycleCoordinatorMocks.invalidateAutomaticSleepScans)
       .toHaveBeenCalledTimes(1);
+    expect(tabLifecycleGenerationMocks.invalidateTabLifecycleGeneration)
+      .toHaveBeenCalledTimes(1);
     expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleAlarm)
       .toHaveBeenCalledTimes(1);
     expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleObservations)
       .toHaveBeenCalledTimes(1);
+    expect(
+      tabLifecycleGenerationMocks.invalidateTabLifecycleGeneration.mock.invocationCallOrder[0],
+    ).toBeLessThan(
+      tabLifecycleCoordinatorMocks.reconcileTabLifecycleObservations.mock.invocationCallOrder[0]!,
+    );
     expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });
 

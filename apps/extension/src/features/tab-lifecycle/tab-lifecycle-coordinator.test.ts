@@ -240,6 +240,27 @@ describe('tab lifecycle coordinator', () => {
     expect(observationMocks.reconcileSleepObservations).not.toHaveBeenCalled();
   });
 
+  it('drops observation recovery invalidated while its tab query is pending', async () => {
+    let resolveTabs!: (tabs: chrome.tabs.Tab[]) => void;
+    browserMocks.tabs.query.mockReturnValue(new Promise((resolve) => {
+      resolveTabs = resolve;
+    }));
+    const { reconcileTabLifecycleObservations } = await import(
+      './tab-lifecycle-coordinator'
+    );
+    const { invalidateTabLifecycleGeneration } = await import(
+      './tab-lifecycle-generation'
+    );
+
+    const pending = reconcileTabLifecycleObservations();
+    await vi.waitFor(() => expect(browserMocks.tabs.query).toHaveBeenCalledTimes(1));
+    invalidateTabLifecycleGeneration();
+    resolveTabs([eligibleTab()]);
+    await pending;
+
+    expect(observationMocks.reconcileSleepObservations).not.toHaveBeenCalled();
+  });
+
   it('bootstraps alarm and observation recovery together', async () => {
     const tabs = [eligibleTab()];
     browserMocks.tabs.query.mockImplementation(async (query) =>

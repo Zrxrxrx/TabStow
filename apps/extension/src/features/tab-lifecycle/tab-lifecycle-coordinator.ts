@@ -11,6 +11,10 @@ import {
   clearSleepObservations,
   reconcileSleepObservations,
 } from './sleep-observations';
+import {
+  currentTabLifecycleGeneration,
+  isCurrentTabLifecycleGeneration,
+} from './tab-lifecycle-generation';
 
 export const TAB_LIFECYCLE_ALARM_NAME = 'tabstow-tab-lifecycle-v1';
 const FIRST_SCAN_DELAY_MINUTES = 1;
@@ -25,8 +29,9 @@ export function invalidateAutomaticSleepScans(): void {
 }
 
 export async function reconcileTabLifecycleAlarm(): Promise<void> {
+  const generation = currentTabLifecycleGeneration();
   const state = await getTabLifecycleState();
-  if (!state.ok) return;
+  if (!state.ok || !isCurrentTabLifecycleGeneration(generation)) return;
 
   if (
     !state.data.policy.automaticSleepEnabled
@@ -38,6 +43,7 @@ export async function reconcileTabLifecycleAlarm(): Promise<void> {
   if (state.data.automaticSleepCapability.status === 'unavailable') return;
 
   const existing = await browser.alarms.get(TAB_LIFECYCLE_ALARM_NAME);
+  if (!isCurrentTabLifecycleGeneration(generation)) return;
   if (existing?.periodInMinutes === SCAN_PERIOD_MINUTES) return;
 
   await browser.alarms.create(TAB_LIFECYCLE_ALARM_NAME, {
@@ -47,14 +53,16 @@ export async function reconcileTabLifecycleAlarm(): Promise<void> {
 }
 
 export async function reconcileTabLifecycleObservations(): Promise<void> {
+  const generation = currentTabLifecycleGeneration();
   const result = await getTabLifecyclePolicy();
-  if (!result.ok) return;
+  if (!result.ok || !isCurrentTabLifecycleGeneration(generation)) return;
   if (!result.data.stowSuggestionsEnabled) {
     await clearSleepObservations();
     return;
   }
 
   const tabs = await browser.tabs.query({ windowType: 'normal' });
+  if (!isCurrentTabLifecycleGeneration(generation)) return;
   await reconcileSleepObservations(tabs);
 }
 
