@@ -3,7 +3,14 @@ import {
   runAutomaticSleepScan,
   type AutomaticSleepScanResult,
 } from './automatic-sleep';
-import { getTabLifecycleState } from './tab-lifecycle-policy';
+import {
+  getTabLifecyclePolicy,
+  getTabLifecycleState,
+} from './tab-lifecycle-policy';
+import {
+  clearSleepObservations,
+  reconcileSleepObservations,
+} from './sleep-observations';
 
 export const TAB_LIFECYCLE_ALARM_NAME = 'tabstow-tab-lifecycle-v1';
 const FIRST_SCAN_DELAY_MINUTES = 1;
@@ -35,9 +42,24 @@ export async function reconcileTabLifecycleAlarm(): Promise<void> {
   });
 }
 
+export async function reconcileTabLifecycleObservations(): Promise<void> {
+  const result = await getTabLifecyclePolicy();
+  if (!result.ok) return;
+  if (!result.data.stowSuggestionsEnabled) {
+    await clearSleepObservations();
+    return;
+  }
+
+  const tabs = await browser.tabs.query({ windowType: 'normal' });
+  await reconcileSleepObservations(tabs);
+}
+
 export function bootstrapTabLifecycleCoordinator(): Promise<void> {
   if (bootstrapInFlight) return bootstrapInFlight;
-  bootstrapInFlight = reconcileTabLifecycleAlarm().finally(() => {
+  bootstrapInFlight = Promise.allSettled([
+    reconcileTabLifecycleAlarm(),
+    reconcileTabLifecycleObservations(),
+  ]).then(() => undefined).finally(() => {
     bootstrapInFlight = null;
   });
   return bootstrapInFlight;
@@ -56,9 +78,17 @@ export function handleTabLifecycleAlarm(): Promise<AutomaticSleepScanResult | nu
       return null;
     }
 
-    return runAutomaticSleepScan(state.data.policy, {
+    const scanResult = await runAutomaticSleepScan(state.data.policy, {
       shouldContinue: () => generation === policyGeneration,
     });
+    if (scanResult.sleptTabIds.length > 0) {
+      try {
+        await reconcileTabLifecycleObservations();
+      } catch {
+        // Tab update events remain a second signal after a successful discard.
+      }
+    }
+    return scanResult;
   })().finally(() => {
     scanInFlight = null;
   });

@@ -20,13 +20,19 @@ const browserMocks = vi.hoisted(() => ({
   },
 }));
 
+const tabLifecycleEventMocks = vi.hoisted(() => ({
+  reconcileTabLifecycleTab: vi.fn(),
+}));
+
 vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
+vi.mock('@/features/tab-lifecycle/tab-lifecycle-events', () => tabLifecycleEventMocks);
 
 describe('active tabs service', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    tabLifecycleEventMocks.reconcileTabLifecycleTab.mockResolvedValue(undefined);
     browserMocks.tabGroups.query.mockResolvedValue([]);
     browserMocks.windows.getAll.mockResolvedValue([
       { id: 2, focused: true, incognito: false, type: 'normal' },
@@ -206,6 +212,10 @@ describe('active tabs service', () => {
 
     expect(browserMocks.tabs.get.mock.calls).toEqual([[3], [4]]);
     expect(browserMocks.tabs.discard.mock.calls).toEqual([[3], [4]]);
+    expect(tabLifecycleEventMocks.reconcileTabLifecycleTab.mock.calls).toEqual([
+      [{ id: 3, discarded: true }],
+      [{ id: 4, discarded: true }],
+    ]);
     expect(result).toEqual({
       ok: true,
       data: {
@@ -274,6 +284,32 @@ describe('active tabs service', () => {
         failures: [],
       },
     });
+  });
+
+  it('keeps a successful manual sleep when direct observation fails', async () => {
+    browserMocks.tabs.get.mockResolvedValue({
+      id: 19,
+      active: false,
+      audible: false,
+      discarded: false,
+      incognito: false,
+      pinned: false,
+      url: 'https://example.com/observed-later',
+    });
+    const discarded = { id: 19, discarded: true };
+    browserMocks.tabs.discard.mockResolvedValue(discarded);
+    tabLifecycleEventMocks.reconcileTabLifecycleTab.mockRejectedValue(
+      new Error('observation unavailable'),
+    );
+    const { sleepActiveTabs } = await import('./active-tabs-service');
+
+    await expect(sleepActiveTabs([19])).resolves.toEqual({
+      ok: true,
+      data: { sleptTabIds: [19], skippedTabIds: [], failures: [] },
+    });
+    expect(tabLifecycleEventMocks.reconcileTabLifecycleTab).toHaveBeenCalledWith(
+      discarded,
+    );
   });
 
   it('reports per-tab failures without stopping the remaining batch', async () => {

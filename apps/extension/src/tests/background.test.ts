@@ -59,6 +59,11 @@ const tabLifecycleCoordinatorMocks = vi.hoisted(() => ({
   handleTabLifecycleAlarm: vi.fn(),
   invalidateAutomaticSleepScans: vi.fn(),
   reconcileTabLifecycleAlarm: vi.fn(),
+  reconcileTabLifecycleObservations: vi.fn(),
+}));
+
+const tabLifecycleEventMocks = vi.hoisted(() => ({
+  registerTabLifecycleEventHandlers: vi.fn(),
 }));
 
 const automaticSleepMocks = vi.hoisted(() => ({
@@ -142,6 +147,7 @@ vi.mock('@/features/tab-lifecycle/tab-lifecycle-coordinator', () => ({
   ...tabLifecycleCoordinatorMocks,
   TAB_LIFECYCLE_ALARM_NAME: 'tabstow-tab-lifecycle-v1',
 }));
+vi.mock('@/features/tab-lifecycle/tab-lifecycle-events', () => tabLifecycleEventMocks);
 vi.mock('@/features/tab-lifecycle/automatic-sleep', () => automaticSleepMocks);
 vi.mock('@/features/sync/connection-service', () => connectionServiceMocks);
 vi.mock('@/features/sync/connection-store', () => connectionStoreMocks);
@@ -174,7 +180,7 @@ async function dispatchRuntimeMessage(
   const sendResponse = vi.fn();
   const keepAlive = listener?.(message, sender, sendResponse);
 
-  for (let attempts = 0; attempts < 5 && sendResponse.mock.calls.length === 0; attempts += 1) {
+  for (let attempts = 0; attempts < 10 && sendResponse.mock.calls.length === 0; attempts += 1) {
     await Promise.resolve();
   }
 
@@ -255,6 +261,8 @@ describe('background message routing', () => {
     await Promise.resolve();
 
     expect(tabLifecycleCoordinatorMocks.bootstrapTabLifecycleCoordinator)
+      .toHaveBeenCalledTimes(1);
+    expect(tabLifecycleEventMocks.registerTabLifecycleEventHandlers)
       .toHaveBeenCalledTimes(1);
     expect(tabLifecycleCoordinatorMocks.handleTabLifecycleAlarm).toHaveBeenCalledTimes(1);
   });
@@ -428,6 +436,8 @@ describe('background message routing', () => {
     expect(tabLifecycleCoordinatorMocks.invalidateAutomaticSleepScans)
       .toHaveBeenCalledTimes(1);
     expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleAlarm)
+      .toHaveBeenCalledTimes(1);
+    expect(tabLifecycleCoordinatorMocks.reconcileTabLifecycleObservations)
       .toHaveBeenCalledTimes(1);
     expect(coordinatorMocks.noteSynchronizedMutation).not.toHaveBeenCalled();
   });

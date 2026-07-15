@@ -18,18 +18,27 @@ const browserMocks = vi.hoisted(() => ({
   },
 }));
 
+const observationMocks = vi.hoisted(() => ({
+  clearSleepObservations: vi.fn(),
+  reconcileSleepObservations: vi.fn(),
+}));
+
 vi.mock('#imports', () => ({ storage: storageMocks }));
 vi.mock('@/lib/browser', () => ({ browser: browserMocks }));
+vi.mock('./sleep-observations', () => observationMocks);
 
 const POLICY_KEY = 'local:tabstow-tab-lifecycle-policy-v1';
 const NOW = Date.UTC(2026, 6, 15, 12);
 
-function storedPolicy(automaticSleepEnabled: boolean) {
+function storedPolicy(
+  automaticSleepEnabled: boolean,
+  stowSuggestionsEnabled = true,
+) {
   return {
     schemaVersion: 1,
     automaticSleepEnabled,
     automaticSleepAfterDays: 7,
-    stowSuggestionsEnabled: true,
+    stowSuggestionsEnabled,
     stowSuggestionAfterDays: 14,
   };
 }
@@ -67,6 +76,8 @@ describe('tab lifecycle coordinator', () => {
     browserMocks.tabs.query.mockResolvedValue([eligibleTab()]);
     browserMocks.tabs.get.mockResolvedValue(eligibleTab());
     browserMocks.tabs.discard.mockResolvedValue({ id: 7, discarded: true });
+    observationMocks.clearSleepObservations.mockResolvedValue(undefined);
+    observationMocks.reconcileSleepObservations.mockResolvedValue([]);
   });
 
   afterEach(() => {
@@ -138,6 +149,7 @@ describe('tab lifecycle coordinator', () => {
       { sleptTabIds: [7], skippedTabIds: [], failures: [] },
     ]);
     expect(browserMocks.tabs.discard).toHaveBeenCalledTimes(1);
+    expect(observationMocks.reconcileSleepObservations).toHaveBeenCalledTimes(1);
   });
 
   it('invalidates an in-flight scan after a policy change', async () => {
@@ -174,5 +186,66 @@ describe('tab lifecycle coordinator', () => {
     browserMocks.tabs.query.mockResolvedValue([{ id: 1 }]);
     await expect(handleTabLifecycleAlarm()).resolves.toBeNull();
     expect(browserMocks.tabs.discard).not.toHaveBeenCalled();
+  });
+
+  it('reconciles normal-window observations or clears them with the suggestion policy', async () => {
+    const { reconcileTabLifecycleObservations } = await import(
+      './tab-lifecycle-coordinator'
+    );
+    const tabs = [eligibleTab()];
+    browserMocks.tabs.query.mockResolvedValue(tabs);
+
+    await reconcileTabLifecycleObservations();
+
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
+    expect(observationMocks.reconcileSleepObservations).toHaveBeenCalledWith(tabs);
+
+    vi.clearAllMocks();
+    storageMocks.getItem.mockResolvedValue(storedPolicy(true, false));
+    await reconcileTabLifecycleObservations();
+
+    expect(observationMocks.clearSleepObservations).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabs.query).not.toHaveBeenCalled();
+    expect(observationMocks.reconcileSleepObservations).not.toHaveBeenCalled();
+  });
+
+  it('bootstraps alarm and observation recovery together', async () => {
+    const tabs = [eligibleTab()];
+    browserMocks.tabs.query.mockImplementation(async (query) =>
+      'windowType' in query ? tabs : [eligibleTab()],
+    );
+    const { bootstrapTabLifecycleCoordinator } = await import(
+      './tab-lifecycle-coordinator'
+    );
+
+    await bootstrapTabLifecycleCoordinator();
+
+    expect(browserMocks.alarms.create).toHaveBeenCalledTimes(1);
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({ windowType: 'normal' });
+    expect(observationMocks.reconcileSleepObservations).toHaveBeenCalledWith(tabs);
+  });
+
+  it('keeps bootstrap best-effort when either recovery path fails', async () => {
+    const { bootstrapTabLifecycleCoordinator } = await import(
+      './tab-lifecycle-coordinator'
+    );
+    browserMocks.alarms.get.mockRejectedValueOnce(new Error('alarms unavailable'));
+
+    await expect(bootstrapTabLifecycleCoordinator()).resolves.toBeUndefined();
+    expect(observationMocks.reconcileSleepObservations).toHaveBeenCalledTimes(1);
+
+    vi.clearAllMocks();
+    storageMocks.getItem.mockImplementation(async (key: string) =>
+      key === POLICY_KEY ? storedPolicy(true) : undefined,
+    );
+    browserMocks.alarms.get.mockResolvedValue(undefined);
+    browserMocks.alarms.create.mockResolvedValue(undefined);
+    browserMocks.tabs.query.mockImplementation(async (query) => {
+      if ('windowType' in query) throw new Error('tabs unavailable');
+      return [eligibleTab()];
+    });
+
+    await expect(bootstrapTabLifecycleCoordinator()).resolves.toBeUndefined();
+    expect(browserMocks.alarms.create).toHaveBeenCalledTimes(1);
   });
 });

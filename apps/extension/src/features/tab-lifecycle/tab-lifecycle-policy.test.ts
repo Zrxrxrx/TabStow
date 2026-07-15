@@ -30,6 +30,17 @@ beforeEach(() => {
 });
 
 describe('tab lifecycle policy', () => {
+  it('reads the normalized policy without probing Chrome capabilities', async () => {
+    storageMocks.getItem.mockResolvedValue({ schemaVersion: 1, ...DEFAULT_POLICY });
+    const { getTabLifecyclePolicy } = await import('./tab-lifecycle-policy');
+
+    await expect(getTabLifecyclePolicy()).resolves.toEqual({
+      ok: true,
+      data: DEFAULT_POLICY,
+    });
+    expect(browserMocks.tabs.query).not.toHaveBeenCalled();
+  });
+
   it('starts with conservative device-local defaults', async () => {
     storageMocks.getItem.mockResolvedValue(undefined);
     const { getTabLifecycleState } = await import('./tab-lifecycle-policy');

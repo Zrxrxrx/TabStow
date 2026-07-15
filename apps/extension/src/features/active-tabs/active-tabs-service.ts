@@ -1,6 +1,7 @@
 import { browser } from '@/lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
 import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
+import { reconcileTabLifecycleTab } from '@/features/tab-lifecycle/tab-lifecycle-events';
 import type {
   ActiveBrowserTab,
   ActiveChromeWindowInfo,
@@ -112,6 +113,11 @@ export async function sleepActiveTabs(
       const discardedTab = await browser.tabs.discard(tabId);
       if (discardedTab?.discarded) {
         sleptTabIds.push(tabId);
+        try {
+          await reconcileTabLifecycleTab(discardedTab);
+        } catch {
+          // The tab event remains a second signal when observation storage is unavailable.
+        }
       } else {
         skippedTabIds.push(tabId);
       }

@@ -108,6 +108,14 @@ export async function detectAutomaticSleepCapability(): Promise<AutomaticSleepCa
   }
 }
 
+export async function getTabLifecyclePolicy(): Promise<AppResult<TabLifecyclePolicy>> {
+  try {
+    return ok(await readPolicy());
+  } catch (error) {
+    return err('unknown-error', toErrorMessage(error));
+  }
+}
+
 export async function getTabLifecycleState(): Promise<AppResult<TabLifecycleState>> {
   try {
     const [policy, automaticSleepCapability] = await Promise.all([

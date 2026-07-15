@@ -36,8 +36,10 @@ import {
   handleTabLifecycleAlarm,
   invalidateAutomaticSleepScans,
   reconcileTabLifecycleAlarm,
+  reconcileTabLifecycleObservations,
   TAB_LIFECYCLE_ALARM_NAME,
 } from '@/features/tab-lifecycle/tab-lifecycle-coordinator';
+import { registerTabLifecycleEventHandlers } from '@/features/tab-lifecycle/tab-lifecycle-events';
 import { previewAutomaticSleepRule } from '@/features/tab-lifecycle/automatic-sleep';
 import {
   cancelGitHubOAuth,
@@ -234,6 +236,7 @@ async function routeMessage(
         if (result.ok) {
           invalidateAutomaticSleepScans();
           await runBestEffort(reconcileTabLifecycleAlarm);
+          await runBestEffort(reconcileTabLifecycleObservations);
         }
         return result;
       }
@@ -350,6 +353,8 @@ async function handleMessage(
 }
 
 export default defineBackground(() => {
+  registerTabLifecycleEventHandlers();
+
   browser.runtime.onInstalled.addListener(() => {
     void registerContextMenu();
     void bootstrapSyncCoordinator();
