@@ -24,6 +24,7 @@ import {
   validateUiAuditManifest,
   type UiAuditBuildEntry,
   type UiAuditExtensionManifest,
+  type UiAuditFeedbackFixture,
   type UiAuditMetrics,
 } from './ui-audit-core';
 
@@ -61,6 +62,24 @@ const extensionRoot = resolve(scriptDirectory, '..');
 const repositoryRoot = resolve(extensionRoot, '../..');
 const buildDirectory = resolve(extensionRoot, '.output/chrome-mv3');
 const casesPath = resolve(scriptDirectory, 'ui-audit-cases.json');
+
+const feedbackFixtures: Record<Exclude<UiAuditFeedbackFixture, 'none'>, {
+  tone: 'success' | 'error';
+  message: string;
+}> = {
+  'stow-success': {
+    tone: 'success',
+    message: 'Stowed 1 tabs and closed 0.',
+  },
+  'restore-success': {
+    tone: 'success',
+    message: 'Restored 2 tabs and moved the session to History.',
+  },
+  'long-error': {
+    tone: 'error',
+    message: 'Unable to stow this window because the browser stopped responding before Tabstow could confirm that every saved tab was safely persisted. Review the tabs and try again.',
+  },
+};
 
 function toRepositoryPath(path: string): string {
   return relative(repositoryRoot, path).split(sep).join('/');
@@ -441,6 +460,33 @@ async function runUiAudit(): Promise<number> {
     await waitForPage(cdp, sessionId);
     await waitForDomQuiet(cdp, sessionId);
 
+    const feedbackFixtureId = auditCase.feedbackFixture ?? 'none';
+    const feedbackFixture = feedbackFixtureId === 'none'
+      ? null
+      : feedbackFixtures[feedbackFixtureId];
+    if (feedbackFixture) {
+      await evaluate(cdp, sessionId, String.raw`(() => {
+        const stage = document.querySelector('.newtab-stage');
+        const workspace = stage?.querySelector(':scope > .v2-workspace');
+        if (!(stage instanceof HTMLElement) || !(workspace instanceof HTMLElement)) {
+          throw new Error('FINDING-004 fixture requires the production New Tab stage and workspace');
+        }
+        if (stage.querySelector(':scope > .newtab-feedback')) {
+          throw new Error('FINDING-004 fixture requires an initially empty feedback row');
+        }
+        const fixture = ${JSON.stringify(feedbackFixture)};
+        const feedback = document.createElement('p');
+        feedback.className = 'newtab-feedback status-message status-message--' + fixture.tone;
+        feedback.dataset.uiAuditFixture = ${JSON.stringify(feedbackFixtureId)};
+        feedback.setAttribute('aria-live', fixture.tone === 'error' ? 'assertive' : 'polite');
+        feedback.setAttribute('role', fixture.tone === 'error' ? 'alert' : 'status');
+        feedback.textContent = fixture.message;
+        stage.insertBefore(feedback, workspace);
+        return true;
+      })()`);
+      await waitForDomQuiet(cdp, sessionId);
+    }
+
     const observation = await evaluate<RuntimeObservation>(cdp, sessionId, String.raw`(async () => {
       const auditPage = ${JSON.stringify(auditCase.page)};
       const sha256 = async (path) => {
@@ -452,6 +498,31 @@ async function runUiAudit(): Promise<number> {
           .join('');
       };
       const root = document.querySelector('#root');
+      const feedbackElements = [...document.querySelectorAll('.newtab-feedback')];
+      const feedback = feedbackElements[0];
+      const workspace = document.querySelector('.v2-workspace');
+      const saved = document.querySelector('.saved-region');
+      const topStrip = document.querySelector('.top-strip');
+      const feedbackRect = feedback?.getBoundingClientRect();
+      const workspaceRect = workspace?.getBoundingClientRect();
+      const savedRect = saved?.getBoundingClientRect();
+      const topStripRect = topStrip?.getBoundingClientRect();
+      const overlapArea = (left, right) => {
+        if (!left || !right) return 0;
+        const width = Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left));
+        const height = Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top));
+        return Math.round(width * height);
+      };
+      const feedbackLineCount = (() => {
+        if (!feedback || !feedback.textContent) return 0;
+        const range = document.createRange();
+        range.selectNodeContents(feedback);
+        return new Set(
+          [...range.getClientRects()]
+            .filter((rect) => rect.width > 0 && rect.height > 0)
+            .map((rect) => Math.round(rect.top * 2) / 2),
+        ).size;
+      })();
       const headingLabels = new Set(
         [...document.querySelectorAll('h1,h2,h3')]
           .map((heading) => heading.textContent?.trim())
@@ -475,6 +546,21 @@ async function runUiAudit(): Promise<number> {
           viewportWidth: innerWidth,
           viewportHeight: innerHeight,
           zoom,
+          feedbackCount: feedbackElements.length,
+          feedbackWorkspaceOverlapAreaPx2: overlapArea(feedbackRect, workspaceRect),
+          feedbackSavedOverlapAreaPx2: overlapArea(feedbackRect, savedRect),
+          feedbackViewportOverflowPx: feedbackRect
+            ? Math.ceil(
+                Math.max(0, -feedbackRect.left)
+                + Math.max(0, feedbackRect.right - innerWidth)
+                + Math.max(0, -feedbackRect.top)
+                + Math.max(0, feedbackRect.bottom - innerHeight)
+              )
+            : 0,
+          feedbackLineCount,
+          topWorkspaceGapPx: topStripRect && workspaceRect
+            ? Math.round((workspaceRect.top - topStripRect.bottom) * 100) / 100
+            : 0,
         },
         runtimeId: chrome.runtime.id,
         manifest: chrome.runtime.getManifest(),
@@ -542,6 +628,7 @@ async function runUiAudit(): Promise<number> {
           zoom: auditCase.zoom,
           theme: auditCase.theme,
           locale: auditCase.locale,
+          feedbackFixture: feedbackFixtureId,
         },
         setup: auditCase.setup,
         cleanup: auditCase.cleanup,

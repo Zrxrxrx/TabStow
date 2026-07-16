@@ -19,6 +19,12 @@ const UI_AUDIT_METRICS = [
   'viewportWidth',
   'viewportHeight',
   'zoom',
+  'feedbackCount',
+  'feedbackWorkspaceOverlapAreaPx2',
+  'feedbackSavedOverlapAreaPx2',
+  'feedbackViewportOverflowPx',
+  'feedbackLineCount',
+  'topWorkspaceGapPx',
 ] as const;
 
 const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
@@ -27,10 +33,24 @@ const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
   'viewportWidth',
   'viewportHeight',
   'zoom',
+  'feedbackCount',
+  'feedbackWorkspaceOverlapAreaPx2',
+  'feedbackSavedOverlapAreaPx2',
+  'feedbackViewportOverflowPx',
+  'feedbackLineCount',
+  'topWorkspaceGapPx',
 ]);
+
+const UI_AUDIT_FEEDBACK_FIXTURES = [
+  'none',
+  'stow-success',
+  'restore-success',
+  'long-error',
+] as const;
 
 export type UiAuditMetric = typeof UI_AUDIT_METRICS[number];
 export type UiAuditOperator = 'atMost' | 'atLeast' | 'equals';
+export type UiAuditFeedbackFixture = typeof UI_AUDIT_FEEDBACK_FIXTURES[number];
 
 export type UiAuditAssertion = {
   metric: UiAuditMetric;
@@ -46,6 +66,7 @@ export type UiAuditCase = {
   zoom: number;
   theme: 'light' | 'dark';
   locale: 'en' | 'zh-CN';
+  feedbackFixture?: UiAuditFeedbackFixture;
   setup: string[];
   cleanup: string[];
   screenshot: string;
@@ -166,6 +187,10 @@ export function validateUiAuditManifest(input: unknown): UiAuditManifest {
     }
     if (candidate.locale !== 'en' && candidate.locale !== 'zh-CN') {
       throw new Error(`${field}.locale must be en or zh-CN`);
+    }
+    if (candidate.feedbackFixture !== undefined
+      && !UI_AUDIT_FEEDBACK_FIXTURES.includes(candidate.feedbackFixture as UiAuditFeedbackFixture)) {
+      throw new Error(`${field}.feedbackFixture is unsupported`);
     }
     validateInstructions(candidate.setup, `${field}.setup`);
     validateInstructions(candidate.cleanup, `${field}.cleanup`);

@@ -69,6 +69,219 @@
           "value": 1
         }
       ]
+    },
+    {
+      "id": "FINDING-004-NONE",
+      "description": "No action feedback leaves no empty row above the New Tab workspace",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "feedbackFixture": "none",
+      "setup": [
+        "Open the production New Tab in a disposable profile without inserting an action-feedback fixture."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-004-NONE.png",
+      "assertions": [
+        {
+          "metric": "workspaceLandmarks",
+          "operator": "equals",
+          "value": "Quick links|Active tabs|Saved for later"
+        },
+        {
+          "metric": "feedbackCount",
+          "operator": "equals",
+          "value": 0
+        },
+        {
+          "metric": "topWorkspaceGapPx",
+          "operator": "equals",
+          "value": 0
+        },
+        {
+          "metric": "feedbackWorkspaceOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackSavedOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackViewportOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackLineCount",
+          "operator": "equals",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "FINDING-004-STOW",
+      "description": "One-line Stow feedback stays above the New Tab workspace",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "feedbackFixture": "stow-success",
+      "setup": [
+        "Insert the audit-only Stow success fixture after the production New Tab renders; App tests cover the real action wiring."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-004-STOW.png",
+      "assertions": [
+        {
+          "metric": "workspaceLandmarks",
+          "operator": "equals",
+          "value": "Quick links|Active tabs|Saved for later"
+        },
+        {
+          "metric": "feedbackCount",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "feedbackWorkspaceOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackSavedOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackViewportOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackLineCount",
+          "operator": "equals",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "FINDING-004-RESTORE",
+      "description": "One-line Restore feedback stays above the New Tab workspace at the tablet breakpoint",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 768,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "feedbackFixture": "restore-success",
+      "setup": [
+        "Insert the audit-only Restore success fixture after the production New Tab renders; App tests cover the real action wiring."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-004-RESTORE.png",
+      "assertions": [
+        {
+          "metric": "workspaceLandmarks",
+          "operator": "equals",
+          "value": "Quick links|Active tabs|Saved for later"
+        },
+        {
+          "metric": "feedbackCount",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "feedbackWorkspaceOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackSavedOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackViewportOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackLineCount",
+          "operator": "equals",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "FINDING-004",
+      "description": "Long action error wraps inside the narrow viewport and stays above the New Tab workspace",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "feedbackFixture": "long-error",
+      "setup": [
+        "Insert the audit-only long error fixture after the production New Tab renders to isolate production layout geometry."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-004.png",
+      "assertions": [
+        {
+          "metric": "workspaceLandmarks",
+          "operator": "equals",
+          "value": "Quick links|Active tabs|Saved for later"
+        },
+        {
+          "metric": "feedbackCount",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "feedbackWorkspaceOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackSavedOverlapAreaPx2",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackViewportOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "feedbackLineCount",
+          "operator": "atLeast",
+          "value": 2
+        }
+      ]
     }
   ]
 }
