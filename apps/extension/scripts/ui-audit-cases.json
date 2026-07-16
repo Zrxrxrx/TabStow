@@ -282,6 +282,130 @@
           "value": 2
         }
       ]
+    },
+    {
+      "id": "FINDING-006-DESKTOP",
+      "description": "Desktop Tab order and nested modal isolation follow the production New Tab interaction model",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "interactionFixture": "finding-006",
+      "setup": [
+        "Use the real empty production New Tab to traverse focus, open and close the Quick Link form, then open Extra and its nested Add todo form."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-006-DESKTOP.png",
+      "assertions": [
+        {
+          "metric": "focusRegionSequence",
+          "operator": "equals",
+          "value": "top|quick-links|active|saved|auxiliary"
+        },
+        {
+          "metric": "tabSequenceComplete",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "quickLinkModalIsolationFailures",
+          "operator": "equals",
+          "value": 0
+        },
+        {
+          "metric": "modalPortaledCount",
+          "operator": "equals",
+          "value": 2
+        },
+        {
+          "metric": "rootInertDuringModal",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "lowerModalInert",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "topModalInteractive",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "focusInTopModal",
+          "operator": "equals",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "FINDING-006",
+      "description": "Narrow Tab order and nested modal isolation follow the production New Tab interaction model",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 768,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "interactionFixture": "finding-006",
+      "setup": [
+        "Use the real empty production New Tab to traverse focus, open and close the Quick Link form, then open Extra and its nested Add todo form."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-006.png",
+      "assertions": [
+        {
+          "metric": "focusRegionSequence",
+          "operator": "equals",
+          "value": "top|quick-links|active|saved|auxiliary"
+        },
+        {
+          "metric": "tabSequenceComplete",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "quickLinkModalIsolationFailures",
+          "operator": "equals",
+          "value": 0
+        },
+        {
+          "metric": "modalPortaledCount",
+          "operator": "equals",
+          "value": 2
+        },
+        {
+          "metric": "rootInertDuringModal",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "lowerModalInert",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "topModalInteractive",
+          "operator": "equals",
+          "value": 1
+        },
+        {
+          "metric": "focusInTopModal",
+          "operator": "equals",
+          "value": 1
+        }
+      ]
     }
   ]
 }

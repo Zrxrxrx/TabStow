@@ -25,6 +25,14 @@ const UI_AUDIT_METRICS = [
   'feedbackViewportOverflowPx',
   'feedbackLineCount',
   'topWorkspaceGapPx',
+  'focusRegionSequence',
+  'tabSequenceComplete',
+  'quickLinkModalIsolationFailures',
+  'modalPortaledCount',
+  'rootInertDuringModal',
+  'lowerModalInert',
+  'topModalInteractive',
+  'focusInTopModal',
 ] as const;
 
 const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
@@ -39,6 +47,13 @@ const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
   'feedbackViewportOverflowPx',
   'feedbackLineCount',
   'topWorkspaceGapPx',
+  'tabSequenceComplete',
+  'quickLinkModalIsolationFailures',
+  'modalPortaledCount',
+  'rootInertDuringModal',
+  'lowerModalInert',
+  'topModalInteractive',
+  'focusInTopModal',
 ]);
 
 const UI_AUDIT_FEEDBACK_FIXTURES = [
@@ -48,9 +63,12 @@ const UI_AUDIT_FEEDBACK_FIXTURES = [
   'long-error',
 ] as const;
 
+const UI_AUDIT_INTERACTION_FIXTURES = ['finding-006'] as const;
+
 export type UiAuditMetric = typeof UI_AUDIT_METRICS[number];
 export type UiAuditOperator = 'atMost' | 'atLeast' | 'equals';
 export type UiAuditFeedbackFixture = typeof UI_AUDIT_FEEDBACK_FIXTURES[number];
+export type UiAuditInteractionFixture = typeof UI_AUDIT_INTERACTION_FIXTURES[number];
 
 export type UiAuditAssertion = {
   metric: UiAuditMetric;
@@ -67,6 +85,7 @@ export type UiAuditCase = {
   theme: 'light' | 'dark';
   locale: 'en' | 'zh-CN';
   feedbackFixture?: UiAuditFeedbackFixture;
+  interactionFixture?: UiAuditInteractionFixture;
   setup: string[];
   cleanup: string[];
   screenshot: string;
@@ -191,6 +210,12 @@ export function validateUiAuditManifest(input: unknown): UiAuditManifest {
     if (candidate.feedbackFixture !== undefined
       && !UI_AUDIT_FEEDBACK_FIXTURES.includes(candidate.feedbackFixture as UiAuditFeedbackFixture)) {
       throw new Error(`${field}.feedbackFixture is unsupported`);
+    }
+    if (candidate.interactionFixture !== undefined
+      && !UI_AUDIT_INTERACTION_FIXTURES.includes(
+        candidate.interactionFixture as UiAuditInteractionFixture,
+      )) {
+      throw new Error(`${field}.interactionFixture is unsupported`);
     }
     validateInstructions(candidate.setup, `${field}.setup`);
     validateInstructions(candidate.cleanup, `${field}.cleanup`);

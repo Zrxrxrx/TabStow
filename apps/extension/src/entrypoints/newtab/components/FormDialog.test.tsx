@@ -11,6 +11,7 @@ let root: Root;
 
 beforeEach(() => {
   container = document.createElement('div');
+  container.id = 'root';
   document.body.appendChild(container);
   root = createRoot(container);
 });
@@ -102,7 +103,7 @@ async function keyDown(key: string) {
 }
 
 function getByText(text: string): HTMLElement {
-  const match = Array.from(container.querySelectorAll<HTMLElement>('button, label, h2')).find(
+  const match = Array.from(document.body.querySelectorAll<HTMLElement>('button, label, h2')).find(
     (element) => element.textContent === text,
   );
   if (!match) throw new Error(`Unable to find text: ${text}`);
@@ -110,7 +111,7 @@ function getByText(text: string): HTMLElement {
 }
 
 function getByLabelText(text: string): HTMLElement {
-  const labels = Array.from(container.querySelectorAll<HTMLLabelElement>('label'));
+  const labels = Array.from(document.body.querySelectorAll<HTMLLabelElement>('label'));
   const label = labels.find((item) => item.textContent?.includes(text));
   const control = label?.querySelector<HTMLElement>('input, textarea, select');
   if (!control) throw new Error(`Unable to find label: ${text}`);
@@ -118,5 +119,5 @@ function getByLabelText(text: string): HTMLElement {
 }
 
 function queryByRole(role: string): HTMLElement | null {
-  return container.querySelector<HTMLElement>(`[role="${role}"]`);
+  return document.body.querySelector<HTMLElement>(`[role="${role}"]`);
 }

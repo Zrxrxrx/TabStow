@@ -26,6 +26,7 @@ let root: Root;
 
 beforeEach(() => {
   container = document.createElement('div');
+  container.id = 'root';
   document.body.appendChild(container);
   root = createRoot(container);
   sendExtensionMessage.mockReset();
@@ -55,8 +56,8 @@ describe('TabLifecyclePolicyDialog', () => {
     ]);
     expect(getCheckbox('Saved for later suggestions').checked).toBe(true);
     expect(getSelect('Suggest after observed sleep').value).toBe('14');
-    expect(container.textContent).toContain('Automatic sleep is available.');
-    expect(container.textContent).toContain('These settings stay on this device');
+    expect(document.body.textContent).toContain('Automatic sleep is available.');
+    expect(document.body.textContent).toContain('These settings stay on this device');
   });
 
   it('discards an unsaved draft when Cancel is chosen', async () => {
@@ -95,7 +96,7 @@ describe('TabLifecyclePolicyDialog', () => {
       type: 'tab-lifecycle:preview-auto-sleep',
       afterDays: 7,
     });
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       '2 tabs currently match this rule and may sleep soon after saving.',
     );
     expect(messagesOfType('tab-lifecycle:update-policy')).toHaveLength(0);
@@ -105,7 +106,7 @@ describe('TabLifecyclePolicyDialog', () => {
       type: 'tab-lifecycle:preview-auto-sleep',
       afterDays: 3,
     });
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       '4 tabs currently match this rule and may sleep soon after saving.',
     );
 
@@ -146,12 +147,12 @@ describe('TabLifecyclePolicyDialog', () => {
 
     expect(getCheckbox('Automatic sleep').disabled).toBe(true);
     expect(getCheckbox('Saved for later suggestions').disabled).toBe(false);
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       'Automatic sleep requires Chrome 121 or later. Update Chrome to use inactivity-based rules. Manual sleep and Saved for later suggestions still work.',
     );
 
     await renderDialog({ locale: 'zh-CN' });
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       '自动休眠需要 Chrome 121 或更高版本。请更新 Chrome 后使用基于未访问时长的规则；手动休眠和‘稍后查看’建议仍可使用。',
     );
   });
@@ -197,14 +198,14 @@ describe('TabLifecyclePolicyDialog', () => {
     await renderDialog();
     await click(getCheckbox('Saved for later suggestions'));
 
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       'Automatic sleep availability could not be checked. Chrome tabs could not be queried.',
     );
     expect(getCheckbox('Automatic sleep').disabled).toBe(true);
     await click(getButton('Retry'));
 
     expect(sendExtensionMessage).toHaveBeenCalledTimes(2);
-    expect(container.textContent).toContain('Automatic sleep is available.');
+    expect(document.body.textContent).toContain('Automatic sleep is available.');
     expect(getCheckbox('Automatic sleep').disabled).toBe(false);
     expect(getCheckbox('Saved for later suggestions').checked).toBe(false);
   });
@@ -219,8 +220,8 @@ describe('TabLifecyclePolicyDialog', () => {
     const onClose = vi.fn();
     await renderDialog({ onClose });
 
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(container.textContent).toContain('Could not load lifecycle settings.');
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.body.textContent).toContain('Could not load lifecycle settings.');
     expect(getButton('Save settings').disabled).toBe(true);
     expect(onClose).not.toHaveBeenCalled();
 
@@ -262,8 +263,8 @@ describe('TabLifecyclePolicyDialog', () => {
       error: { code: 'unknown-error', message: 'Settings could not be saved.' },
     }));
 
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(container.textContent).toContain('Settings could not be saved.');
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.body.textContent).toContain('Settings could not be saved.');
     expect(getCheckbox('Automatic sleep').checked).toBe(true);
     expect(getSelect('Sleep after inactivity').value).toBe('30');
     expect(getButtons('Cancel').every((button) => !button.disabled)).toBe(true);
@@ -294,7 +295,7 @@ function getSelect(label: string) {
 }
 
 function getLabeledControl<T extends HTMLElement>(label: string, selector: string): T {
-  const match = Array.from(container.querySelectorAll<HTMLLabelElement>('label')).find(
+  const match = Array.from(document.body.querySelectorAll<HTMLLabelElement>('label')).find(
     (item) => item.textContent?.includes(label),
   );
   const control = match?.querySelector<T>(selector);
@@ -309,7 +310,7 @@ function getButton(name: string) {
 }
 
 function getButtons(name: string) {
-  return Array.from(container.querySelectorAll<HTMLButtonElement>('button')).filter(
+  return Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).filter(
     (item) => item.textContent === name || item.getAttribute('aria-label') === name,
   );
 }

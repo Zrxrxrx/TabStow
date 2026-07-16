@@ -1003,25 +1003,29 @@ h3 {
   text-align: left;
 }
 
-.extra-drawer-backdrop {
+.dialog-backdrop.extra-drawer-backdrop {
   position: fixed;
   inset: 0;
   z-index: 20;
   display: flex;
+  align-items: stretch;
   justify-content: flex-end;
+  padding: 0;
   background: color-mix(in oklab, var(--bg), transparent 18%);
   backdrop-filter: blur(3px);
 }
 
-.extra-drawer {
+.modal-dialog.extra-drawer {
   width: min(100%, 430px);
   height: 100%;
+  max-height: none;
   overflow: auto;
   padding: 18px;
   display: grid;
   align-content: start;
   gap: 14px;
   background: var(--surface);
+  border: 0;
   border-left: 1px solid var(--border);
   box-shadow: var(--elev-raised);
 }
@@ -1136,16 +1140,15 @@ svg {
 .newtab-shell {
   width: 100%;
   height: 100vh;
-  display: grid;
-  grid-template-columns: clamp(132px, 10.4vw, 150px) minmax(0, 1fr);
 }
 
 .quick-links-rail {
+  grid-area: primary;
   min-width: 0;
-  height: 100vh;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 18px 12px 13px;
+  padding: 18px 12px 0;
   border-right: 1px solid var(--border);
   background: var(--rail);
 }
@@ -1275,11 +1278,13 @@ svg {
 }
 
 .rail-utilities {
+  grid-area: auxiliary;
   display: grid;
   gap: 3px;
-  margin-top: auto;
-  padding-top: 10px;
+  padding: 10px 12px 13px;
   border-top: 1px solid var(--border);
+  border-right: 1px solid var(--border);
+  background: var(--rail);
 }
 
 .rail-utility-button {
@@ -1302,16 +1307,18 @@ svg {
 }
 
 .newtab-stage {
+  width: 100%;
   min-width: 0;
   min-height: 0;
   height: 100vh;
   display: grid;
   grid-template-areas:
-    "top"
-    "feedback"
-    "workspace";
-  grid-template-columns: minmax(0, 1fr);
-  grid-template-rows: 72px auto minmax(0, 1fr);
+    "primary top"
+    "primary feedback"
+    "primary workspace"
+    "auxiliary workspace";
+  grid-template-columns: clamp(132px, 10.4vw, 150px) minmax(0, 1fr);
+  grid-template-rows: 72px auto minmax(0, 1fr) auto;
 }
 
 .top-strip {
@@ -1931,7 +1938,7 @@ svg {
 }
 
 @media (max-width: 1180px) {
-  .newtab-shell {
+  .newtab-stage {
     grid-template-columns: 132px minmax(0, 1fr);
   }
 
