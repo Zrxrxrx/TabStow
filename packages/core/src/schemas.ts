@@ -35,12 +35,9 @@ export const tabSessionSchema = z
     }
   });
 
-export const themeSchema = z.enum(['system', 'light', 'dark']);
-
 export const defaultSettingsSchema = z.object({
   includePinnedTabs: z.boolean(),
   closePinnedTabs: z.boolean(),
-  theme: themeSchema,
 });
 
 export const extensionSettingsSchema = defaultSettingsSchema
@@ -49,15 +46,13 @@ export const extensionSettingsSchema = defaultSettingsSchema
   })
   .strict();
 
-export const safeSyncSettingsSchema = extensionSettingsSchema
-  .omit({ theme: true })
-  .strict();
+export const safeSyncSettingsSchema = extensionSettingsSchema.strict();
 
 const syncDocumentSettingsSchema = safeSyncSettingsSchema
   .extend({
     gistId: z.string().min(1).optional(),
     gistFileName: z.string().min(1).optional(),
-    theme: themeSchema.optional(),
+    theme: z.unknown().optional(),
   })
   .strict()
   .transform(
@@ -134,7 +129,6 @@ export const syncDocumentSchema = z.object({
 export const DEFAULT_SETTINGS = {
   includePinnedTabs: false,
   closePinnedTabs: false,
-  theme: 'system',
 } as const satisfies z.infer<typeof defaultSettingsSchema>;
 
 export function isZodValidationError(error: unknown): error is z.ZodError {
@@ -143,7 +137,6 @@ export function isZodValidationError(error: unknown): error is z.ZodError {
 
 export type SavedTab = z.infer<typeof savedTabSchema>;
 export type TabSession = z.infer<typeof tabSessionSchema>;
-export type Theme = z.infer<typeof themeSchema>;
 export type DefaultSettings = z.infer<typeof defaultSettingsSchema>;
 export type ExtensionSettings = z.infer<typeof extensionSettingsSchema>;
 export type SafeSyncSettings = z.infer<typeof safeSyncSettingsSchema>;

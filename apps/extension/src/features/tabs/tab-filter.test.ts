@@ -11,7 +11,6 @@ const settings: ExtensionSettings = {
   deviceId: 'device-1',
   includePinnedTabs: false,
   closePinnedTabs: false,
-  theme: 'system',
 };
 
 function tab(partial: Partial<StowableBrowserTab>): StowableBrowserTab {

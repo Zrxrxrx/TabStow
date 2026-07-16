@@ -1,25 +1,20 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
-import { getThemePreferences, type ThemeMode } from '@/features/theme/theme-preferences';
+import { bootstrapThemePreferences } from '@/features/theme/theme-bootstrap';
 import { App } from './App';
 import '@/styles/tabstow-tokens.css';
 import './styles.css';
 
 async function mount() {
-  let initialThemeError: string | null = null;
-  let initialThemeMode: ThemeMode = 'light';
-
-  try {
-    initialThemeMode = (await getThemePreferences()).mode;
-  } catch (error) {
-    initialThemeError =
-      error instanceof Error ? error.message : 'Could not migrate theme preferences.';
-  }
-
-  document.documentElement.dataset.themeMode = initialThemeMode;
+  const theme = await bootstrapThemePreferences();
+  window.addEventListener('pagehide', theme.dispose, { once: true });
   createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
-      <App initialThemeError={initialThemeError} initialThemeMode={initialThemeMode} />
+      <App
+        initialThemeError={theme.initialError}
+        initialThemeMode={theme.initialMode}
+        subscribeToThemeChanges={theme.subscribe}
+      />
     </React.StrictMode>,
   );
 }

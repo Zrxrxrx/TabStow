@@ -12,6 +12,7 @@ type LegacyStoredSettings = Partial<ExtensionSettings> & {
   githubToken?: unknown;
   gistId?: unknown;
   gistFileName?: unknown;
+  theme?: unknown;
 };
 
 export async function getSettings(): Promise<ExtensionSettings> {
@@ -32,7 +33,6 @@ export async function getSettings(): Promise<ExtensionSettings> {
   );
   const settings = extensionSettingsSchema.parse({
     ...DEFAULT_SETTINGS,
-    theme: stored?.theme ?? DEFAULT_SETTINGS.theme,
     ...preferences,
     deviceId: replicaId,
   });

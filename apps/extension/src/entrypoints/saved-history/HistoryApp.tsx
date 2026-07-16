@@ -23,7 +23,11 @@ function reasonMessageKey(reason: HistoryEntry['reason']) {
   return 'historyOpenedFrom' as const;
 }
 
-export function HistoryApp() {
+export function HistoryApp({
+  initialThemeError = null,
+}: {
+  initialThemeError?: string | null;
+} = {}) {
   const [entries, setEntries] = useState<HistoryEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -110,6 +114,7 @@ export function HistoryApp() {
       backToWorkspaceLabel={t(locale, 'backToWorkspace')}
       pageLabel={t(locale, 'history')}
     >
+      <StatusMessage message={initialThemeError} tone="error" />
       <StatusMessage message={status.message} tone={status.tone} />
       {loading ? <p>{t(locale, 'historyLoading')}</p> : null}
       {!loading && status.tone !== 'error' && entries.length === 0 ? (

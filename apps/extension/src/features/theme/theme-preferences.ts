@@ -42,3 +42,11 @@ export async function saveThemePreferences(preferences: unknown): Promise<ThemeP
   await storage.setItem(THEME_KEY, normalized);
   return normalized;
 }
+
+export function watchThemePreferences(
+  listener: (preferences: ThemePreferences) => void,
+): () => void {
+  return storage.watch<unknown>(THEME_KEY, (value) => {
+    listener(normalizeThemePreferences(value));
+  });
+}
