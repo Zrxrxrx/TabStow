@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
-import { Languages, Moon, Settings, SlidersHorizontal, Sun, X } from 'lucide-react';
+import { Languages, Moon, Settings, SlidersHorizontal, Sun } from 'lucide-react';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import {
   getLanguagePreference,
@@ -202,17 +202,6 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
     document.documentElement.dataset.themeMode = themeMode;
   }, [themeMode]);
 
-  useEffect(() => {
-    if (!extraOpen) return;
-
-    function closeOnEscape(event: KeyboardEvent) {
-      if (event.key === 'Escape') setExtraOpen(false);
-    }
-
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [extraOpen]);
-
   async function runAction<T>(
     actionId: string,
     action: () => Promise<AppResult<T>>,
@@ -290,44 +279,6 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   return (
     <>
       <main className="newtab-shell" data-od-id="newtab-shell">
-        <aside className="quick-links-rail" aria-label={t(locale, 'quickLinks')}>
-          <div className="rail-brand brand-lockup" data-od-id="brand-lockup">
-            <div className="mark" aria-hidden="true">TS</div>
-            <div>
-              <h1 id="tabstow-title" data-od-id="page-title">Tabstow</h1>
-              <p>{t(locale, 'tabstowSubtitle')}</p>
-            </div>
-          </div>
-          <div className="rail-links-scroll">
-            <QuickLinks
-              disabled={busyAction !== null}
-              locale={locale}
-              refreshKey={quickLinksRefreshKey}
-            />
-          </div>
-          <div className="rail-utilities">
-            <button
-              type="button"
-              className="rail-utility-button"
-              onClick={() => setExtraOpen(true)}
-              aria-expanded={extraOpen}
-              aria-controls="extra-drawer"
-            >
-              <SlidersHorizontal size={16} aria-hidden="true" />
-              <span>{t(locale, 'extra')}</span>
-            </button>
-            <button
-              type="button"
-              className="rail-utility-button"
-              onClick={openOptions}
-              aria-label={t(locale, 'openSettings')}
-            >
-              <Settings size={16} aria-hidden="true" />
-              <span>{t(locale, 'settings')}</span>
-            </button>
-          </div>
-        </aside>
-
         <section className="newtab-stage">
           <header className="top-strip" data-od-id="top-strip">
             <UnifiedSearch
@@ -388,6 +339,23 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
           </div>
           </header>
 
+          <aside className="quick-links-rail" aria-label={t(locale, 'quickLinks')}>
+            <div className="rail-brand brand-lockup" data-od-id="brand-lockup">
+              <div className="mark" aria-hidden="true">TS</div>
+              <div>
+                <h1 id="tabstow-title" data-od-id="page-title">Tabstow</h1>
+                <p>{t(locale, 'tabstowSubtitle')}</p>
+              </div>
+            </div>
+            <div className="rail-links-scroll">
+              <QuickLinks
+                disabled={busyAction !== null}
+                locale={locale}
+                refreshKey={quickLinksRefreshKey}
+              />
+            </div>
+          </aside>
+
           <NewTabFeedback message={status.message} tone={status.tone} />
 
           <section className="workspace-container v2-workspace" aria-label="Tab workspace">
@@ -440,6 +408,28 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
               </div>
             </div>
           </section>
+
+          <div className="rail-utilities">
+            <button
+              type="button"
+              className="rail-utility-button"
+              onClick={() => setExtraOpen(true)}
+              aria-expanded={extraOpen}
+              aria-controls="extra-drawer"
+            >
+              <SlidersHorizontal size={16} aria-hidden="true" />
+              <span>{t(locale, 'extra')}</span>
+            </button>
+            <button
+              type="button"
+              className="rail-utility-button"
+              onClick={openOptions}
+              aria-label={t(locale, 'openSettings')}
+            >
+              <Settings size={16} aria-hidden="true" />
+              <span>{t(locale, 'settings')}</span>
+            </button>
+          </div>
         </section>
       </main>
 
@@ -475,37 +465,17 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
       ) : null}
 
       {extraOpen ? (
-        <aside
-          className="extra-drawer-backdrop is-open"
+        <ModalDialog
+          backdropClassName="extra-drawer-backdrop is-open"
+          closeLabel={t(locale, 'closeExtra')}
+          description={t(locale, 'extraDescription')}
           id="extra-drawer"
-          aria-hidden="false"
-          onClick={(event) => {
-            if (event.target === event.currentTarget) setExtraOpen(false);
-          }}
+          onClose={() => setExtraOpen(false)}
+          surfaceClassName="extra-drawer"
+          title={t(locale, 'extra')}
         >
-          <section
-            className="extra-drawer"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="extra-drawer-title"
-          >
-            <header>
-              <div>
-                <h2 id="extra-drawer-title">{t(locale, 'extra')}</h2>
-                <p className="subtle">{t(locale, 'extraDescription')}</p>
-              </div>
-              <button
-                type="button"
-                className="icon-button"
-                aria-label={t(locale, 'closeExtra')}
-                onClick={() => setExtraOpen(false)}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </header>
-            <TodosPanel locale={locale} />
-          </section>
-        </aside>
+          <TodosPanel locale={locale} />
+        </ModalDialog>
       ) : null}
       {recoveryOpen ? (
         <RecoveryBinDialog

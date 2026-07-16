@@ -8,6 +8,7 @@ import { SyncStatusDialog } from './SyncStatusDialog';
 describe('SyncStatusDialog', () => {
   it('renders missing values safely and routes recovery through Settings', async () => {
     const container = document.createElement('div');
+    container.id = 'root';
     document.body.appendChild(container);
     const root = createRoot(container);
     const onOpenSettings = vi.fn();
@@ -21,9 +22,9 @@ describe('SyncStatusDialog', () => {
       />,
     ));
 
-    expect(container.querySelectorAll('dd')).toHaveLength(7);
-    expect(container.textContent).toContain('Unavailable');
-    const reconnect = Array.from(container.querySelectorAll('button')).find(
+    expect(document.body.querySelectorAll('dd')).toHaveLength(7);
+    expect(document.body.textContent).toContain('Unavailable');
+    const reconnect = Array.from(document.body.querySelectorAll('button')).find(
       (button) => button.textContent?.includes('Reconnect GitHub'),
     )!;
     await act(async () => reconnect.click());

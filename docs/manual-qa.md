@@ -2,7 +2,7 @@
 
 ## UI audit evidence
 
-Use a disposable Chrome for Testing profile. Never connect the audit runner to a daily-use profile or a profile containing GitHub credentials.
+Use a disposable Chrome for Testing profile. Never connect the audit runner to a daily-use profile or a profile containing GitHub credentials. On macOS, use the mock keychain flag below and never approve a Chromium Safe Storage prompt for this audit.
 
 1. Build the production MV3 extension and inspect the runner contract:
 
@@ -22,6 +22,7 @@ Use a disposable Chrome for Testing profile. Never connect the audit runner to a
      --disable-extensions-except="$BUILD_DIR" \
      --load-extension="$BUILD_DIR" \
      --remote-debugging-port=9333 \
+     --use-mock-keychain \
      --lang=en-US \
      --enable-automation \
      --no-first-run
@@ -54,6 +55,17 @@ bun run audit:ui -- --port 9333 --case FINDING-004 --output .artifacts/ui-audit/
 ```
 
 The finding-specific cases insert audit-only feedback markup after the real production New Tab renders. Component tests cover the actual Stow and Restore action-to-message wiring; these runtime cases isolate the production CSS geometry. Confirm the no-message case leaves no empty row, the 1440px Stow and 768px Restore messages remain one line, and the 390px long error wraps while staying fully visible above Active and Saved content. Every case must report zero feedback/workspace overlap, zero feedback/Saved overlap, and zero feedback viewport overflow.
+
+### FINDING-006 focus order and modal isolation
+
+Run the desktop and narrow interaction cases against the same clean production build:
+
+```bash
+bun run audit:ui -- --port 9333 --case FINDING-006-DESKTOP --output .artifacts/ui-audit/<commit>/FINDING-006-DESKTOP
+bun run audit:ui -- --port 9333 --case FINDING-006 --output .artifacts/ui-audit/<commit>/FINDING-006
+```
+
+Both cases use real CDP Tab input and production controls. They record the complete focus trace, exercise Quick Link modal focus containment and restoration, then leave Extra with its nested Add todo form open for evidence. Require the compressed region order `top|quick-links|active|saved|auxiliary`, a complete Tab sequence, zero Quick Link modal isolation failures, two body-level modal portals, an inert application root and lower backdrop, and focus inside the interactive top modal. The 768px case does not assert horizontal overflow; responsive reflow is covered separately by FINDING-001.
 
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
 - Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved for Later region.

@@ -256,14 +256,17 @@ let chromeChangeEvents: ReturnType<typeof installAppChromeEvents>;
 function expectFeedbackBetweenStageRegions(feedback: HTMLElement) {
   const stage = container.querySelector('.newtab-stage');
   expect(stage?.children.item(0)).toBe(container.querySelector('.top-strip'));
-  expect(stage?.children.item(1)).toBe(feedback);
-  expect(stage?.children.item(2)).toBe(container.querySelector('.v2-workspace'));
-  expect(stage?.children).toHaveLength(3);
+  expect(stage?.children.item(1)).toBe(container.querySelector('.quick-links-rail'));
+  expect(stage?.children.item(2)).toBe(feedback);
+  expect(stage?.children.item(3)).toBe(container.querySelector('.v2-workspace'));
+  expect(stage?.children.item(4)).toBe(container.querySelector('.rail-utilities'));
+  expect(stage?.children).toHaveLength(5);
 }
 
 describe('App', () => {
   beforeEach(() => {
     container = document.createElement('div');
+    container.id = 'root';
     document.body.appendChild(container);
     root = createRoot(container);
     sendExtensionMessage.mockReset();
@@ -1423,8 +1426,10 @@ describe('App', () => {
     expect(container.querySelector('.saved-region')).not.toBeNull();
     const stage = container.querySelector('.newtab-stage');
     expect(stage?.children.item(0)).toBe(container.querySelector('.top-strip'));
-    expect(stage?.children.item(1)).toBe(container.querySelector('.v2-workspace'));
-    expect(stage?.children).toHaveLength(2);
+    expect(stage?.children.item(1)).toBe(container.querySelector('.quick-links-rail'));
+    expect(stage?.children.item(2)).toBe(container.querySelector('.v2-workspace'));
+    expect(stage?.children.item(3)).toBe(container.querySelector('.rail-utilities'));
+    expect(stage?.children).toHaveLength(4);
     expect(container.querySelector('.page-shell')).toBeNull();
     expect(container.querySelector('.topbar')).toBeNull();
     expect(container.querySelector('.workspace-grid')).toBeNull();
@@ -1444,14 +1449,47 @@ describe('App', () => {
 
     await click(screen().getByRole('button', { name: 'Extra' }));
 
-    expect(container.querySelector('.extra-drawer-backdrop.is-open')).not.toBeNull();
+    expect(document.body.querySelector('.extra-drawer-backdrop.is-open')).not.toBeNull();
     expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: 'Todos' })).not.toBeNull();
     expect(() => screen().getByRole('heading', { name: 'Appearance' })).toThrow();
 
     await click(screen().getByRole('button', { name: 'Close extra drawer' }));
 
-    expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
+    expect(document.body.querySelector('.extra-drawer-backdrop')).toBeNull();
+  });
+
+  it('orders keyboard regions from the top strip through primary content to auxiliary controls', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: [SAVED_SESSIONS[1]!] });
+    getQuickLinks.mockResolvedValue([{
+      id: 'link-1',
+      url: 'https://example.com/',
+      label: 'Example',
+      icon: null,
+      createdAt: '2026-07-07T00:00:00.000Z',
+    }]);
+
+    await renderApp();
+
+    const focusable = Array.from(container.querySelectorAll<HTMLElement>([
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',')));
+    const regions = focusable.flatMap((element) => {
+      if (element.closest('.top-strip')) return ['top'];
+      if (element.closest('.rail-links-scroll')) return ['quick-links'];
+      if (element.closest('.active-region')) return ['active'];
+      if (element.closest('.saved-region')) return ['saved'];
+      if (element.closest('.rail-utilities')) return ['auxiliary'];
+      return [];
+    }).filter((region, index, all) => region !== all[index - 1]);
+
+    expect(regions).toEqual(['top', 'quick-links', 'active', 'saved', 'auxiliary']);
+    expect(container.querySelector('[tabindex]:not([tabindex="0"]):not([tabindex="-1"])')).toBeNull();
   });
 
   it('keeps the V2 layout class contract stable for CSS', async () => {
@@ -1481,7 +1519,7 @@ describe('App', () => {
     }
 
     await click(screen().getByRole('button', { name: 'Extra' }));
-    expect(container.querySelector('.extra-drawer')).not.toBeNull();
+    expect(document.body.querySelector('.extra-drawer')).not.toBeNull();
   });
 
   it('adds and removes quick links through the utility panel', async () => {
@@ -1568,8 +1606,8 @@ describe('App', () => {
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
     expect(document.activeElement).toBe(screen().getByRole('button', { name: 'Spec draft' }));
     expect(() => screen().getByRole('button', { name: 'Settings' })).toThrow();
-    expect(container.querySelector('.open-tab-choice img.favicon')).not.toBeNull();
-    expect(container.querySelector('.open-tab-choice .favicon-fallback')).toBeNull();
+    expect(document.body.querySelector('.open-tab-choice img.favicon')).not.toBeNull();
+    expect(document.body.querySelector('.open-tab-choice .favicon-fallback')).toBeNull();
     await click(screen().getByRole('button', { name: 'Add' }));
 
     expect(promptSpy).not.toHaveBeenCalled();
@@ -1615,7 +1653,7 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Fetch' }));
 
     expect(screen().getByText('example.com')).not.toBeNull();
-    expect(container.querySelector<HTMLImageElement>('img.quick-link-site-icon')?.getAttribute('src')).toBe(
+    expect(document.body.querySelector<HTMLImageElement>('img.quick-link-site-icon')?.getAttribute('src')).toBe(
       'chrome-extension://tabstow-test/_favicon/?pageUrl=https%3A%2F%2Fexample.com%2Fdocs&size=32',
     );
 
@@ -1953,19 +1991,41 @@ describe('App', () => {
     expect(screen().getByText('Review launch checklist')).not.toBeNull();
   });
 
-  it('closes the nested Add todo dialog without closing the Extra drawer on Escape', async () => {
+  it('stacks the Extra and Add todo dialogs and restores focus in close order', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
 
     await renderApp();
-    await click(screen().getByRole('button', { name: 'Extra' }));
+    const extraTrigger = screen().getByRole('button', { name: 'Extra' });
+    extraTrigger.focus();
+    await click(extraTrigger);
+
+    let backdrops = document.body.querySelectorAll<HTMLElement>('.dialog-backdrop');
+    expect(backdrops).toHaveLength(1);
+    expect(backdrops.item(0).classList.contains('extra-drawer-backdrop')).toBe(true);
+    expect(container.hasAttribute('inert')).toBe(true);
+    expect(document.activeElement).toBe(screen().getByLabelText('Add todo'));
+
     await click(screen().getByLabelText('Add todo'));
 
+    backdrops = document.body.querySelectorAll<HTMLElement>('.dialog-backdrop');
+    expect(backdrops).toHaveLength(2);
+    expect(backdrops.item(0).hasAttribute('inert')).toBe(true);
+    expect(backdrops.item(1).hasAttribute('inert')).toBe(false);
     expect(screen().getByRole('dialog', { name: 'Add todo' })).not.toBeNull();
+    expect(document.activeElement).toBe(screen().getByLabelText('Todo title'));
 
     await keyDown('Escape');
 
     expect(() => screen().getByRole('dialog', { name: 'Add todo' })).toThrow();
     expect(screen().getByRole('dialog', { name: 'Extra' })).not.toBeNull();
+    expect(container.hasAttribute('inert')).toBe(true);
+    expect(document.activeElement).toBe(screen().getByLabelText('Add todo'));
+
+    await keyDown('Escape');
+
+    expect(() => screen().getByRole('dialog', { name: 'Extra' })).toThrow();
+    expect(container.hasAttribute('inert')).toBe(false);
+    expect(document.activeElement).toBe(extraTrigger);
   });
 
   it('closes duplicate tabs from the active workspace action', async () => {
@@ -2030,7 +2090,7 @@ describe('App', () => {
 
     await renderApp();
 
-    expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.body.querySelectorAll('[role="dialog"]')).toHaveLength(1);
     expect(screen().getByRole('dialog', { name: 'Tabstow is already open' })).not.toBeNull();
 
     await click(screen().getByRole('button', { name: 'Keep them open' }));
@@ -3211,7 +3271,7 @@ function expectChromeControlsAbsent() {
 function screen() {
   return {
     getByRole(role: string, options?: { name?: string }) {
-      const elements = Array.from(container.querySelectorAll<HTMLElement>('*')).filter((element) => {
+      const elements = Array.from(document.body.querySelectorAll<HTMLElement>('*')).filter((element) => {
         if (role === 'button') return element.tagName === 'BUTTON';
         if (role === 'heading') return /^H[1-6]$/.test(element.tagName);
         if (role === 'alert') return element.getAttribute('role') === 'alert';
@@ -3222,14 +3282,14 @@ function screen() {
       return match;
     },
     getByLabelText(label: string) {
-      const match = Array.from(container.querySelectorAll<HTMLElement>('*')).find(
+      const match = Array.from(document.body.querySelectorAll<HTMLElement>('*')).find(
         (element) => element.getAttribute('aria-label') === label,
       );
       if (!match) throw new Error(`Missing label: ${label}`);
       return match;
     },
     getByText(text: string) {
-      const match = Array.from(container.querySelectorAll<HTMLElement>('*')).find(
+      const match = Array.from(document.body.querySelectorAll<HTMLElement>('*')).find(
         (element) => element.textContent?.trim() === text,
       );
       if (!match) throw new Error(`Missing text: ${text}`);
@@ -3251,7 +3311,7 @@ function getAccessibleName(element: HTMLElement) {
   if (labelledBy) {
     const label = labelledBy
       .split(/\s+/)
-      .map((id) => container.querySelector<HTMLElement>(`#${id}`)?.textContent?.trim() ?? '')
+      .map((id) => element.ownerDocument.getElementById(id)?.textContent?.trim() ?? '')
       .join(' ')
       .trim();
     if (label) return label;

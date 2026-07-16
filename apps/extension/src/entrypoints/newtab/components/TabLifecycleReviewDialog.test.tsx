@@ -51,6 +51,7 @@ let root: Root;
 
 beforeEach(() => {
   container = document.createElement('div');
+  container.id = 'root';
   document.body.appendChild(container);
   root = createRoot(container);
   sendExtensionMessage.mockReset();
@@ -69,7 +70,7 @@ describe('TabLifecycleReviewDialog', () => {
   it('groups a stable snapshot by source window and starts with every row selected', async () => {
     await renderDialog();
 
-    const groups = container.querySelectorAll<HTMLElement>('.lifecycle-review-group');
+    const groups = document.body.querySelectorAll<HTMLElement>('.lifecycle-review-group');
     expect(groups).toHaveLength(2);
     expect(groups[0]?.querySelector('h3')?.textContent).toBe('Window 1');
     expect(groups[0]?.textContent?.indexOf('First article')).toBeLessThan(
@@ -77,7 +78,7 @@ describe('TabLifecycleReviewDialog', () => {
     );
     expect(groups[1]?.querySelector('h3')?.textContent).toBe('Window 2');
     expect(getCheckboxes().every((checkbox) => checkbox.checked)).toBe(true);
-    expect(container.textContent).toContain('3 tabs selected · 2 sessions will be created.');
+    expect(document.body.textContent).toContain('3 tabs selected · 2 sessions will be created.');
     expect(getButton('Save 3 for later and close original tabs').disabled).toBe(false);
 
     await click(getButton('Clear all'));
@@ -105,7 +106,7 @@ describe('TabLifecycleReviewDialog', () => {
       tabId: 80,
       windowId: 8,
     });
-    expect(container.textContent).not.toContain('First article');
+    expect(document.body.textContent).not.toContain('First article');
     expect(onCandidatesRemoved).toHaveBeenCalledWith(['observation-reading-first']);
 
     getButton('Keep Project notes sleeping').focus();
@@ -114,9 +115,9 @@ describe('TabLifecycleReviewDialog', () => {
       type: 'tab-lifecycle:suppress-suggestions',
       observationIds: ['observation-notes'],
     });
-    expect(container.textContent).not.toContain('Project notes');
+    expect(document.body.textContent).not.toContain('Project notes');
     expect(onCandidatesRemoved).toHaveBeenCalledWith(['observation-notes']);
-    expect(document.activeElement).toBe(container.querySelector('.lifecycle-review-toolbar'));
+    expect(document.activeElement).toBe(document.body.querySelector('.lifecycle-review-toolbar'));
   });
 
   it('keeps a failed confirmation open, then reports an exact partial result and refreshes', async () => {
@@ -174,12 +175,12 @@ describe('TabLifecycleReviewDialog', () => {
       ok: false,
       error: { code: 'unknown-error', message: 'Sessions could not be saved.' },
     }));
-    expect(container.querySelector('[role="dialog"]')).not.toBeNull();
-    expect(container.textContent).toContain('Tabs could not be saved. Nothing was closed.');
+    expect(document.body.querySelector('[role="dialog"]')).not.toBeNull();
+    expect(document.body.textContent).toContain('Tabs could not be saved. Nothing was closed.');
     expect(getCheckboxes()).toHaveLength(3);
 
     await click(getButton('Save 3 for later and close original tabs'));
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       'Saved 2 tabs in 2 sessions; closed 0 original tabs, skipped 1 tab, and 2 original tabs could not be closed.',
     );
     expect(onStowed).toHaveBeenCalledTimes(1);
@@ -200,10 +201,10 @@ describe('TabLifecycleReviewDialog', () => {
     const onStowed = vi.fn(() => Promise.reject(new Error('Refresh failed.')));
     await renderDialog({ initialCandidates: [CANDIDATES[0]!], onStowed });
 
-    expect(container.textContent).toContain('1 tab selected · 1 session will be created.');
+    expect(document.body.textContent).toContain('1 tab selected · 1 session will be created.');
     await click(getButton('Save 1 for later and close original tabs'));
 
-    expect(container.textContent).toContain(
+    expect(document.body.textContent).toContain(
       'Saved 1 tab in 1 session and closed 1 original tab.',
     );
     expect(onStowed).toHaveBeenCalledTimes(1);
@@ -217,11 +218,11 @@ describe('TabLifecycleReviewDialog', () => {
     });
     await renderDialog({ initialCandidates: [CANDIDATES[0]!], locale: 'zh-CN' });
 
-    expect(container.textContent).toContain('查看长期休眠的标签页');
+    expect(document.body.textContent).toContain('查看长期休眠的标签页');
     expect(getButton('全选')).toBeTruthy();
     await click(getButton('保存 1 个到“稍后查看”并关闭原标签页'));
-    expect(container.textContent).toContain('无法保存标签页，且没有关闭任何原标签页。');
-    expect(container.textContent).toContain('Database rejected the transaction.');
+    expect(document.body.textContent).toContain('无法保存标签页，且没有关闭任何原标签页。');
+    expect(document.body.textContent).toContain('Database rejected the transaction.');
   });
 });
 
@@ -243,7 +244,7 @@ async function renderDialog(
 }
 
 function getCheckboxes() {
-  return Array.from(container.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
+  return Array.from(document.body.querySelectorAll<HTMLInputElement>('input[type="checkbox"]'));
 }
 
 function getButton(name: string) {
@@ -253,7 +254,7 @@ function getButton(name: string) {
 }
 
 function getButtons(name: string) {
-  return Array.from(container.querySelectorAll<HTMLButtonElement>('button')).filter(
+  return Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).filter(
     (button) => button.textContent === name || button.getAttribute('aria-label') === name,
   );
 }

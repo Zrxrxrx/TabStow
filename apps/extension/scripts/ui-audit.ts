@@ -48,6 +48,7 @@ type PendingCall = {
 
 type RuntimeObservation = {
   metrics: UiAuditMetrics;
+  interactionTrace: Array<Record<string, unknown>>;
   runtimeId: string;
   manifest: UiAuditExtensionManifest;
   resourceHashes: {
@@ -55,6 +56,18 @@ type RuntimeObservation = {
     page: string;
   };
   colorScheme: string;
+};
+
+type Finding006Interaction = {
+  focusRegionSequence: string;
+  tabSequenceComplete: number;
+  quickLinkModalIsolationFailures: number;
+  modalPortaledCount: number;
+  rootInertDuringModal: number;
+  lowerModalInert: number;
+  topModalInteractive: number;
+  focusInTopModal: number;
+  trace: Array<Record<string, unknown>>;
 };
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
@@ -276,6 +289,233 @@ async function waitForDomQuiet(cdp: CdpConnection, sessionId: string): Promise<v
   if (result.timedOut) throw new Error('Extension page did not reach a quiet DOM state');
 }
 
+async function dispatchKey(
+  cdp: CdpConnection,
+  sessionId: string,
+  key: 'Escape' | 'Tab',
+): Promise<void> {
+  const code = key === 'Tab' ? 'Tab' : 'Escape';
+  const virtualKeyCode = key === 'Tab' ? 9 : 27;
+  const params = {
+    key,
+    code,
+    windowsVirtualKeyCode: virtualKeyCode,
+    nativeVirtualKeyCode: virtualKeyCode,
+  };
+  await cdp.call('Input.dispatchKeyEvent', { type: 'rawKeyDown', ...params }, sessionId);
+  await cdp.call('Input.dispatchKeyEvent', { type: 'keyUp', ...params }, sessionId);
+}
+
+async function focusAndClickButton(
+  cdp: CdpConnection,
+  sessionId: string,
+  name: string,
+  marker?: string,
+): Promise<void> {
+  await evaluate(cdp, sessionId, String.raw`(() => {
+    const name = ${JSON.stringify(name)};
+    const button = [...document.querySelectorAll('button')].find((candidate) =>
+      candidate.getAttribute('aria-label') === name
+      || candidate.textContent?.replace(/\s+/g, ' ').trim() === name
+    );
+    if (!(button instanceof HTMLButtonElement)) {
+      throw new Error('FINDING-006 could not find button: ' + name);
+    }
+    const marker = ${JSON.stringify(marker ?? null)};
+    if (marker) button.dataset[marker] = 'true';
+    button.focus();
+    button.click();
+    return true;
+  })()`);
+  await waitForDomQuiet(cdp, sessionId);
+}
+
+async function runFinding006Interaction(
+  cdp: CdpConnection,
+  sessionId: string,
+): Promise<Finding006Interaction> {
+  const focusableCount = await evaluate<number>(cdp, sessionId, String.raw`(() => {
+    const selector = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const nameOf = (element) => {
+      const labelledBy = element.getAttribute('aria-labelledby');
+      const labelled = labelledBy
+        ?.split(/\s+/)
+        .map((id) => document.getElementById(id)?.textContent?.trim() ?? '')
+        .filter(Boolean)
+        .join(' ');
+      return element.getAttribute('aria-label')
+        || labelled
+        || element.getAttribute('placeholder')
+        || element.textContent?.replace(/\s+/g, ' ').trim()
+        || element.tagName.toLowerCase();
+    };
+    const regionOf = (element) => {
+      if (element.closest('.top-strip')) return 'top';
+      if (element.closest('.rail-links-scroll')) return 'quick-links';
+      if (element.closest('.active-region')) return 'active';
+      if (element.closest('.saved-region')) return 'saved';
+      if (element.closest('.rail-utilities')) return 'auxiliary';
+      return 'unmapped';
+    };
+    const focusable = [...document.querySelectorAll(selector)].filter((element) => {
+      if (!(element instanceof HTMLElement) || element.closest('[inert]')) return false;
+      const style = getComputedStyle(element);
+      return element.getClientRects().length > 0
+        && style.display !== 'none'
+        && style.visibility !== 'hidden';
+    });
+    focusable.forEach((element, index) => {
+      element.dataset.uiAuditFocusIndex = String(index);
+      element.dataset.uiAuditFocusName = nameOf(element);
+      element.dataset.uiAuditFocusRegion = regionOf(element);
+    });
+    document.body.tabIndex = -1;
+    document.body.focus();
+    return focusable.length;
+  })()`);
+
+  const focusTrace: Array<Record<string, unknown>> = [];
+  let tabSequenceComplete = focusableCount > 0 ? 1 : 0;
+  for (let index = 0; index < focusableCount; index += 1) {
+    await dispatchKey(cdp, sessionId, 'Tab');
+    const step = await evaluate<{
+      actualIndex: number;
+      name: string;
+      region: string;
+    }>(cdp, sessionId, String.raw`(() => {
+      const active = document.activeElement;
+      return {
+        actualIndex: Number(active?.getAttribute('data-ui-audit-focus-index') ?? -1),
+        name: active?.getAttribute('data-ui-audit-focus-name') ?? '',
+        region: active?.getAttribute('data-ui-audit-focus-region') ?? 'unmapped',
+      };
+    })()`);
+    if (step.actualIndex !== index) tabSequenceComplete = 0;
+    focusTrace.push({ step: 'tab', expectedIndex: index, ...step });
+  }
+
+  const focusRegionSequence = focusTrace
+    .map((step) => String(step.region))
+    .filter((region) => region !== 'unmapped')
+    .filter((region, index, regions) => region !== regions[index - 1])
+    .join('|');
+  await evaluate(cdp, sessionId, String.raw`(() => {
+    for (const element of document.querySelectorAll('[data-ui-audit-focus-index]')) {
+      delete element.dataset.uiAuditFocusIndex;
+      delete element.dataset.uiAuditFocusName;
+      delete element.dataset.uiAuditFocusRegion;
+    }
+    document.body.removeAttribute('tabindex');
+    return true;
+  })()`);
+
+  await focusAndClickButton(cdp, sessionId, 'Edit quick links');
+  await focusAndClickButton(cdp, sessionId, 'Add quick link', 'uiAuditQuickLinkTrigger');
+  const quickLinkOpen = await evaluate<{
+    focusInside: boolean;
+    portal: boolean;
+    rootInert: boolean;
+  }>(cdp, sessionId, String.raw`(() => {
+    const backdrops = [...document.querySelectorAll('.dialog-backdrop')];
+    const backdrop = backdrops.at(-1);
+    const surface = backdrop?.querySelector('[role="dialog"]');
+    return {
+      focusInside: surface?.contains(document.activeElement) ?? false,
+      portal: backdrop?.parentElement === document.body,
+      rootInert: document.querySelector('#root')?.hasAttribute('inert') ?? false,
+    };
+  })()`);
+  const trapPrepared = await evaluate<boolean>(cdp, sessionId, String.raw`(() => {
+    const surface = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+    if (!(surface instanceof HTMLElement)) return false;
+    const selector = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const focusable = [...surface.querySelectorAll(selector)].filter((element) =>
+      element instanceof HTMLElement && element.getClientRects().length > 0
+    );
+    const first = focusable[0];
+    const last = focusable.at(-1);
+    if (!(first instanceof HTMLElement) || !(last instanceof HTMLElement)) return false;
+    first.dataset.uiAuditTrapFirst = 'true';
+    last.focus();
+    return true;
+  })()`);
+  await dispatchKey(cdp, sessionId, 'Tab');
+  const focusWrapped = await evaluate<boolean>(cdp, sessionId, String.raw`(() => (
+    document.activeElement?.getAttribute('data-ui-audit-trap-first') === 'true'
+  ))()`);
+  await dispatchKey(cdp, sessionId, 'Escape');
+  await waitForDomQuiet(cdp, sessionId);
+  const quickLinkClosed = await evaluate<{
+    dialogClosed: boolean;
+    focusRestored: boolean;
+    rootRestored: boolean;
+  }>(cdp, sessionId, String.raw`(() => {
+    const trigger = document.querySelector('[data-ui-audit-quick-link-trigger="true"]');
+    const result = {
+      dialogClosed: document.querySelector('.dialog-backdrop') === null,
+      focusRestored: document.activeElement === trigger,
+      rootRestored: !(document.querySelector('#root')?.hasAttribute('inert') ?? false),
+    };
+    trigger?.removeAttribute('data-ui-audit-quick-link-trigger');
+    return result;
+  })()`);
+  const quickLinkChecks = {
+    ...quickLinkOpen,
+    trapPrepared,
+    focusWrapped,
+    ...quickLinkClosed,
+  };
+  const quickLinkModalIsolationFailures = Object.values(quickLinkChecks)
+    .filter((passed) => !passed).length;
+
+  await focusAndClickButton(cdp, sessionId, 'Extra');
+  await focusAndClickButton(cdp, sessionId, 'Add todo');
+  const nested = await evaluate<{
+    focusInTopModal: number;
+    lowerModalInert: number;
+    modalPortaledCount: number;
+    rootInertDuringModal: number;
+    topModalInteractive: number;
+  }>(cdp, sessionId, String.raw`(() => {
+    const backdrops = [...document.querySelectorAll('.dialog-backdrop')];
+    const top = backdrops.at(-1);
+    const topSurface = top?.querySelector('[role="dialog"]');
+    return {
+      modalPortaledCount: backdrops.filter((backdrop) => backdrop.parentElement === document.body).length,
+      rootInertDuringModal: document.querySelector('#root')?.hasAttribute('inert') ? 1 : 0,
+      lowerModalInert: backdrops.length === 2 && backdrops[0]?.hasAttribute('inert') ? 1 : 0,
+      topModalInteractive: top && !top.hasAttribute('inert') ? 1 : 0,
+      focusInTopModal: topSurface?.contains(document.activeElement) ? 1 : 0,
+    };
+  })()`);
+
+  return {
+    focusRegionSequence,
+    tabSequenceComplete,
+    quickLinkModalIsolationFailures,
+    ...nested,
+    trace: [
+      ...focusTrace,
+      { step: 'quick-link-modal', ...quickLinkChecks },
+      { step: 'nested-extra-todo', ...nested },
+    ],
+  };
+}
+
 async function collectBuildEntries(
   root: string,
   directory = root,
@@ -487,8 +727,24 @@ async function runUiAudit(): Promise<number> {
       await waitForDomQuiet(cdp, sessionId);
     }
 
+    const interactionFixtureId = auditCase.interactionFixture ?? 'none';
+    const interaction: Finding006Interaction = interactionFixtureId === 'finding-006'
+      ? await runFinding006Interaction(cdp, sessionId)
+      : {
+          focusRegionSequence: '',
+          tabSequenceComplete: 0,
+          quickLinkModalIsolationFailures: 0,
+          modalPortaledCount: 0,
+          rootInertDuringModal: 0,
+          lowerModalInert: 0,
+          topModalInteractive: 0,
+          focusInTopModal: 0,
+          trace: [],
+        };
+
     const observation = await evaluate<RuntimeObservation>(cdp, sessionId, String.raw`(async () => {
       const auditPage = ${JSON.stringify(auditCase.page)};
+      const interaction = ${JSON.stringify(interaction)};
       const sha256 = async (path) => {
         const response = await fetch(chrome.runtime.getURL(path), { cache: 'no-store' });
         if (!response.ok) throw new Error('Could not read runtime resource: ' + path);
@@ -561,7 +817,16 @@ async function runUiAudit(): Promise<number> {
           topWorkspaceGapPx: topStripRect && workspaceRect
             ? Math.round((workspaceRect.top - topStripRect.bottom) * 100) / 100
             : 0,
+          focusRegionSequence: interaction.focusRegionSequence,
+          tabSequenceComplete: interaction.tabSequenceComplete,
+          quickLinkModalIsolationFailures: interaction.quickLinkModalIsolationFailures,
+          modalPortaledCount: interaction.modalPortaledCount,
+          rootInertDuringModal: interaction.rootInertDuringModal,
+          lowerModalInert: interaction.lowerModalInert,
+          topModalInteractive: interaction.topModalInteractive,
+          focusInTopModal: interaction.focusInTopModal,
         },
+        interactionTrace: interaction.trace,
         runtimeId: chrome.runtime.id,
         manifest: chrome.runtime.getManifest(),
         resourceHashes: {
@@ -629,12 +894,14 @@ async function runUiAudit(): Promise<number> {
           theme: auditCase.theme,
           locale: auditCase.locale,
           feedbackFixture: feedbackFixtureId,
+          interactionFixture: interactionFixtureId,
         },
         setup: auditCase.setup,
         cleanup: auditCase.cleanup,
       },
       observed: {
         metrics: observation.metrics,
+        interactionTrace: observation.interactionTrace,
         colorScheme: observation.colorScheme,
         resourceHashes: observation.resourceHashes,
       },

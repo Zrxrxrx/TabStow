@@ -31,17 +31,18 @@ describe('RecoveryBinDialog', () => {
     });
     const onRestored = vi.fn();
     const container = document.createElement('div');
+    container.id = 'root';
     document.body.appendChild(container);
     const root = createRoot(container);
 
     await act(async () => root.render(<RecoveryBinDialog locale="en" onClose={() => undefined} onRestored={onRestored} />));
 
-    expect(container.querySelectorAll('.recovery-entry')).toHaveLength(5);
-    expect(container.querySelector('.recovery-entry strong')?.textContent).toBe('Session 5');
-    expect(container.querySelector<HTMLImageElement>('.recovery-entry img.saved-tab-favicon')?.src).toContain(
+    expect(document.body.querySelectorAll('.recovery-entry')).toHaveLength(5);
+    expect(document.body.querySelector('.recovery-entry strong')?.textContent).toBe('Session 5');
+    expect(document.body.querySelector<HTMLImageElement>('.recovery-entry img.saved-tab-favicon')?.src).toContain(
       '_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F5',
     );
-    const restore = container.querySelector<HTMLButtonElement>('.recovery-entry button')!;
+    const restore = document.body.querySelector<HTMLButtonElement>('.recovery-entry button')!;
     await act(async () => restore.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:restore', historyId: 'history-5' });
     expect(onRestored).toHaveBeenCalledTimes(1);

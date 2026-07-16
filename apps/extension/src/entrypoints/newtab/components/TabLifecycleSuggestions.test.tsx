@@ -40,6 +40,7 @@ let root: Root;
 
 beforeEach(() => {
   container = document.createElement('div');
+  container.id = 'root';
   document.body.appendChild(container);
   root = createRoot(container);
   sendExtensionMessage.mockReset();
@@ -75,16 +76,16 @@ describe('TabLifecycleSuggestions', () => {
     );
 
     await click(getButton('Review'));
-    expect(container.textContent).toContain('First sleeping tab');
-    expect(container.textContent).toContain('Second sleeping tab');
+    expect(document.body.textContent).toContain('First sleeping tab');
+    expect(document.body.textContent).toContain('Second sleeping tab');
 
     await renderSuggestions({ refreshKey: 1 });
     expect(sendExtensionMessage).toHaveBeenCalledTimes(2);
     expect(container.querySelector('.lifecycle-suggestion-banner')?.textContent).toContain(
       '1 tab has been observed sleeping on this device for at least 14 days.',
     );
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('First sleeping tab');
-    expect(container.querySelector('[role="dialog"]')?.textContent).toContain('Second sleeping tab');
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('First sleeping tab');
+    expect(document.body.querySelector('[role="dialog"]')?.textContent).toContain('Second sleeping tab');
   });
 
   it('snoozes exactly the currently listed observations for seven days', async () => {
@@ -192,7 +193,7 @@ async function renderSuggestions(
 }
 
 function getButton(name: string) {
-  const button = Array.from(container.querySelectorAll<HTMLButtonElement>('button')).find(
+  const button = Array.from(document.body.querySelectorAll<HTMLButtonElement>('button')).find(
     (item) => item.textContent === name || item.getAttribute('aria-label') === name,
   );
   if (!button) throw new Error(`Missing button: ${name}`);

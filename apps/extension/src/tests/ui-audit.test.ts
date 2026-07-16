@@ -55,6 +55,28 @@ const feedbackManifestInput = {
   }],
 };
 
+const interactionManifestInput = {
+  ...manifestInput,
+  cases: [{
+    ...manifestInput.cases[0],
+    id: 'FINDING-006',
+    description: 'Keyboard order and modal isolation stay aligned',
+    viewport: { width: 768, height: 900 },
+    interactionFixture: 'finding-006',
+    screenshot: 'FINDING-006.png',
+    assertions: [
+      { metric: 'focusRegionSequence', operator: 'equals', value: 'top|quick-links|active|saved|auxiliary' },
+      { metric: 'tabSequenceComplete', operator: 'equals', value: 1 },
+      { metric: 'quickLinkModalIsolationFailures', operator: 'equals', value: 0 },
+      { metric: 'modalPortaledCount', operator: 'equals', value: 2 },
+      { metric: 'rootInertDuringModal', operator: 'equals', value: 1 },
+      { metric: 'lowerModalInert', operator: 'equals', value: 1 },
+      { metric: 'topModalInteractive', operator: 'equals', value: 1 },
+      { metric: 'focusInTopModal', operator: 'equals', value: 1 },
+    ],
+  }],
+};
+
 describe('UI audit command', () => {
   it('parses a named case and deterministic output settings', () => {
     expect(parseUiAuditArguments([
@@ -120,6 +142,10 @@ describe('UI audit manifest', () => {
     expect(validateUiAuditManifest(feedbackManifestInput)).toEqual(feedbackManifestInput);
   });
 
+  it('accepts the focused FINDING-006 interaction fixture', () => {
+    expect(validateUiAuditManifest(interactionManifestInput)).toEqual(interactionManifestInput);
+  });
+
   it('keeps the checked-in case manifest valid', () => {
     const checkedInManifest = JSON.parse(readFileSync(
       new URL('../../scripts/ui-audit-cases.json', import.meta.url),
@@ -131,6 +157,8 @@ describe('UI audit manifest', () => {
       'FINDING-004-STOW',
       'FINDING-004-RESTORE',
       'FINDING-004',
+      'FINDING-006-DESKTOP',
+      'FINDING-006',
     ]);
   });
 
@@ -146,6 +174,14 @@ describe('UI audit manifest', () => {
     invalidManifest.cases[0]!.feedbackFixture = 'custom-message';
     expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
       'feedbackFixture is unsupported',
+    );
+  });
+
+  it('rejects an unknown interaction fixture', () => {
+    const invalidManifest = structuredClone(interactionManifestInput);
+    invalidManifest.cases[0]!.interactionFixture = 'custom-actions';
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'interactionFixture is unsupported',
     );
   });
 
@@ -181,6 +217,14 @@ describe('UI audit assertions', () => {
       feedbackViewportOverflowPx: 0,
       feedbackLineCount: 0,
       topWorkspaceGapPx: 0,
+      focusRegionSequence: 'top|quick-links|active|saved|auxiliary',
+      tabSequenceComplete: 1,
+      quickLinkModalIsolationFailures: 0,
+      modalPortaledCount: 0,
+      rootInertDuringModal: 0,
+      lowerModalInert: 0,
+      topModalInteractive: 0,
+      focusInTopModal: 0,
     }, []);
 
     expect(result.passed).toBe(false);
@@ -210,6 +254,14 @@ describe('UI audit assertions', () => {
       feedbackViewportOverflowPx: 0,
       feedbackLineCount: 0,
       topWorkspaceGapPx: 0,
+      focusRegionSequence: 'top|quick-links|active|saved|auxiliary',
+      tabSequenceComplete: 1,
+      quickLinkModalIsolationFailures: 0,
+      modalPortaledCount: 0,
+      rootInertDuringModal: 0,
+      lowerModalInert: 0,
+      topModalInteractive: 0,
+      focusInTopModal: 0,
     }, ['Unhandled exception']);
 
     expect(result.assertions.every((assertion) => assertion.passed)).toBe(true);
