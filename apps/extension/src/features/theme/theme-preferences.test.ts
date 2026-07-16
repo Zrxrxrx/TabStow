@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 const storageMocks = vi.hoisted(() => ({
   getItem: vi.fn(),
   setItem: vi.fn(),
+  watch: vi.fn(),
 }));
 const cacheMocks = vi.hoisted(() => ({
   clearThemeBackgroundCache: vi.fn(),
@@ -15,6 +16,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   vi.resetModules();
   cacheMocks.clearThemeBackgroundCache.mockResolvedValue(undefined);
+  storageMocks.watch.mockReturnValue(vi.fn());
 });
 
 describe('theme preferences', () => {
@@ -78,5 +80,32 @@ describe('theme preferences', () => {
       'local:tabstow-theme-preferences',
       { mode: 'dark' },
     );
+  });
+
+  it('normalizes watched values and returns the one WXT unwatch callback', async () => {
+    const unwatch = vi.fn();
+    storageMocks.watch.mockReturnValue(unwatch);
+    const listener = vi.fn();
+    const { watchThemePreferences } = await import('./theme-preferences');
+
+    const stopWatching = watchThemePreferences(listener);
+    const callback = storageMocks.watch.mock.calls[0]?.[1] as
+      | ((nextValue: unknown) => void)
+      | undefined;
+    callback?.({ mode: 'dark', paletteId: 'sage' });
+    callback?.({ mode: 'system' });
+    callback?.(null);
+
+    expect(storageMocks.watch).toHaveBeenCalledTimes(1);
+    expect(storageMocks.watch).toHaveBeenCalledWith(
+      'local:tabstow-theme-preferences',
+      expect.any(Function),
+    );
+    expect(listener.mock.calls).toEqual([
+      [{ mode: 'dark' }],
+      [{ mode: 'light' }],
+      [{ mode: 'light' }],
+    ]);
+    expect(stopWatching).toBe(unwatch);
   });
 });

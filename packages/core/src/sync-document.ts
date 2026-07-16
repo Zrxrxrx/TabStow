@@ -9,8 +9,7 @@ import {
 } from './schemas';
 
 export function toSafeSyncSettings(settings: ExtensionSettings): SafeSyncSettings {
-  const { theme: _theme, ...safeSettings } = settings;
-  return safeSyncSettingsSchema.parse(safeSettings);
+  return safeSyncSettingsSchema.parse(settings);
 }
 
 export function toImportableSettings(

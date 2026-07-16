@@ -8,7 +8,7 @@ import type { StowSuggestionList } from '@/features/tab-lifecycle/types';
 import { reorderQuickLinks, updateQuickLink, type QuickLink } from '@/features/quick-links/quick-links';
 import type { AppResult } from '@/lib/errors';
 import type { ExtensionMessage, StowResult } from '@/lib/messages';
-import { App } from './App';
+import { App, type AppProps } from './App';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
@@ -42,8 +42,7 @@ const { getTodos, saveTodos } = vi.hoisted(() => ({
   getTodos: vi.fn(),
   saveTodos: vi.fn(),
 }));
-const { getThemePreferences, saveThemePreferences } = vi.hoisted(() => ({
-  getThemePreferences: vi.fn(),
+const { saveThemePreferences } = vi.hoisted(() => ({
   saveThemePreferences: vi.fn(),
 }));
 const { getLanguagePreference, saveLanguagePreference } = vi.hoisted(() => ({
@@ -91,7 +90,6 @@ vi.mock('@/features/theme/theme-preferences', async () => {
   );
   return {
     ...actual,
-    getThemePreferences,
     saveThemePreferences,
   };
 });
@@ -279,7 +277,6 @@ describe('App', () => {
     isQuickLinkIconToken.mockClear();
     getTodos.mockReset();
     saveTodos.mockReset();
-    getThemePreferences.mockReset();
     saveThemePreferences.mockReset();
     getLanguagePreference.mockReset();
     saveLanguagePreference.mockReset();
@@ -300,7 +297,6 @@ describe('App', () => {
     deleteQuickLinkIcon.mockResolvedValue(undefined);
     getTodos.mockResolvedValue([]);
     saveTodos.mockImplementation(async (todos: unknown) => todos);
-    getThemePreferences.mockResolvedValue({ mode: 'light' });
     saveThemePreferences.mockImplementation(async (preferences: unknown) => preferences);
     getLanguagePreference.mockResolvedValue('auto');
     saveLanguagePreference.mockImplementation(async (language: unknown) => language);
@@ -1321,17 +1317,16 @@ describe('App', () => {
         dismissed: false,
       },
     ]);
-    getThemePreferences.mockResolvedValue({ mode: 'dark' });
     getLanguagePreference.mockResolvedValue('zh-CN');
 
-    await renderApp();
+    await renderApp({ initialThemeMode: 'dark' });
 
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
     expect(screen().getByText('Example')).not.toBeNull();
     expect(container.querySelector('.quick-links-panel')).not.toBeNull();
     expect(container.querySelector('.quick-link-card')).not.toBeNull();
     expect(container.querySelector('.quick-link-card-actions')).toBeNull();
-    expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(screen().getByRole('button', { name: '切换主题' }).textContent).toContain('深色');
     expect(document.documentElement.lang).toBe('zh-CN');
 
     await click(screen().getByRole('button', { name: '更多' }));
@@ -1343,7 +1338,6 @@ describe('App', () => {
   it('renders top-bar language and light-dark switches without auto or system choices', async () => {
     mockMessages({ activeTabs: [UNIQUE_TAB] });
     getLanguagePreference.mockResolvedValue('en');
-    getThemePreferences.mockResolvedValue({ mode: 'light' });
     saveLanguagePreference.mockImplementation(async (language: unknown) => language);
     saveThemePreferences.mockImplementation(async (preferences: unknown) => ({
       mode: (preferences as { mode: 'light' | 'dark' }).mode,
@@ -1367,7 +1361,7 @@ describe('App', () => {
 
     await click(themeSwitch);
     expect(saveThemePreferences).toHaveBeenCalledWith(expect.objectContaining({ mode: 'dark' }));
-    expect(document.documentElement.dataset.themeMode).toBe('dark');
+    expect(themeSwitch.textContent).toContain('深色');
     expect(screen().getByRole('button', { name: '切换主题' })).toBe(themeSwitch);
 
     await click(screen().getByRole('button', { name: '更多' }));
@@ -1375,6 +1369,33 @@ describe('App', () => {
     expect(() => screen().getByLabelText('主题模式')).toThrow();
     expect(container.textContent).not.toContain('Auto');
     expect(container.textContent).not.toContain('System');
+  });
+
+  it('shows a bootstrap read failure while keeping the visible light fallback', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp({
+      initialThemeError: 'Theme storage unavailable',
+      initialThemeMode: 'light',
+    });
+
+    expect(screen().getByRole('alert').textContent).toContain('Theme storage unavailable');
+    expect(screen().getByRole('button', { name: 'Switch theme' }).textContent).toContain('Light');
+  });
+
+  it('keeps the theme state and label synchronized with external updates', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+    let notifyTheme: ((mode: 'light' | 'dark') => void) | undefined;
+    const subscribeToThemeChanges = vi.fn((listener: (mode: 'light' | 'dark') => void) => {
+      notifyTheme = listener;
+      return vi.fn();
+    });
+
+    await renderApp({ initialThemeMode: 'light', subscribeToThemeChanges });
+    await act(async () => notifyTheme?.('dark'));
+
+    expect(subscribeToThemeChanges).toHaveBeenCalledTimes(1);
+    expect(screen().getByRole('button', { name: 'Switch theme' }).textContent).toContain('Dark');
   });
 
   it('renders migrated dashboard labels in Simplified Chinese when selected', async () => {
@@ -3212,9 +3233,9 @@ function mockTwoChromeWindowsWithGroup() {
   });
 }
 
-async function renderApp() {
+async function renderApp(props: AppProps = {}) {
   await act(async () => {
-    root.render(<App />);
+    root.render(<App {...props} />);
   });
 }
 

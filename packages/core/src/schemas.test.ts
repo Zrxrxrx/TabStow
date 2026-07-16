@@ -80,7 +80,6 @@ describe('core schemas', () => {
     expect(DEFAULT_SETTINGS).toEqual({
       includePinnedTabs: false,
       closePinnedTabs: false,
-      theme: 'system',
     });
 
     expect(
@@ -89,6 +88,16 @@ describe('core schemas', () => {
         deviceId: 'device-1',
       }),
     ).toMatchObject(DEFAULT_SETTINGS);
+  });
+
+  it('rejects theme from current extension settings', () => {
+    expect(
+      extensionSettingsSchema.safeParse({
+        ...DEFAULT_SETTINGS,
+        deviceId: 'device-1',
+        theme: 'dark',
+      }).success,
+    ).toBe(false);
   });
 
   it('rejects legacy token and Gist binding fields from ordinary settings', () => {
@@ -126,23 +135,26 @@ describe('core schemas', () => {
     expect(result.success).toBe(false);
   });
 
-  it('parses legacy sync documents with theme but strips it from settings', () => {
-    const result = syncDocumentSchema.parse({
-      schemaVersion: 1,
-      deviceId: 'device-1',
-      exportedAt: '2026-07-06T00:00:00.000Z',
-      sessions: [],
-      settings: {
+  it.each(['system', 'dark', 'sepia', null, { mode: 'dark' }])(
+    'parses a legacy sync theme value (%j) but strips it from settings',
+    (theme) => {
+      const result = syncDocumentSchema.parse({
+        schemaVersion: 1,
         deviceId: 'device-1',
-        gistFileName: 'tabstow.sync.json',
-        includePinnedTabs: false,
-        closePinnedTabs: false,
-        theme: 'system',
-      },
-    });
+        exportedAt: '2026-07-06T00:00:00.000Z',
+        sessions: [],
+        settings: {
+          deviceId: 'device-1',
+          gistFileName: 'tabstow.sync.json',
+          includePinnedTabs: false,
+          closePinnedTabs: false,
+          theme,
+        },
+      });
 
-    expect(result.settings).not.toHaveProperty('theme');
-  });
+      expect(result.settings).not.toHaveProperty('theme');
+    },
+  );
 
   it('parses sync documents with quick links and defaults older documents to an empty list', () => {
     const legacy = syncDocumentSchema.parse({

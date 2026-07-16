@@ -506,6 +506,7 @@ describe('sync document v2', () => {
           gistFileName: 'legacy.json',
           includePinnedTabs: true,
           closePinnedTabs: false,
+          theme: { mode: 'sepia' },
         },
       },
       'replica-local',
@@ -516,6 +517,7 @@ describe('sync document v2', () => {
     expect(migrated.preferences.includePinnedTabs.value).toBe(true);
     expect(JSON.stringify(migrated)).not.toContain('legacy-gist');
     expect(JSON.stringify(migrated)).not.toContain('legacy-device');
+    expect(JSON.stringify(migrated)).not.toContain('sepia');
   });
 
   it('creates sortable positions between neighbors', () => {

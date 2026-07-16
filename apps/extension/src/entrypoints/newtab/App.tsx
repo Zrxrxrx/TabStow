@@ -10,7 +10,6 @@ import {
   type LanguagePreference,
 } from '@/features/i18n/i18n';
 import {
-  getThemePreferences,
   saveThemePreferences,
   type ThemeMode,
 } from '@/features/theme/theme-preferences';
@@ -47,12 +46,19 @@ const DISCONNECTED_SYNC: ConnectionView = {
 
 const EMPTY_ACTIVE_SNAPSHOT: ActiveTabsSnapshot = { windows: [], tabs: [], chromeGroups: [] };
 
-type AppProps = {
+export type AppProps = {
   initialThemeError?: string | null;
   initialThemeMode?: ThemeMode;
+  subscribeToThemeChanges?: (
+    listener: (mode: ThemeMode) => void,
+  ) => () => void;
 };
 
-export function App({ initialThemeError = null, initialThemeMode }: AppProps = {}) {
+export function App({
+  initialThemeError = null,
+  initialThemeMode = 'light',
+  subscribeToThemeChanges,
+}: AppProps = {}) {
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [activeSnapshot, setActiveSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_ACTIVE_SNAPSHOT);
   const [busyAction, setBusyAction] = useState<string | null>(null);
@@ -67,7 +73,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   const [quickLinksRefreshKey, setQuickLinksRefreshKey] = useState(0);
   const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED_SYNC);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
-  const [themeMode, setThemeMode] = useState<ThemeMode>(initialThemeMode ?? 'light');
+  const [themeMode, setThemeMode] = useState<ThemeMode>(initialThemeMode);
   const [duplicateTabstowCount, setDuplicateTabstowCount] = useState(0);
   const [duplicateTabstowClosePending, setDuplicateTabstowClosePending] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
@@ -183,24 +189,12 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   }, []);
 
   useEffect(() => {
-    if (initialThemeMode) return;
-    void getThemePreferences().then(
-      (theme) => setThemeMode(theme.mode),
-      (error) =>
-        setStatus({
-          tone: 'error',
-          message: error instanceof Error ? error.message : 'Could not load theme preferences.',
-        }),
-    );
-  }, [initialThemeMode]);
+    return subscribeToThemeChanges?.(setThemeMode);
+  }, [subscribeToThemeChanges]);
 
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
-
-  useEffect(() => {
-    document.documentElement.dataset.themeMode = themeMode;
-  }, [themeMode]);
 
   async function runAction<T>(
     actionId: string,

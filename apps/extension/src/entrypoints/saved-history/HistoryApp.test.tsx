@@ -126,6 +126,15 @@ describe('HistoryApp', () => {
     expect(getByText('History is empty.')).not.toBeNull();
   });
 
+  it('shows an initial theme read failure without suppressing History content', async () => {
+    sendExtensionMessage.mockResolvedValueOnce({ ok: true, data: [] });
+
+    await renderHistory({ initialThemeError: 'Theme storage unavailable' });
+
+    expect(getByRole('alert', 'Theme storage unavailable')).not.toBeNull();
+    expect(getByText('History is empty.')).not.toBeNull();
+  });
+
   it('shows an error returned while loading History', async () => {
     sendExtensionMessage.mockResolvedValueOnce({
       ok: false,
@@ -198,9 +207,11 @@ describe('HistoryApp', () => {
   });
 });
 
-async function renderHistory() {
+async function renderHistory(
+  props: { initialThemeError?: string | null } = {},
+) {
   await act(async () => {
-    root.render(<HistoryApp />);
+    root.render(<HistoryApp {...props} />);
   });
 }
 

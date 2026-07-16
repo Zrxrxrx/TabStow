@@ -18,7 +18,6 @@ const SETTINGS: ExtensionSettings = {
   deviceId: 'replica-123',
   includePinnedTabs: true,
   closePinnedTabs: false,
-  theme: 'dark',
 };
 
 const DISCONNECTED: ConnectionView = {
@@ -96,7 +95,19 @@ describe('OptionsApp', () => {
       'checked',
       true,
     );
+    expect(() => screen().getByLabelText('Theme')).toThrow();
     expect(screen().getByText('replica-123')).not.toBeNull();
+  });
+
+  it('shows an initial theme read failure without hiding Settings', async () => {
+    respondWith(DISCONNECTED);
+
+    await act(async () =>
+      root.render(<OptionsApp initialThemeError="Theme storage unavailable" />),
+    );
+
+    expect(screen().getByRole('alert').textContent).toBe('Theme storage unavailable');
+    expect(container.querySelector('h1')?.textContent).toBe('Settings');
   });
 
   it('shows only sanitized Device Flow information', async () => {

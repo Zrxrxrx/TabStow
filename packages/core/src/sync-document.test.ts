@@ -11,7 +11,6 @@ const settings: ExtensionSettings = {
   deviceId: 'device-1',
   includePinnedTabs: true,
   closePinnedTabs: false,
-  theme: 'dark',
 };
 
 const session: TabSession = {
@@ -87,23 +86,26 @@ describe('sync documents', () => {
     expect(parseSyncDocument(document).quickLinks).toHaveLength(1);
   });
 
-  it('parses legacy sync documents that still contain theme without importing it', () => {
-    const document = parseSyncDocument({
-      schemaVersion: 1,
-      deviceId: 'device-1',
-      exportedAt: '2026-07-06T00:00:00.000Z',
-      sessions: [session],
-      settings: {
+  it.each(['dark', 'sepia', null, { mode: 'dark' }])(
+    'parses a legacy sync theme value (%j) without importing it',
+    (theme) => {
+      const document = parseSyncDocument({
+        schemaVersion: 1,
         deviceId: 'device-1',
-        gistId: 'gist-1',
-        gistFileName: 'tabstow.sync.json',
-        includePinnedTabs: true,
-        closePinnedTabs: false,
-        theme: 'dark',
-      },
-    });
+        exportedAt: '2026-07-06T00:00:00.000Z',
+        sessions: [session],
+        settings: {
+          deviceId: 'device-1',
+          gistId: 'gist-1',
+          gistFileName: 'tabstow.sync.json',
+          includePinnedTabs: true,
+          closePinnedTabs: false,
+          theme,
+        },
+      });
 
-    expect(document.settings).not.toHaveProperty('theme');
-    expect(toImportableSettings(document.settings)).not.toHaveProperty('theme');
-  });
+      expect(document.settings).not.toHaveProperty('theme');
+      expect(toImportableSettings(document.settings)).not.toHaveProperty('theme');
+    },
+  );
 });

@@ -28,7 +28,6 @@ const EMPTY_FORM: ExtensionSettings = {
   deviceId: '',
   includePinnedTabs: false,
   closePinnedTabs: false,
-  theme: 'system',
 };
 
 const DISCONNECTED: ConnectionView = {
@@ -48,7 +47,11 @@ function formatTime(value: string | number | undefined): string {
   }).format(new Date(value));
 }
 
-export function OptionsApp() {
+export function OptionsApp({
+  initialThemeError = null,
+}: {
+  initialThemeError?: string | null;
+} = {}) {
   const [settings, setSettings] = useState<ExtensionSettings>(EMPTY_FORM);
   const [settingsPatch, setSettingsPatch] = useState<Partial<ExtensionSettings>>({});
   const settingsPatchRef = useRef<Partial<ExtensionSettings>>({});
@@ -200,6 +203,7 @@ export function OptionsApp() {
         Connect GitHub once, then let Tabstow synchronize automatically.
       </p>
 
+      <StatusMessage message={initialThemeError} tone="error" />
       <StatusMessage message={status.message} tone={status.tone} />
 
       <section className="settings-section" aria-labelledby="gist-heading">
@@ -456,17 +460,6 @@ export function OptionsApp() {
             disabled={!settings.includePinnedTabs}
           />
           Close pinned tabs after saving
-        </label>
-        <label>
-          Theme
-          <select
-            value={settings.theme}
-            onChange={(event) => updateField('theme', event.target.value as ExtensionSettings['theme'])}
-          >
-            <option value="system">System</option>
-            <option value="light">Light</option>
-            <option value="dark">Dark</option>
-          </select>
         </label>
       </section>
 
