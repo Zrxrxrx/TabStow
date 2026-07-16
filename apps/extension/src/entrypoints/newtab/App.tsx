@@ -24,6 +24,7 @@ import {
   getAcknowledgedIncidentKey,
 } from '@/features/sync/sync-incident-acknowledgement';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
+import { ModalDialog } from './components/ModalDialog';
 import { QuickLinks } from './components/QuickLinks';
 import { RecoveryBinDialog } from './components/RecoveryBinDialog';
 import { NewTabFeedback } from './components/NewTabFeedback';
@@ -67,6 +68,8 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED_SYNC);
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const [themeMode, setThemeMode] = useState<ThemeMode>(initialThemeMode ?? 'light');
+  const [duplicateTabstowCount, setDuplicateTabstowCount] = useState(0);
+  const [duplicateTabstowClosePending, setDuplicateTabstowClosePending] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
   const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [syncDetailsOpen, setSyncDetailsOpen] = useState(false);
@@ -89,6 +92,25 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
   useEffect(() => {
     void loadSessions();
     void observeSync('open');
+  }, []);
+
+  useEffect(() => {
+    let active = true;
+
+    void sendExtensionMessage<AppResult<{ duplicateCount: number }>>({
+      type: 'newtab:get-duplicate-state',
+    }).then(
+      (response) => {
+        if (active && response.ok && response.data.duplicateCount > 0) {
+          setDuplicateTabstowCount(response.data.duplicateCount);
+        }
+      },
+      () => undefined,
+    );
+
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -229,6 +251,22 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
 
   function openOptions() {
     chrome.runtime.openOptionsPage();
+  }
+
+  async function closeOtherTabstowPages() {
+    setDuplicateTabstowClosePending(true);
+    try {
+      const response = await sendExtensionMessage<AppResult<{ closedTabCount: number }>>({
+        type: 'newtab:close-duplicates',
+      });
+      if (response.ok) {
+        setDuplicateTabstowCount(0);
+      } else {
+        setStatus({ tone: 'error', message: response.error.message });
+      }
+    } finally {
+      setDuplicateTabstowClosePending(false);
+    }
   }
 
   async function updateLanguage(nextLanguage: Exclude<LanguagePreference, 'auto'>) {
@@ -405,6 +443,37 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
         </section>
       </main>
 
+      {duplicateTabstowCount > 0 ? (
+        <ModalDialog
+          actions={(
+            <>
+              <button
+                className="secondary-button"
+                disabled={duplicateTabstowClosePending}
+                onClick={() => setDuplicateTabstowCount(0)}
+                type="button"
+              >
+                {t(locale, 'duplicateTabstowKeepOpen')}
+              </button>
+              <button
+                className="primary-button"
+                disabled={duplicateTabstowClosePending}
+                onClick={() => void closeOtherTabstowPages()}
+                type="button"
+              >
+                {t(locale, 'duplicateTabstowCloseOthers')}
+              </button>
+            </>
+          )}
+          busy={duplicateTabstowClosePending}
+          closeLabel={t(locale, 'duplicateTabstowKeepOpen')}
+          onClose={() => setDuplicateTabstowCount(0)}
+          title={t(locale, 'duplicateTabstowTitle')}
+        >
+          <p>{t(locale, 'duplicateTabstowDescription', { count: duplicateTabstowCount })}</p>
+        </ModalDialog>
+      ) : null}
+
       {extraOpen ? (
         <aside
           className="extra-drawer-backdrop is-open"
@@ -445,7 +514,7 @@ export function App({ initialThemeError = null, initialThemeMode }: AppProps = {
           onRestored={loadSessions}
         />
       ) : null}
-      {syncDetailsOpen ? (
+      {syncDetailsOpen && duplicateTabstowCount === 0 ? (
         <SyncStatusDialog
           connection={connection}
           locale={locale}

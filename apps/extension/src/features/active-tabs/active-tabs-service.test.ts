@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const browserMocks = vi.hoisted(() => ({
+  runtime: {
+    getURL: vi.fn((path: string) => `chrome-extension://tabstow-test${path}`),
+  },
   search: {
     query: vi.fn(),
   },
@@ -70,6 +73,78 @@ describe('active tabs service', () => {
       ok: true,
       data: [{ id: 1, windowId: 2, index: 0, url: 'https://example.com' }],
     });
+  });
+
+  it('detects other open Tabstow pages without counting the current page', async () => {
+    browserMocks.tabs.query.mockResolvedValue([
+      { id: 7, url: 'chrome-extension://tabstow-test/newtab.html' },
+      { id: 8, url: 'chrome-extension://tabstow-test/newtab.html' },
+      { id: 9, url: 'chrome-extension://tabstow-test/options.html' },
+      { id: 10, url: 'https://example.com/' },
+      {
+        id: 11,
+        pendingUrl: 'chrome-extension://tabstow-test/newtab.html',
+        url: 'chrome://newtab/',
+      },
+    ]);
+
+    const { getDuplicateTabstowPageState } = await import('./active-tabs-service');
+
+    await expect(getDuplicateTabstowPageState(7)).resolves.toEqual({
+      ok: true,
+      data: { duplicateCount: 2 },
+    });
+    expect(browserMocks.runtime.getURL).toHaveBeenCalledWith('/newtab.html');
+    expect(browserMocks.tabs.query).toHaveBeenCalledWith({});
+  });
+
+  it('rechecks duplicate Tabstow pages before closing them and preserves the current page', async () => {
+    browserMocks.tabs.query
+      .mockResolvedValueOnce([
+        { id: 7, url: 'chrome-extension://tabstow-test/newtab.html' },
+        { id: 8, url: 'chrome-extension://tabstow-test/newtab.html' },
+      ])
+      .mockResolvedValueOnce([
+        { id: 7, url: 'chrome-extension://tabstow-test/newtab.html' },
+        { id: 11, url: 'chrome-extension://tabstow-test/newtab.html' },
+        { id: 12, url: 'chrome-extension://tabstow-test/options.html' },
+      ]);
+
+    const {
+      closeDuplicateTabstowPages,
+      getDuplicateTabstowPageState,
+    } = await import('./active-tabs-service');
+
+    await getDuplicateTabstowPageState(7);
+    await expect(closeDuplicateTabstowPages(7)).resolves.toEqual({
+      ok: true,
+      data: { closedTabCount: 1 },
+    });
+    expect(browserMocks.tabs.remove).toHaveBeenCalledWith([11]);
+  });
+
+  it('does not inspect or close tabs when the current Tabstow page cannot be identified', async () => {
+    const {
+      closeDuplicateTabstowPages,
+      getDuplicateTabstowPageState,
+    } = await import('./active-tabs-service');
+
+    await expect(getDuplicateTabstowPageState(undefined)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'chrome-tabs-error',
+        message: 'Tabstow could not identify the current tab.',
+      },
+    });
+    await expect(closeDuplicateTabstowPages(undefined)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: 'chrome-tabs-error',
+        message: 'Tabstow could not identify the current tab.',
+      },
+    });
+    expect(browserMocks.tabs.query).not.toHaveBeenCalled();
+    expect(browserMocks.tabs.remove).not.toHaveBeenCalled();
   });
 
   it('lists active tabs with Chrome tab-group metadata', async () => {

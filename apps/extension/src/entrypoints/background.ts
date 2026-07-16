@@ -14,7 +14,9 @@ import {
 } from '@/features/context-menu/context-menu';
 import {
   closeActiveTabs,
+  closeDuplicateTabstowPages,
   focusActiveTab,
+  getDuplicateTabstowPageState,
   listActiveTabs,
   listActiveTabsSnapshot,
   runDefaultSearch,
@@ -169,6 +171,10 @@ async function routeMessage(
   const message = rawMessage as ExtensionMessage;
   try {
     switch (message.type) {
+      case 'newtab:get-duplicate-state':
+        return getDuplicateTabstowPageState(sender?.tab?.id);
+      case 'newtab:close-duplicates':
+        return closeDuplicateTabstowPages(sender?.tab?.id);
       case 'sessions:list':
         return ok(await listSessions());
       case 'sessions:stow-current-window-preview':

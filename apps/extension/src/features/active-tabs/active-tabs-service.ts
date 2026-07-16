@@ -10,6 +10,50 @@ import type {
   ChromeTabGroupInfo,
 } from './types';
 
+async function listOtherTabstowPageIds(currentTabId: number): Promise<number[]> {
+  const newTabUrl = browser.runtime.getURL('/newtab.html');
+  const tabs = await browser.tabs.query({});
+
+  return tabs.flatMap((tab) =>
+    tab.id != null &&
+    tab.id !== currentTabId &&
+    (tab.pendingUrl ?? tab.url) === newTabUrl
+      ? [tab.id]
+      : [],
+  );
+}
+
+export async function getDuplicateTabstowPageState(
+  currentTabId: number | undefined,
+): Promise<AppResult<{ duplicateCount: number }>> {
+  if (currentTabId == null) {
+    return err('chrome-tabs-error', 'Tabstow could not identify the current tab.');
+  }
+
+  try {
+    const duplicateTabIds = await listOtherTabstowPageIds(currentTabId);
+    return ok({ duplicateCount: duplicateTabIds.length });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
+export async function closeDuplicateTabstowPages(
+  currentTabId: number | undefined,
+): Promise<AppResult<{ closedTabCount: number }>> {
+  if (currentTabId == null) {
+    return err('chrome-tabs-error', 'Tabstow could not identify the current tab.');
+  }
+
+  try {
+    const duplicateTabIds = await listOtherTabstowPageIds(currentTabId);
+    if (duplicateTabIds.length > 0) await browser.tabs.remove(duplicateTabIds);
+    return ok({ closedTabCount: duplicateTabIds.length });
+  } catch (error) {
+    return err('chrome-tabs-error', toErrorMessage(error));
+  }
+}
+
 export async function listActiveTabs(): Promise<AppResult<ActiveBrowserTab[]>> {
   try {
     const tabs = await browser.tabs.query({});

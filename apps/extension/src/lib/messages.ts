@@ -38,6 +38,8 @@ export type StowPreview = {
 export type { SyncResult } from '@/features/sync/sync-types';
 
 export type ExtensionMessage =
+  | { type: 'newtab:get-duplicate-state' }
+  | { type: 'newtab:close-duplicates' }
   | { type: 'sessions:list' }
   | { type: 'sessions:stow-current-window-preview' }
   | { type: 'sessions:stow-current-window' }
@@ -95,6 +97,8 @@ export type ExtensionEvent =
   | { type: 'connection:state-changed' };
 
 export type ExtensionMessageResponse =
+  | AppResult<{ duplicateCount: number }>
+  | AppResult<{ closedTabCount: number }>
   | AppResult<TabSession[]>
   | AppResult<TabSession>
   | AppResult<StowResult>

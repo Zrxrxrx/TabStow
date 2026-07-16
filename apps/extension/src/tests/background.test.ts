@@ -127,7 +127,9 @@ const sessionServiceMocks = vi.hoisted(() => ({
 
 const activeTabsMocks = vi.hoisted(() => ({
   closeActiveTabs: vi.fn(),
+  closeDuplicateTabstowPages: vi.fn(),
   focusActiveTab: vi.fn(),
+  getDuplicateTabstowPageState: vi.fn(),
   listActiveTabs: vi.fn(),
   listActiveTabsSnapshot: vi.fn(),
   moveActiveTab: vi.fn(),
@@ -249,6 +251,34 @@ describe('background message routing', () => {
     expect(keepAlive).toBe(true);
     expect(sessionServiceMocks.getCurrentWindowStowPreview).toHaveBeenCalledWith(91);
     expect(response).toEqual({ ok: true, data: { eligibleTabCount: 3 } });
+  });
+
+  it('uses the sender tab when inspecting and closing duplicate Tabstow pages', async () => {
+    activeTabsMocks.getDuplicateTabstowPageState.mockResolvedValue({
+      ok: true,
+      data: { duplicateCount: 2 },
+    });
+    activeTabsMocks.closeDuplicateTabstowPages.mockResolvedValue({
+      ok: true,
+      data: { closedTabCount: 2 },
+    });
+
+    await import('../entrypoints/background');
+
+    const sender = { tab: { id: 91 } } as chrome.runtime.MessageSender;
+    const inspected = await dispatchRuntimeMessage(
+      { type: 'newtab:get-duplicate-state' },
+      sender,
+    );
+    const closed = await dispatchRuntimeMessage(
+      { type: 'newtab:close-duplicates' },
+      sender,
+    );
+
+    expect(activeTabsMocks.getDuplicateTabstowPageState).toHaveBeenCalledWith(91);
+    expect(inspected.response).toEqual({ ok: true, data: { duplicateCount: 2 } });
+    expect(activeTabsMocks.closeDuplicateTabstowPages).toHaveBeenCalledWith(91);
+    expect(closed.response).toEqual({ ok: true, data: { closedTabCount: 2 } });
   });
 
   it('registers toolbar action click handling', async () => {

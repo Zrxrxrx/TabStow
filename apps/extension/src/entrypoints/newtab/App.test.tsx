@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveBrowserTab, ActiveTabsSnapshot } from '@/features/active-tabs/types';
+import type { ConnectionView } from '@/features/sync/sync-types';
 import type { StowSuggestionList } from '@/features/tab-lifecycle/types';
 import { reorderQuickLinks, updateQuickLink, type QuickLink } from '@/features/quick-links/quick-links';
 import type { AppResult } from '@/lib/errors';
@@ -1965,6 +1966,64 @@ describe('App', () => {
     });
   });
 
+  it('prompts when Tabstow is open in other tabs and lets the user keep them open', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], duplicateTabstowPages: 2 });
+
+    await renderApp();
+
+    const dialog = screen().getByRole('dialog', { name: 'Tabstow is already open' });
+    expect(dialog.textContent).toContain('Other open Tabstow tabs: 2.');
+    expect(sentMessageTypes()).not.toContain('newtab:close-duplicates');
+
+    await click(screen().getByRole('button', { name: 'Keep them open' }));
+
+    expect(() => screen().getByRole('dialog', { name: 'Tabstow is already open' })).toThrow();
+    expect(sentMessageTypes()).not.toContain('newtab:close-duplicates');
+  });
+
+  it('does not prompt when the current page is the only open Tabstow tab', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'newtab:get-duplicate-state',
+    });
+    expect(() => screen().getByRole('dialog', { name: 'Tabstow is already open' })).toThrow();
+  });
+
+  it('closes other Tabstow tabs only after the user confirms', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], duplicateTabstowPages: 2 });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Close other tabs' }));
+
+    expect(sendExtensionMessage).toHaveBeenCalledWith({
+      type: 'newtab:close-duplicates',
+    });
+    expect(() => screen().getByRole('dialog', { name: 'Tabstow is already open' })).toThrow();
+  });
+
+  it('shows the duplicate Tabstow prompt before an automatic sync incident prompt', async () => {
+    mockMessages({
+      activeTabs: [UNIQUE_TAB],
+      duplicateTabstowPages: 1,
+      syncConnection: {
+        phase: 'connected',
+        sync: { state: 'paused', action: 'reconnect', message: 'Token expired' },
+      },
+    });
+
+    await renderApp();
+
+    expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(screen().getByRole('dialog', { name: 'Tabstow is already open' })).not.toBeNull();
+
+    await click(screen().getByRole('button', { name: 'Keep them open' }));
+
+    expect(screen().getByRole('dialog', { name: 'Sync details' })).not.toBeNull();
+  });
+
   it('sleeps eligible tabs across visible windows from the bulk action', async () => {
     const tabs: ActiveBrowserTab[] = [
       { ...UNIQUE_TAB, id: 40, title: 'Eligible one', url: 'https://sleep.example/one' },
@@ -2796,21 +2855,37 @@ function activeTabsSnapshot(
 function mockMessages({
   activeTabs,
   chromeGroups = [],
+  duplicateTabstowPages = 0,
   focusedWindowId,
   incognitoWindowIds = [],
   sessions = SESSIONS,
   suggestions = { afterDays: 14, candidates: [] },
+  syncConnection,
 }: {
   activeTabs: ActiveBrowserTab[];
   chromeGroups?: ActiveTabsSnapshot['chromeGroups'];
+  duplicateTabstowPages?: number;
   focusedWindowId?: number;
   incognitoWindowIds?: number[];
   sessions?: TabSession[];
   suggestions?: StowSuggestionList;
+  syncConnection?: ConnectionView;
 }) {
   let currentActiveTabs = activeTabs;
 
   sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+    if (message.type === 'newtab:get-duplicate-state') {
+      return { ok: true, data: { duplicateCount: duplicateTabstowPages } };
+    }
+
+    if (message.type === 'newtab:close-duplicates') {
+      return { ok: true, data: { closedTabCount: duplicateTabstowPages } };
+    }
+
+    if (message.type === 'sync:observe' && syncConnection) {
+      return { ok: true, data: syncConnection };
+    }
+
     if (message.type === 'sessions:stow-current-window-preview') {
       return { ok: true, data: { eligibleTabCount: currentActiveTabs.length } };
     }

@@ -84,6 +84,8 @@ describe('i18n', () => {
     expect(t('en', 'sleepSearchUnavailableReason')).toBe(
       'Clear search to sleep tabs in the selected window.',
     );
+    expect(t('en', 'duplicateTabstowTitle')).toBe('Tabstow is already open');
+    expect(t('en', 'duplicateTabstowCloseOthers')).toBe('Close other tabs');
   });
 
   it('includes Simplified Chinese labels for migrated dashboard surfaces', async () => {
@@ -165,6 +167,8 @@ describe('i18n', () => {
     expect(t('zh-CN', 'sleepSearchUnavailableReason')).toBe(
       '清除搜索后，才能休眠所选窗口中的标签页。',
     );
+    expect(t('zh-CN', 'duplicateTabstowTitle')).toBe('Tabstow 已在其他标签页打开');
+    expect(t('zh-CN', 'duplicateTabstowCloseOthers')).toBe('关闭其他标签页');
   });
 
   it('includes English and Simplified Chinese labels for the History page', async () => {
