@@ -51,7 +51,7 @@
         {
           "metric": "workspaceLandmarks",
           "operator": "equals",
-          "value": "Quick links|Active tabs|Saved for later"
+          "value": "Quick links|Active tabs|Saved windows"
         },
         {
           "metric": "viewportWidth",
@@ -93,7 +93,7 @@
         {
           "metric": "workspaceLandmarks",
           "operator": "equals",
-          "value": "Quick links|Active tabs|Saved for later"
+          "value": "Quick links|Active tabs|Saved windows"
         },
         {
           "metric": "feedbackCount",
@@ -150,7 +150,7 @@
         {
           "metric": "workspaceLandmarks",
           "operator": "equals",
-          "value": "Quick links|Active tabs|Saved for later"
+          "value": "Quick links|Active tabs|Saved windows"
         },
         {
           "metric": "feedbackCount",
@@ -202,7 +202,7 @@
         {
           "metric": "workspaceLandmarks",
           "operator": "equals",
-          "value": "Quick links|Active tabs|Saved for later"
+          "value": "Quick links|Active tabs|Saved windows"
         },
         {
           "metric": "feedbackCount",
@@ -254,7 +254,7 @@
         {
           "metric": "workspaceLandmarks",
           "operator": "equals",
-          "value": "Quick links|Active tabs|Saved for later"
+          "value": "Quick links|Active tabs|Saved windows"
         },
         {
           "metric": "feedbackCount",

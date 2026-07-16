@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { MessageKey } from './i18n';
 
 const storageMocks = vi.hoisted(() => ({
   getItem: vi.fn(),
@@ -24,8 +25,8 @@ describe('i18n', () => {
   it('falls back to English messages', async () => {
     const { t } = await import('./i18n');
 
-    expect(t('en', 'stowCurrentWindow')).toBe('Stow current window');
-    expect(t('zh-CN', 'stowCurrentWindow')).toBe('收起当前窗口');
+    expect(t('en', 'stowCurrentWindow')).toBe('Stow window');
+    expect(t('zh-CN', 'stowCurrentWindow')).toBe('收起窗口');
     expect(t('en', 'switchLanguage')).toBe('Switch language');
     expect(t('en', 'switchTheme')).toBe('Switch theme');
     expect(t('en', 'editQuickLinksMode')).toBe('Edit quick links');
@@ -35,17 +36,21 @@ describe('i18n', () => {
     expect(t('en', 'searchTabs')).toBe('Search active and saved tabs');
     expect(t('en', 'clearTabSearch')).toBe('Clear tab search');
     expect(t('en', 'history')).toBe('History');
+    expect(t('en', 'recoveryBin')).toBe('History');
+    expect(t('en', 'savedForLater')).toBe('Saved windows');
+    expect(t('en', 'savedSessions')).toBe('Saved windows');
+    expect(t('en', 'noSavedSessions')).toBe('No saved windows yet.');
     expect(t('en', 'savedSessionsSubtitle')).toBe(
-      'Durable stowed sessions sorted newest first. Normally opened, restored, and removed items move to History; middle-click keeps a Saved copy.',
+      'Stowed windows stay here until you restore or remove them. Both actions move them to History.',
     );
-    expect(t('en', 'restoreAll')).toBe('Restore all and move session to History');
+    expect(t('en', 'restoreAll')).toBe('Restore window');
     expect(t('en', 'restoreSavedSession', { label: 'Work' })).toBe(
-      'Restore Work and move to History',
+      'Restore Work and move the window to History',
     );
     expect(t('en', 'removeSavedTab', { label: 'Docs' })).toBe('Move Docs to History');
     expect(t('en', 'removeSavedSession', { label: 'Work' })).toBe('Move Work to History');
     expect(t('en', 'dragSavedTab', { label: 'Docs' })).toBe('Drag saved tab Docs');
-    expect(t('en', 'dragSavedSession', { label: 'Work' })).toBe('Drag saved session Work');
+    expect(t('en', 'dragSavedSession', { label: 'Work' })).toBe('Drag saved window Work');
     expect(t('en', 'dropSavedTabBefore', { label: 'Docs' })).toBe(
       'Drop saved tab before Docs',
     );
@@ -53,24 +58,33 @@ describe('i18n', () => {
       'Drop saved tab at end of Work',
     );
     expect(t('en', 'dropSavedSessionBefore', { label: 'Work' })).toBe(
-      'Drop saved session before Work',
+      'Drop saved window before Work',
     );
-    expect(t('en', 'dropSavedSessionAtEnd')).toBe('Drop saved session at end');
+    expect(t('en', 'dropSavedSessionAtEnd')).toBe('Drop saved window at end');
     expect(t('en', 'openedSavedTab')).toBe('Opened saved tab.');
     expect(t('en', 'movedSavedTabToHistory')).toBe('Moved tab to History.');
     expect(t('en', 'restoredSavedSession', { count: 2 })).toBe(
-      'Restored 2 tabs and moved the session to History.',
+      'Restored 2 tabs and moved the window to History.',
     );
-    expect(t('en', 'movedSavedSessionToHistory')).toBe('Moved saved session to History.');
+    expect(t('en', 'movedSavedSessionToHistory')).toBe('Moved saved window to History.');
     expect(t('en', 'movedSavedTab')).toBe('Moved saved tab.');
-    expect(t('en', 'reorderedSavedSessions')).toBe('Reordered saved sessions.');
-    expect(t('en', 'savedCount', { sessions: '2 sessions', tabs: '3 tabs' })).toBe(
-      '2 sessions, 3 tabs',
+    expect(t('en', 'reorderedSavedSessions')).toBe('Reordered saved windows.');
+    expect(t('en', 'savedCount', { sessions: '2 windows', tabs: '3 tabs' })).toBe(
+      '2 windows, 3 tabs',
     );
-    expect(t('en', 'savedSessionsCount', { count: 2 })).toBe('2 sessions');
+    expect(t('en', 'savedSessionsCount', { count: 2 })).toBe('2 windows');
     expect(t('en', 'savedTabsCount', { count: 3 })).toBe('3 tabs');
-    expect(t('en', 'savedSessionCount', { count: 1 })).toBe('1 session');
+    expect(t('en', 'savedSessionCount', { count: 1 })).toBe('1 window');
     expect(t('en', 'savedTabCount', { count: 1 })).toBe('1 tab');
+    expect(t('en', 'saveTabForLater', { label: 'Docs' })).toBe(
+      'Save Docs to Saved windows',
+    );
+    expect(t('en', 'stowThisWindow')).toBe('Stow window');
+    expect(t('en', 'stowedSessions')).toBe('Saved windows');
+    expect(t('en', 'stowSuggestions')).toBe('Saved windows suggestions');
+    expect(t('en', 'lifecycleConfirmStow', { count: '2 tabs' })).toBe(
+      'Move 2 tabs to Saved windows and close original tabs',
+    );
     expect(t('en', 'syncChangesSavedLocally')).toBe('Changes saved locally');
     expect(t('en', 'syncPaused')).toBe('Sync paused');
     expect(t('en', 'extra')).toBe('Extra');
@@ -92,13 +106,13 @@ describe('i18n', () => {
     const { t } = await import('./i18n');
 
     expect(t('zh-CN', 'activeTabs')).toBe('打开的标签页');
-    expect(t('zh-CN', 'stowedSessions')).toBe('已收起的标签页');
+    expect(t('zh-CN', 'stowedSessions')).toBe('已保存的窗口');
     expect(t('zh-CN', 'searchTheWeb')).toBe('搜索网页');
     expect(t('zh-CN', 'language')).toBe('语言');
     expect(t('zh-CN', 'windowNumber', { number: 2 })).toBe('窗口 2');
     expect(t('zh-CN', 'chromeGroupFallback', { id: 31 })).toBe('Chrome 分组 31');
     expect(t('zh-CN', 'dragTab', { label: '示例' })).toBe('拖动 示例');
-    expect(t('zh-CN', 'saveTabForLater', { label: '示例' })).toBe('保存 示例 到稍后查看');
+    expect(t('zh-CN', 'saveTabForLater', { label: '示例' })).toBe('将 示例 保存到已保存的窗口');
     expect(t('zh-CN', 'quickLinkUrl')).toBe('快捷链接网址');
     expect(t('zh-CN', 'quickLinkLabel')).toBe('快捷链接名称');
     expect(t('zh-CN', 'quickLinkIcon')).toBe('快捷链接图标');
@@ -118,17 +132,21 @@ describe('i18n', () => {
     expect(t('zh-CN', 'searchTabs')).toBe('搜索打开和已保存的标签页');
     expect(t('zh-CN', 'clearTabSearch')).toBe('清除标签页搜索');
     expect(t('zh-CN', 'history')).toBe('历史记录');
+    expect(t('zh-CN', 'recoveryBin')).toBe('历史记录');
+    expect(t('zh-CN', 'savedForLater')).toBe('已保存的窗口');
+    expect(t('zh-CN', 'savedSessions')).toBe('已保存的窗口');
+    expect(t('zh-CN', 'noSavedSessions')).toBe('还没有已保存的窗口。');
     expect(t('zh-CN', 'savedSessionsSubtitle')).toBe(
-      '持久保存的会话按最新优先排序；正常打开、恢复或移除的内容会移至历史记录，中键打开会保留已保存副本。',
+      '收起的窗口会保存在这里；恢复或移除后都会进入历史记录。',
     );
-    expect(t('zh-CN', 'restoreAll')).toBe('全部恢复并将会话移至历史记录');
+    expect(t('zh-CN', 'restoreAll')).toBe('恢复窗口');
     expect(t('zh-CN', 'restoreSavedSession', { label: '工作' })).toBe(
-      '恢复工作并移至历史记录',
+      '恢复工作并将窗口移至历史记录',
     );
     expect(t('zh-CN', 'removeSavedTab', { label: '文档' })).toBe('将文档移至历史记录');
     expect(t('zh-CN', 'removeSavedSession', { label: '工作' })).toBe('将工作移至历史记录');
     expect(t('zh-CN', 'dragSavedTab', { label: '文档' })).toBe('拖动已保存的标签页文档');
-    expect(t('zh-CN', 'dragSavedSession', { label: '工作' })).toBe('拖动已保存的会话工作');
+    expect(t('zh-CN', 'dragSavedSession', { label: '工作' })).toBe('拖动已保存的窗口工作');
     expect(t('zh-CN', 'dropSavedTabBefore', { label: '文档' })).toBe(
       '将已保存的标签页放在文档之前',
     );
@@ -136,24 +154,29 @@ describe('i18n', () => {
       '将已保存的标签页放在工作末尾',
     );
     expect(t('zh-CN', 'dropSavedSessionBefore', { label: '工作' })).toBe(
-      '将已保存的会话放在工作之前',
+      '将已保存的窗口放在工作之前',
     );
-    expect(t('zh-CN', 'dropSavedSessionAtEnd')).toBe('将已保存的会话放在末尾');
+    expect(t('zh-CN', 'dropSavedSessionAtEnd')).toBe('将已保存的窗口放在末尾');
     expect(t('zh-CN', 'openedSavedTab')).toBe('已打开保存的标签页。');
     expect(t('zh-CN', 'movedSavedTabToHistory')).toBe('已将标签页移至历史记录。');
     expect(t('zh-CN', 'restoredSavedSession', { count: 2 })).toBe(
-      '已恢复 2 个标签页，并将会话移至历史记录。',
+      '已恢复 2 个标签页，并将窗口移至历史记录。',
     );
-    expect(t('zh-CN', 'movedSavedSessionToHistory')).toBe('已将保存的会话移至历史记录。');
+    expect(t('zh-CN', 'movedSavedSessionToHistory')).toBe('已将窗口移至历史记录。');
     expect(t('zh-CN', 'movedSavedTab')).toBe('已移动保存的标签页。');
-    expect(t('zh-CN', 'reorderedSavedSessions')).toBe('已重新排列保存的会话。');
-    expect(t('zh-CN', 'savedCount', { sessions: '2 个会话', tabs: '3 个标签页' })).toBe(
-      '2 个会话，3 个标签页',
+    expect(t('zh-CN', 'reorderedSavedSessions')).toBe('已重新排列已保存的窗口。');
+    expect(t('zh-CN', 'savedCount', { sessions: '2 个窗口', tabs: '3 个标签页' })).toBe(
+      '2 个窗口，3 个标签页',
     );
-    expect(t('zh-CN', 'savedSessionsCount', { count: 2 })).toBe('2 个会话');
+    expect(t('zh-CN', 'savedSessionsCount', { count: 2 })).toBe('2 个窗口');
     expect(t('zh-CN', 'savedTabsCount', { count: 3 })).toBe('3 个标签页');
-    expect(t('zh-CN', 'savedSessionCount', { count: 1 })).toBe('1 个会话');
+    expect(t('zh-CN', 'savedSessionCount', { count: 1 })).toBe('1 个窗口');
     expect(t('zh-CN', 'savedTabCount', { count: 1 })).toBe('1 个标签页');
+    expect(t('zh-CN', 'stowThisWindow')).toBe('收起窗口');
+    expect(t('zh-CN', 'stowSuggestions')).toBe('“已保存的窗口”建议');
+    expect(t('zh-CN', 'lifecycleConfirmStow', { count: '2 个标签页' })).toBe(
+      '将 2 个标签页移至“已保存的窗口”并关闭原标签页',
+    );
     expect(t('zh-CN', 'syncChangesSavedLocally')).toBe('更改已保存在本地');
     expect(t('zh-CN', 'syncPaused')).toBe('同步已暂停');
     expect(t('zh-CN', 'extra')).toBe('更多');
@@ -186,7 +209,8 @@ describe('i18n', () => {
       'Removed from Reading',
     );
     expect(t('en', 'historyOpen')).toBe('Open');
-    expect(t('en', 'historyRestore')).toBe('Restore to Saved for later');
+    expect(t('en', 'historyRestore')).toBe('Restore to Saved windows');
+    expect(t('en', 'historyRestored')).toBe('Restored to Saved windows.');
     expect(t('en', 'historyDeletePermanently')).toBe('Delete permanently');
     expect(t('en', 'historyConfirmDelete')).toBe(
       'Delete this History entry permanently?',
@@ -199,10 +223,58 @@ describe('i18n', () => {
     expect(t('zh-CN', 'historyRestoredFrom', { sourceTitle: '阅读' })).toBe('从阅读恢复');
     expect(t('zh-CN', 'historyRemovedFrom', { sourceTitle: '阅读' })).toBe('从阅读移除');
     expect(t('zh-CN', 'historyOpen')).toBe('打开');
-    expect(t('zh-CN', 'historyRestore')).toBe('恢复到稍后查看');
+    expect(t('zh-CN', 'historyRestore')).toBe('恢复到已保存的窗口');
+    expect(t('zh-CN', 'historyRestored')).toBe('已恢复到已保存的窗口。');
     expect(t('zh-CN', 'historyDeletePermanently')).toBe('永久删除');
     expect(t('zh-CN', 'historyConfirmDelete')).toBe('要永久删除这条历史记录吗？');
     expect(t('zh-CN', 'backToWorkspace')).toBe('返回工作区');
+  });
+
+  it('uses one lifecycle vocabulary in both locales', async () => {
+    const { t } = await import('./i18n');
+    const lifecycleKeys = [
+      'automaticSleepUnsupported',
+      'dragSavedSession',
+      'dropSavedSessionAtEnd',
+      'dropSavedSessionBefore',
+      'historyRestore',
+      'historyRestored',
+      'lifecycleConfirmStow',
+      'lifecycleSelectionSummary',
+      'lifecycleStowPartial',
+      'lifecycleStowSuccess',
+      'lifecycleSuggestionBanner',
+      'lifecycleSuggestionBannerOne',
+      'movedSavedSessionToHistory',
+      'noSavedSessions',
+      'recoveryBin',
+      'reorderedSavedSessions',
+      'restoreAll',
+      'restoredSavedSession',
+      'restoreSavedSession',
+      'savedForLater',
+      'savedSessions',
+      'savedSessionsSubtitle',
+      'saveTabForLater',
+      'stowedSessions',
+      'stowCurrentWindow',
+      'stowSuggestions',
+      'stowTabCompleted',
+      'stowThisWindow',
+      'tabLifecycleDescription',
+    ] satisfies MessageKey[];
+
+    const englishCopy = lifecycleKeys.map((key) => t('en', key)).join('\n');
+    const chineseCopy = lifecycleKeys.map((key) => t('zh-CN', key)).join('\n');
+
+    expect(englishCopy).not.toMatch(/Recovery Bin|Saved for later|middle-click|saved sessions?/i);
+    expect(chineseCopy).not.toMatch(/临时找回|稍后查看|中键|会话/);
+    expect(englishCopy).toContain('Stow window');
+    expect(englishCopy).toContain('Saved windows');
+    expect(englishCopy).toContain('History');
+    expect(chineseCopy).toContain('收起窗口');
+    expect(chineseCopy).toContain('已保存的窗口');
+    expect(chineseCopy).toContain('历史记录');
   });
 
   it('interpolates variables in message templates', async () => {

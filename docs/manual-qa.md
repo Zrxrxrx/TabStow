@@ -79,19 +79,19 @@ bun run audit:ui -- --port 9333 --case FINDING-001 --output .artifacts/ui-audit/
 bun run audit:ui -- --port 9333 --case FINDING-001-ZOOM --output .artifacts/ui-audit/<commit>/FINDING-001-ZOOM
 ```
 
-The cases cover `1440@100%`, `1024@100%`, `768@100%`, `390@100%`, and `1024@200%`. They apply the requested production zoom, theme, and language, then use focused audit-only empty, representative, or long collection rows to isolate the production scroll geometry. Require zero horizontal document overflow, the expected fixed/sticky-rail/single-flow scroll ownership, visible and reachable language, theme, sync, Stow, Extra, and Settings controls, viewport-bounded Quick Link dialogs, and reachability of the final Quick Link, Active Tab, and Saved Tab in populated and long states.
+The cases cover `1440@100%`, `1024@100%`, `768@100%`, `390@100%`, and `1024@200%`. They apply the requested production zoom, theme, and language, then use focused audit-only empty, representative, or long collection rows to isolate the production scroll geometry. Require zero horizontal document overflow, the expected fixed/sticky-rail/single-flow scroll ownership, visible and reachable language, theme, sync, Stow, History, Extra, and Settings controls, viewport-bounded Quick Link dialogs, and reachability of the final Quick Link, Active Tab, and Saved Tab in populated and long states.
 
-At 1024 pixels and wider, Quick Links, Active Tabs, and Saved for Later retain independent scrolling. From 768 through 1023 pixels, the rail remains viewport-height while the document scrolls stacked Active and Saved regions. Below 768 pixels and at the effective viewport produced by 200% zoom, every region uses one document flow. Internal horizontal scrolling in the window filter remains allowed; the document itself must not scroll horizontally.
+At 1024 pixels and wider, Quick Links, Active Tabs, and Saved windows retain independent scrolling. From 768 through 1023 pixels, the rail remains viewport-height while the document scrolls stacked Active and Saved regions. Below 768 pixels and at the effective viewport produced by 200% zoom, every region uses one document flow. Internal horizontal scrolling in the window filter remains allowed; the document itself must not scroll horizontally.
 
-Repeat empty, representative, and long collections in light/dark and English/Simplified Chinese. During the long-state pass, drag within Quick Links, Active Tabs, and Saved for Later toward the current scroll edge and confirm Chromium auto-scroll continues without changing existing drag semantics.
+Repeat empty, representative, and long collections in light/dark and English/Simplified Chinese. During the long-state pass, drag within Quick Links, Active Tabs, and Saved windows toward the current scroll edge and confirm Chromium auto-scroll continues without changing existing drag semantics.
 
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
-- Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved for Later region.
+- Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved windows region.
 - At 1440px, 1180px, and 1024px widths, confirm all three regions remain visible, the page has no horizontal overflow, and Active/Saved scroll independently.
 - Repeat the width matrix in light/dark mode and English/Simplified Chinese. Confirm the saved theme is applied before content appears and no light-mode flash occurs.
 - Verify empty, typical, and long Quick Link/Active/Saved collections. At desktop widths, rail branding and utility controls stay fixed while the Quick Link list scrolls. At tablet widths, the Quick Links rail stays sticky and auxiliary controls remain reachable at the end of the document. Below 768px, every region remains reachable in document flow.
 - Click the extension toolbar icon and confirm the current window's eligible tabs are stowed and no popup opens.
-- Open several ordinary web tabs and use **Stow current window**.
+- Open several ordinary web tabs and use **Stow window**.
 - Open two normal Chrome windows with pinned, ungrouped, and natively grouped web tabs.
 - Confirm Active Tabs shows the focused window first and preserves each window's eligible tab-strip order.
 - Drag an ungrouped tab, reorder a tab inside a group, move a tab into and out of a group, and move a tab between windows.
@@ -99,7 +99,7 @@ Repeat empty, representative, and long collections in light/dark and English/Sim
 - Confirm pinned tabs only accept pinned destinations and retain their pinned state across windows.
 - Change tab order, group membership, group title/color/collapsed state, and window focus directly in Chrome; confirm the dashboard refreshes without manual Refresh or Collapse controls.
 - Reload Tabstow and confirm no local URL/manual grouping or stale local order returns.
-- Confirm Active, Saved, Recovery, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails. Explicit Quick Link emoji and uploaded images remain intact.
+- Confirm Active, Saved, History, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails. Explicit Quick Link emoji and uploaded images remain intact.
 - Confirm only Chrome tabs with `audible === true` show Audible and only tabs with `discarded === true` show Sleeping. Sleep and policy controls must not send discard/wake mutations.
 - Use the All/current/other-window filters and confirm real counts, internal horizontal scrolling for many windows without document overflow, and no change to Chrome-owned tab order.
 - Close one tab, close a group, and close duplicates.
@@ -108,21 +108,21 @@ Repeat empty, representative, and long collections in light/dark and English/Sim
 - Create, complete, search, and clear todos.
 - Toggle fixed light/dark mode and English/Simplified Chinese. Confirm no palette, transparency, system mode, or custom-background control remains.
 - Use Unified Search to filter Active and Saved collections, choose Active/Saved suggestions, press `/` to focus, Escape to clear, and Enter in the input to run the default web search.
-- Confirm **Stow current window** displays the authoritative eligible count, disables at zero, prevents duplicate clicks, uses indeterminate busy copy, and reports the real saved/closed counts on partial success.
-- Confirm the saved session appears and eligible tabs close.
+- Confirm **Stow window** displays the authoritative eligible count, disables at zero, prevents duplicate clicks, uses indeterminate busy copy, and reports the real saved/closed counts on partial success.
+- Confirm the saved window appears and eligible tabs close.
 - Save duplicate URLs with different fragments/default ports and distinct query strings; confirm only the newest normalized copy remains and query strings remain distinct.
-- Use quick tab search and confirm Active tabs and Saved for later filter without running a web search or flattening their groups; confirm Saved drag-and-drop is disabled until the query is cleared.
-- Reorder saved sessions and tabs, move a tab between sessions, reload the extension, and confirm the order persists.
+- Use quick tab search and confirm Active tabs and Saved windows filter without running a web search or flattening their groups; confirm Saved drag-and-drop is disabled until the query is cleared.
+- Reorder saved windows and tabs, move a tab between saved windows, reload the extension, and confirm the order persists.
 - Left-click a saved tab and confirm it opens in the background, moves to History, and keeps Tabstow focused; middle-click another and confirm it remains saved.
-- Restore a saved session and delete another, then confirm both move to History and can be restored to Saved for later.
-- Open Recovery Bin and confirm it shows the newest five History entries after sorting by moved time, exposes loading/empty/error states, restores complete entries, refreshes Saved, and links to full History.
+- Restore a saved window and remove another, then confirm both move to History and can be restored to Saved windows.
+- Open History and confirm the preview shows the newest five entries after sorting by moved time, exposes loading/empty/error states, restores complete entries, refreshes Saved windows, and links to full History.
 - Open a History tab without consuming it and permanently delete a History entry.
 - Register a test OAuth App with Device Flow enabled, build with `WXT_GITHUB_OAUTH_CLIENT_ID`, and prepare an existing Gist containing `tabstow.sync.json`.
 - In two separate Chrome profiles, choose **Connect GitHub**, complete Device Flow, and bind both profiles to the same existing Gist.
 - Verify automatic discovery for one unlisted canonical file, explicit selection for multiple candidates, manual Gist ID/filename entry for no candidates, and the warning before a public Gist is confirmed.
-- With local Saved for Later and Quick Link data present, confirm that Tabstow requires target confirmation before the first merge.
+- With local Saved windows and Quick Link data present, confirm that Tabstow requires target confirmation before the first merge.
 - Open a New Tab in profile A and confirm it reads remote changes immediately. Refocus repeatedly within 60 seconds and confirm it does not poll on every focus.
-- Make a burst of Saved for Later and Quick Link changes. Confirm local UI updates immediately and one delayed Gist update occurs roughly 60 seconds after the final change.
+- Make a burst of Saved windows and Quick Link changes. Confirm local UI updates immediately and one delayed Gist update occurs roughly 60 seconds after the final change.
 - Close the New Tab before the quiet deadline and confirm the background alarm still updates the Gist. Repeat across browser restart and sleep/wake.
 - Concurrently add, move, reorder, consume, restore, and delete Saved tabs and sessions in both profiles. Reopen/focus each profile and confirm they converge, including deletion and empty-session removal.
 - Restore a History entry and confirm the restored session and tabs synchronize with fresh identities. Confirm remote deletions do not create local History entries.
@@ -134,7 +134,7 @@ Repeat empty, representative, and long collections in light/dark and English/Sim
 - Use Settings **Pull** and **Push** and confirm Saved URLs deduplicate while local History remains unchanged. Verify those buttons do not appear on the New Tab.
 - Corrupt the non-empty sync file and confirm Tabstow pauses, displays an unable-to-sync message, and offers Open Gist/Retry/Choose another without overwriting it.
 - Rename or remove the bound file and confirm Tabstow pauses instead of silently switching Gists.
-- Disconnect and confirm local Saved for Later, Quick Links, and History remain, the remote Gist is unchanged, and Settings links to GitHub for full OAuth revocation.
+- Disconnect and confirm local Saved windows, Quick Links, and History remain, the remote Gist is unchanged, and Settings links to GitHub for full OAuth revocation.
 - Upgrade a valid version-one file and confirm only version two is written afterward.
 
 ### FINDING-003 shared utility page shell
@@ -154,7 +154,7 @@ Each case cycles the rendered page through no theme attribute, explicit light, a
 
 ## Tab lifecycle
 
-- Open **Tab lifecycle** from Active Tabs. Confirm Automatic sleep defaults off, Saved for later suggestions default on, thresholds remain visible while disabled, and Cancel discards every draft change.
+- Open **Tab lifecycle** from Active Tabs. Confirm Automatic sleep defaults off, Saved windows suggestions default on, thresholds remain visible while disabled, and Cancel discards every draft change.
 - Save each automatic-sleep preset and each suggestion preset. Reload Tabstow and confirm the device-local policy persists without appearing in the Gist sync document.
 - On Chrome 121 or later, enable Automatic sleep and confirm the dialog shows a live matching-tab preview before Save. On an older Chromium build, confirm only Automatic sleep is disabled and the upgrade message appears; manual sleep and suggestions remain available.
 - Simulate a transient Tabs API failure and confirm the dialog shows Retry rather than claiming the browser is too old. Retry must preserve unsaved suggestion settings.
@@ -165,9 +165,9 @@ Each case cycles the rendered page through no theme attribute, explicit light, a
 - Choose **Remind me about these in 7 days** and confirm only the currently listed candidates disappear. A newly qualifying candidate may still show the banner.
 - Open Review and confirm the snapshot is grouped by source window in Chrome tab order, every row starts selected, and Select all/Clear all update both the tab and resulting-session counts.
 - Use **Open tab** on one row and confirm Chrome focuses and wakes it, then removes it from the review. Use **Keep sleeping** on another and confirm it stays open but does not reappear until it wakes or navigates.
-- Review live duplicate URLs, fragment-only variants, and URLs already present in Saved for later. Confirm only the deterministic unsaved representative appears and excluded tabs are never closed.
-- Confirm a multi-window selection creates one non-empty Saved session per contributing window, persists every represented tab before closing any original, and closes originals individually.
+- Review live duplicate URLs, fragment-only variants, and URLs already present in Saved windows. Confirm only the deterministic unsaved representative appears and excluded tabs are never closed.
+- Confirm a multi-window selection creates one non-empty saved window per contributing window, persists every represented tab before closing any original, and closes originals individually.
 - Change, wake, move, or protect a selected tab while confirmation is running. Confirm its Saved copy remains after persistence and the changed original stays open. Force one close failure and confirm other represented tabs still close with accurate partial-result counts.
-- Trigger confirmation twice quickly and retry the same completed request. Confirm no duplicate Saved sessions are created and no unrelated tab closes.
-- After a successful or partial suggested Stow, confirm Saved for later, Active Tabs, and the banner refresh together. Only a result that saved at least one tab should schedule Gist synchronization.
-- Disable Saved for later suggestions, reload the service worker, and confirm observation, snooze, and suppression state is cleared. Re-enable it and confirm currently sleeping tabs begin a new conservative observed period rather than inheriting an unknown duration.
+- Trigger confirmation twice quickly and retry the same completed request. Confirm no duplicate saved windows are created and no unrelated tab closes.
+- After a successful or partial suggested Stow, confirm Saved windows, Active Tabs, and the banner refresh together. Only a result that saved at least one tab should schedule Gist synchronization.
+- Disable Saved windows suggestions, reload the service worker, and confirm observation, snooze, and suppression state is cleared. Re-enable it and confirm currently sleeping tabs begin a new conservative observed period rather than inheriting an unknown duration.

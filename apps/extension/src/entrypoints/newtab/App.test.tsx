@@ -451,7 +451,7 @@ describe('App', () => {
     ).length).toBeGreaterThan(beforePolicyClose);
   });
 
-  it('reloads Active tabs, Saved for later, and suggestions after a confirmed suggested stow', async () => {
+  it('reloads Active tabs, Saved windows, and suggestions after a confirmed suggested stow', async () => {
     mockMessages({
       activeTabs: [{ ...UNIQUE_TAB, id: 32, windowId: 8, discarded: true }],
       focusedWindowId: 8,
@@ -480,7 +480,7 @@ describe('App', () => {
     };
 
     await click(screen().getByRole('button', {
-      name: 'Save 1 for later and close original tabs',
+      name: 'Move 1 tab to Saved windows and close original tabs',
     }));
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
@@ -589,9 +589,9 @@ describe('App', () => {
     expect(container.textContent).not.toContain('Saved mail');
     expect(container.textContent).not.toContain('Saved article');
     expect(screen().getByText('1 open')).not.toBeNull();
-    expect(screen().getByText('1 session')).not.toBeNull();
+    expect(screen().getByText('1 window')).not.toBeNull();
     expect(screen().getByText('1 tab')).not.toBeNull();
-    expect(screen().getByLabelText('1 session, 1 tab')).not.toBeNull();
+    expect(screen().getByLabelText('1 window, 1 tab')).not.toBeNull();
 
     const dragHandle = screen().getByLabelText('Drag GitHub active issue') as HTMLButtonElement;
     expect(dragHandle.getAttribute('aria-disabled')).toBe('true');
@@ -600,7 +600,7 @@ describe('App', () => {
       screen().getByText('GitHub active issue').closest('button') as HTMLButtonElement,
     ).toHaveProperty('disabled', false);
     expect(
-      screen().getByLabelText('Save GitHub active issue for later') as HTMLButtonElement,
+      screen().getByLabelText('Save GitHub active issue to Saved windows') as HTMLButtonElement,
     ).toHaveProperty('disabled', false);
     expect(
       screen().getByLabelText('Close GitHub active issue') as HTMLButtonElement,
@@ -693,16 +693,16 @@ describe('App', () => {
       type: 'sessions:delete',
       sessionId: 'session-1',
     });
-    expect(screen().getByRole('status').textContent).toBe('Moved saved session to History.');
+    expect(screen().getByRole('status').textContent).toBe('Moved saved window to History.');
 
-    await click(screen().getByLabelText('Restore Session One and move to History'));
+    await click(screen().getByLabelText('Restore Session One and move the window to History'));
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'sessions:restore',
       sessionId: 'session-1',
     });
     const restoreFeedback = screen().getByRole('status');
     expect(restoreFeedback.textContent).toBe(
-      'Restored 2 tabs and moved the session to History.',
+      'Restored 2 tabs and moved the window to History.',
     );
     expectFeedbackBetweenStageRegions(restoreFeedback);
   });
@@ -748,14 +748,14 @@ describe('App', () => {
     expect(screen().getByRole('status').textContent).toBe('Moved saved tab.');
 
     const sessionTransfer = createDataTransfer();
-    await dragStart(screen().getByLabelText('Drag saved session Session Two'), sessionTransfer);
-    await drop(screen().getByLabelText('Drop saved session before Session One'), sessionTransfer);
+    await dragStart(screen().getByLabelText('Drag saved window Session Two'), sessionTransfer);
+    await drop(screen().getByLabelText('Drop saved window before Session One'), sessionTransfer);
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({
       type: 'sessions:reorder',
       orderedIds: ['session-2', 'session-1'],
     });
-    expect(screen().getByRole('status').textContent).toBe('Reordered saved sessions.');
+    expect(screen().getByRole('status').textContent).toBe('Reordered saved windows.');
     expect(sentMessageTypes().filter((type) => type === 'sessions:list').length).toBeGreaterThan(2);
   });
 
@@ -1385,15 +1385,30 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '打开的标签页' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: '稍后查看' })).not.toBeNull();
-    expect(screen().getByText('1 个会话')).not.toBeNull();
+    expect(screen().getByRole('heading', { name: '已保存的窗口' })).not.toBeNull();
+    expect(screen().getByText('1 个窗口')).not.toBeNull();
     expect(screen().getByText('1 个标签页')).not.toBeNull();
     expect(screen().getByText('已打开 1 个')).not.toBeNull();
-    expect(screen().getByLabelText('已保存的会话')).not.toBeNull();
-    expect(screen().getByLabelText('1 个会话，1 个标签页')).not.toBeNull();
+    expect(screen().getByLabelText('已保存的窗口')).not.toBeNull();
+    expect(screen().getByLabelText('1 个窗口，1 个标签页')).not.toBeNull();
     expect(screen().getByLabelText('搜索打开的标签页、已保存标签页或网页')).not.toBeNull();
     expect(screen().getByLabelText('编辑快捷链接')).not.toBeNull();
-    expect(screen().getByText('收起当前窗口')).not.toBeNull();
+    expect(screen().getByText('收起窗口')).not.toBeNull();
+    expect(screen().getByRole('button', { name: '历史记录' }).textContent).toBe('历史记录');
+
+    await click(screen().getByLabelText('将Session Two移至历史记录'));
+    expect(screen().getByRole('status').textContent).toBe('已将窗口移至历史记录。');
+
+    await click(screen().getByLabelText('恢复Session Two并将窗口移至历史记录'));
+    expect(screen().getByRole('status').textContent).toBe(
+      '已恢复 1 个标签页，并将窗口移至历史记录。',
+    );
+
+    await click(screen().getByRole('button', { name: '历史记录' }));
+    expect(screen().getByRole('dialog', { name: '历史记录' })).not.toBeNull();
+    expect(screen().getByText('历史记录为空。')).not.toBeNull();
+    await click(screen().getByRole('button', { name: '取消' }));
+
     expect(() => screen().getByRole('heading', { name: 'Quick links' })).toThrow();
     expect(() => screen().getByRole('heading', { name: 'Saved for later' })).toThrow();
     expect(container.textContent).not.toContain(' open');
@@ -1436,11 +1451,19 @@ describe('App', () => {
     expect(container.querySelector('.extra-drawer-backdrop')).toBeNull();
     expect(screen().getByRole('button', { name: 'Extra' })).not.toBeNull();
     expect(screen().getByRole('button', { name: 'Open settings' })).not.toBeNull();
-    expect(screen().getByRole('button', { name: 'Stow current window' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Stow window' })).not.toBeNull();
     expect(screen().getByText('Example')).not.toBeNull();
 
     expect(screen().getByRole('heading', { name: 'Active tabs' })).not.toBeNull();
-    expect(screen().getByRole('heading', { name: 'Saved for later' })).not.toBeNull();
+    expect(screen().getByRole('heading', { name: 'Saved windows' })).not.toBeNull();
+    const historyAction = screen().getByRole('button', { name: 'History' });
+    expect(historyAction.textContent).toBe('History');
+    expect(historyAction.querySelector('.lucide-history')).not.toBeNull();
+    expect(historyAction.querySelector('.lucide-trash-2')).toBeNull();
+    await click(historyAction);
+    expect(screen().getByRole('dialog', { name: 'History' })).not.toBeNull();
+    expect(screen().getByText('History is empty.')).not.toBeNull();
+    await click(screen().getByRole('button', { name: 'Cancel' }));
     expect(container.querySelector('.active-workspace.panel.column')).not.toBeNull();
     expect(container.querySelector('.saved-sessions.panel.column')).not.toBeNull();
     expect(container.querySelector('.meta-pill')).not.toBeNull();
@@ -2290,7 +2313,7 @@ describe('App', () => {
     });
   });
 
-  it('saves a single active tab for later from its row action', async () => {
+  it('saves a single active tab to Saved windows from its row action', async () => {
     let activeTabs = [UNIQUE_TAB];
     let sessions: TabSession[] = [];
     const savedSession: TabSession = {
@@ -2333,7 +2356,7 @@ describe('App', () => {
     await renderApp();
     expect(screen().getByText('1 open')).not.toBeNull();
 
-    const saveButton = screen().getByLabelText('Save Spec draft for later');
+    const saveButton = screen().getByLabelText('Save Spec draft to Saved windows');
     await act(async () => {
       saveButton.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     });
@@ -2395,7 +2418,9 @@ describe('App', () => {
       'chrome-extension://tabstow-test/_favicon/?pageUrl=https%3A%2F%2Fdocs.example.com%2Fpath&size=32',
     );
     expect(
-      screen().getByRole('button', { name: 'Restore 2 tabs stowed and move to History' }),
+      screen().getByRole('button', {
+        name: 'Restore 2 tabs stowed and move the window to History',
+      }),
     ).not.toBeNull();
     const savedTabButton = screen().getByLabelText('Open Example Docs');
     expect(savedTabButton.tagName).toBe('DIV');
@@ -2581,7 +2606,7 @@ describe('App', () => {
     await renderApp();
     expect(screen().getByText('1 open')).not.toBeNull();
 
-    await click(screen().getByText('Stow current window'));
+    await click(screen().getByText('Stow window'));
 
     expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
     expect(screen().getByText('0 open')).not.toBeNull();
@@ -2614,9 +2639,9 @@ describe('App', () => {
     });
 
     await renderApp();
-    await click(screen().getByText('Stow current window'));
+    await click(screen().getByText('Stow window'));
 
-    expect(() => screen().getByText('Stow this window')).toThrow();
+    expect(() => screen().getByText('Stow window')).toThrow();
     expectChromeControlsAbsent();
 
     pendingStow.resolve({
@@ -2667,7 +2692,7 @@ describe('App', () => {
     });
 
     await renderApp();
-    const stowButton = screen().getByText('Stow current window');
+    const stowButton = screen().getByText('Stow window');
 
     await act(async () => {
       stowButton.dispatchEvent(new MouseEvent('click', { bubbles: true }));
@@ -2723,7 +2748,7 @@ describe('App', () => {
     });
 
     await renderApp();
-    await click(screen().getByText('Stow current window'));
+    await click(screen().getByText('Stow window'));
 
     secondRefresh.resolve({ ok: true, data: activeTabsSnapshot([]) });
     await act(async () => {
@@ -2983,6 +3008,10 @@ function mockMessages({
 
     if (message.type === 'sessions:list') {
       return { ok: true, data: sessions };
+    }
+
+    if (message.type === 'history:list') {
+      return { ok: true, data: [] };
     }
 
     if (message.type === 'tab-lifecycle:list-suggestions') {

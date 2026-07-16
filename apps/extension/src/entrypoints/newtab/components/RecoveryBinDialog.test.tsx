@@ -10,6 +10,7 @@ vi.mock('@/lib/messages', () => ({ sendExtensionMessage }));
 
 describe('RecoveryBinDialog', () => {
   it('sorts History newest-first, limits the preview to five, and restores complete entries', async () => {
+    sendExtensionMessage.mockReset();
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
       value: { runtime: { getURL: (path: string) => `chrome-extension://test${path}` } },
@@ -37,6 +38,13 @@ describe('RecoveryBinDialog', () => {
 
     await act(async () => root.render(<RecoveryBinDialog locale="en" onClose={() => undefined} onRestored={onRestored} />));
 
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
+    const titleId = dialog.getAttribute('aria-labelledby')!;
+    expect(document.getElementById(titleId)?.textContent).toBe('History');
+    expect(dialog.textContent).not.toContain('Recovery Bin');
+    const fullHistory = dialog.querySelector<HTMLAnchorElement>('.recovery-history-link')!;
+    expect(fullHistory.textContent).toContain('View full History');
+    expect(fullHistory.href).toBe('chrome-extension://test/saved-history.html');
     expect(document.body.querySelectorAll('.recovery-entry')).toHaveLength(5);
     expect(document.body.querySelector('.recovery-entry strong')?.textContent).toBe('Session 5');
     expect(document.body.querySelector<HTMLImageElement>('.recovery-entry img.saved-tab-favicon')?.src).toContain(
@@ -46,6 +54,35 @@ describe('RecoveryBinDialog', () => {
     await act(async () => restore.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:restore', historyId: 'history-5' });
     expect(onRestored).toHaveBeenCalledTimes(1);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it('uses the same History vocabulary in Simplified Chinese', async () => {
+    sendExtensionMessage.mockReset().mockResolvedValue({ ok: true, data: [] });
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: { runtime: { getURL: (path: string) => `chrome-extension://test${path}` } },
+    });
+    const container = document.createElement('div');
+    container.id = 'root';
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <RecoveryBinDialog
+        locale="zh-CN"
+        onClose={() => undefined}
+        onRestored={() => undefined}
+      />,
+    ));
+
+    const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
+    const titleId = dialog.getAttribute('aria-labelledby')!;
+    expect(document.getElementById(titleId)?.textContent).toBe('历史记录');
+    expect(dialog.textContent).not.toContain('临时找回');
+    expect(dialog.querySelector('.recovery-history-link')?.textContent).toContain('查看完整历史记录');
 
     await act(async () => root.unmount());
     container.remove();

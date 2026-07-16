@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const browserMocks = vi.hoisted(() => ({
+  i18n: {
+    getUILanguage: vi.fn(() => 'en-US'),
+  },
   contextMenus: {
     create: vi.fn(),
     removeAll: vi.fn(),
@@ -25,7 +28,31 @@ vi.mock('@/lib/browser', () => ({
 vi.mock('@/features/tabs/session-service', () => sessionServiceMocks);
 vi.mock('@/features/sync/sync-coordinator', () => coordinatorMocks);
 
-import { registerContextMenuClickHandler } from './context-menu';
+import { registerContextMenu, registerContextMenuClickHandler } from './context-menu';
+
+describe('context menu registration', () => {
+  it('uses the product Stow window vocabulary', async () => {
+    await registerContextMenu();
+
+    expect(browserMocks.contextMenus.create).toHaveBeenCalledWith({
+      id: 'tabstow-stow-current-window',
+      title: 'Stow window',
+      contexts: ['page'],
+    });
+  });
+
+  it('uses the Chinese product vocabulary in a Chinese Chrome UI', async () => {
+    browserMocks.i18n.getUILanguage.mockReturnValueOnce('zh-CN');
+
+    await registerContextMenu();
+
+    expect(browserMocks.contextMenus.create).toHaveBeenCalledWith({
+      id: 'tabstow-stow-current-window',
+      title: '收起窗口',
+      contexts: ['page'],
+    });
+  });
+});
 
 describe('context menu click handler', () => {
   beforeEach(() => {

@@ -78,12 +78,12 @@ describe('TabLifecycleReviewDialog', () => {
     );
     expect(groups[1]?.querySelector('h3')?.textContent).toBe('Window 2');
     expect(getCheckboxes().every((checkbox) => checkbox.checked)).toBe(true);
-    expect(document.body.textContent).toContain('3 tabs selected · 2 sessions will be created.');
-    expect(getButton('Save 3 for later and close original tabs').disabled).toBe(false);
+    expect(document.body.textContent).toContain('3 tabs selected · 2 windows will be created.');
+    expect(getButton('Move 3 tabs to Saved windows and close original tabs').disabled).toBe(false);
 
     await click(getButton('Clear all'));
     expect(getCheckboxes().every((checkbox) => !checkbox.checked)).toBe(true);
-    expect(getButton('Save 0 for later and close original tabs').disabled).toBe(true);
+    expect(getButton('Move 0 tabs to Saved windows and close original tabs').disabled).toBe(true);
 
     await click(getButton('Select all'));
     expect(getCheckboxes().every((checkbox) => checkbox.checked)).toBe(true);
@@ -158,7 +158,7 @@ describe('TabLifecycleReviewDialog', () => {
     const onStowed = vi.fn(() => Promise.resolve());
     await renderDialog({ onClose, onStowed });
 
-    await act(async () => getButton('Save 3 for later and close original tabs').click());
+    await act(async () => getButton('Move 3 tabs to Saved windows and close original tabs').click());
     expect(sendExtensionMessage).toHaveBeenLastCalledWith({
       type: 'tab-lifecycle:stow-suggestions',
       observationIds: [
@@ -179,9 +179,9 @@ describe('TabLifecycleReviewDialog', () => {
     expect(document.body.textContent).toContain('Tabs could not be saved. Nothing was closed.');
     expect(getCheckboxes()).toHaveLength(3);
 
-    await click(getButton('Save 3 for later and close original tabs'));
+    await click(getButton('Move 3 tabs to Saved windows and close original tabs'));
     expect(document.body.textContent).toContain(
-      'Saved 2 tabs in 2 sessions; closed 0 original tabs, skipped 1 tab, and 2 original tabs could not be closed.',
+      'Saved 2 tabs in 2 windows; closed 0 original tabs, skipped 1 tab, and 2 original tabs could not be closed.',
     );
     expect(onStowed).toHaveBeenCalledTimes(1);
     expect(getCheckboxes()).toHaveLength(0);
@@ -201,11 +201,11 @@ describe('TabLifecycleReviewDialog', () => {
     const onStowed = vi.fn(() => Promise.reject(new Error('Refresh failed.')));
     await renderDialog({ initialCandidates: [CANDIDATES[0]!], onStowed });
 
-    expect(document.body.textContent).toContain('1 tab selected · 1 session will be created.');
-    await click(getButton('Save 1 for later and close original tabs'));
+    expect(document.body.textContent).toContain('1 tab selected · 1 window will be created.');
+    await click(getButton('Move 1 tab to Saved windows and close original tabs'));
 
     expect(document.body.textContent).toContain(
-      'Saved 1 tab in 1 session and closed 1 original tab.',
+      'Saved 1 tab in 1 window and closed 1 original tab.',
     );
     expect(onStowed).toHaveBeenCalledTimes(1);
     expect(getButtons('Cancel').every((button) => !button.disabled)).toBe(true);
@@ -220,7 +220,7 @@ describe('TabLifecycleReviewDialog', () => {
 
     expect(document.body.textContent).toContain('查看长期休眠的标签页');
     expect(getButton('全选')).toBeTruthy();
-    await click(getButton('保存 1 个到“稍后查看”并关闭原标签页'));
+    await click(getButton('将 1 个标签页移至“已保存的窗口”并关闭原标签页'));
     expect(document.body.textContent).toContain('无法保存标签页，且没有关闭任何原标签页。');
     expect(document.body.textContent).toContain('Database rejected the transaction.');
   });

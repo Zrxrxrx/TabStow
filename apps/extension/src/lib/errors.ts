@@ -43,7 +43,7 @@ export function toErrorMessage(error: unknown): string {
 export function toKnownStorageError(error: unknown): AppResult<never> | null {
   const message = toErrorMessage(error);
   if (message.startsWith('Session not found:')) {
-    return err('session-not-found', 'Saved session was not found.');
+    return err('session-not-found', 'Saved window was not found.');
   }
   if (message.startsWith('Saved tab not found:')) {
     return err('saved-tab-not-found', 'Saved tab was not found.');

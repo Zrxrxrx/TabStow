@@ -209,7 +209,13 @@ export function TabLifecycleReviewDialog({
           >
             {stowing
               ? t(locale, 'lifecycleSavingSafely')
-              : t(locale, 'lifecycleConfirmStow', { count: selectedCandidates.length })}
+              : t(locale, 'lifecycleConfirmStow', {
+                  count: t(
+                    locale,
+                    selectedCandidates.length === 1 ? 'savedTabCount' : 'savedTabsCount',
+                    { count: selectedCandidates.length },
+                  ),
+                })}
           </button>
         </>
       }

@@ -1,5 +1,6 @@
-import { saveCurrentWindowAsSession } from '@/features/tabs/session-service';
+import { resolveLocale, t } from '@/features/i18n/i18n';
 import { noteSynchronizedMutation } from '@/features/sync/sync-coordinator';
+import { saveCurrentWindowAsSession } from '@/features/tabs/session-service';
 import { browser } from '@/lib/browser';
 
 const STOW_CURRENT_WINDOW_MENU_ID = 'tabstow-stow-current-window';
@@ -8,7 +9,7 @@ export async function registerContextMenu(): Promise<void> {
   await browser.contextMenus.removeAll();
   browser.contextMenus.create({
     id: STOW_CURRENT_WINDOW_MENU_ID,
-    title: 'Stow current window tabs',
+    title: t(resolveLocale('auto', browser.i18n.getUILanguage()), 'stowCurrentWindow'),
     contexts: ['page'],
   });
 }

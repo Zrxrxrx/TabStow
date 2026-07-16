@@ -185,7 +185,7 @@ async function routeMessage(
         return saveTabsAsSession([message.tabId]);
       case 'sessions:open-tab':
         if (!hasId(message.sessionId)) {
-          return err('session-not-found', 'Saved session was not found.');
+          return err('session-not-found', 'Saved window was not found.');
         }
         if (!hasId(message.tabId)) {
           return err('saved-tab-not-found', 'Saved tab was not found.');
@@ -196,12 +196,12 @@ async function routeMessage(
         return openSavedTab(message.sessionId, message.tabId, message.consume);
       case 'sessions:restore':
         if (!hasId(message.sessionId)) {
-          return err('session-not-found', 'Saved session was not found.');
+          return err('session-not-found', 'Saved window was not found.');
         }
         return restoreSession(message.sessionId);
       case 'sessions:delete-tab':
         if (!hasId(message.sessionId)) {
-          return err('session-not-found', 'Saved session was not found.');
+          return err('session-not-found', 'Saved window was not found.');
         }
         if (!hasId(message.tabId)) {
           return err('saved-tab-not-found', 'Saved tab was not found.');
@@ -210,7 +210,7 @@ async function routeMessage(
         return ok({ deleted: true });
       case 'sessions:delete':
         if (!hasId(message.sessionId)) {
-          return err('session-not-found', 'Saved session was not found.');
+          return err('session-not-found', 'Saved window was not found.');
         }
         await moveSessionToHistory(message.sessionId, 'deleted');
         return ok({ deleted: true });
