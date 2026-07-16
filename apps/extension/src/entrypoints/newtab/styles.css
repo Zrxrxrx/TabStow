@@ -52,7 +52,7 @@ body {
   color: var(--text-color);
   margin: 0;
   min-width: 320px;
-  min-height: 100vh;
+  min-height: 100dvh;
   font-size: 15px;
   line-height: 1.55;
   -webkit-font-smoothing: antialiased;
@@ -923,7 +923,7 @@ h3 {
 
 .form-dialog {
   width: min(100%, 430px);
-  max-height: min(720px, calc(100vh - 32px));
+  max-height: min(720px, calc(100dvh - 32px));
   overflow: auto;
   display: grid;
   gap: 14px;
@@ -1139,7 +1139,7 @@ svg {
 
 .newtab-shell {
   width: 100%;
-  height: 100vh;
+  height: 100dvh;
 }
 
 .quick-links-rail {
@@ -1310,7 +1310,7 @@ svg {
   width: 100%;
   min-width: 0;
   min-height: 0;
-  height: 100vh;
+  height: 100dvh;
   display: grid;
   grid-template-areas:
     "primary top"
@@ -1724,7 +1724,7 @@ svg {
 
 .modal-dialog {
   width: min(100%, 520px);
-  max-height: min(760px, calc(100vh - 60px));
+  max-height: min(760px, calc(100dvh - 60px));
   overflow: auto;
   display: grid;
   gap: 14px;
@@ -1965,6 +1965,139 @@ svg {
 
   .active-window-list {
     grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 1023px) {
+  html,
+  body,
+  #root {
+    min-width: 320px;
+    height: auto;
+    min-height: 100dvh;
+    overflow: visible;
+  }
+
+  .newtab-shell,
+  .newtab-stage {
+    height: auto;
+    min-height: 100dvh;
+  }
+
+  .newtab-stage {
+    align-items: start;
+    grid-template-areas:
+      "primary top"
+      "primary feedback"
+      "primary workspace"
+      "auxiliary .";
+    grid-template-columns: 132px minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto;
+  }
+
+  .quick-links-rail {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    height: 100dvh;
+    max-height: 100dvh;
+    margin-block-end: -100dvh;
+  }
+
+  .rail-links-scroll {
+    flex: 1 1 auto;
+  }
+
+  .top-strip {
+    position: sticky;
+    top: 0;
+    align-self: start;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .top-strip-controls {
+    grid-template-columns: 44px 44px minmax(120px, 1fr) minmax(170px, 205px);
+  }
+
+  .v2-workspace {
+    grid-template-rows: auto;
+    overflow: visible;
+  }
+
+  .v2-workspace-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .active-region,
+  .saved-region {
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  .active-region {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .active-region > .panel,
+  .saved-region > .panel {
+    min-height: 0;
+  }
+
+  .newtab-feedback {
+    width: min(420px, calc(100% - 36px));
+  }
+}
+
+@media (max-width: 767px) {
+  .newtab-stage {
+    grid-template-areas:
+      "top"
+      "primary"
+      "feedback"
+      "workspace"
+      "auxiliary";
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto;
+  }
+
+  .top-strip,
+  .quick-links-rail {
+    position: relative;
+    top: auto;
+    height: auto;
+    max-height: none;
+    margin-block-end: 0;
+  }
+
+  .top-strip-controls {
+    grid-template-columns: 44px 44px minmax(0, 1fr);
+  }
+
+  .top-strip .stow-current-button {
+    grid-column: 1 / -1;
+  }
+
+  .quick-links-rail {
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .rail-links-scroll {
+    flex: none;
+    overflow: visible;
+    overscroll-behavior: auto;
+  }
+
+  .rail-utilities {
+    border-top: 1px solid var(--border);
+    border-right: 0;
+  }
+
+  .newtab-feedback {
+    width: auto;
+    max-width: none;
+    margin-inline: 12px;
   }
 }
 

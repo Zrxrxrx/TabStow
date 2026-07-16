@@ -33,6 +33,14 @@ const UI_AUDIT_METRICS = [
   'lowerModalInert',
   'topModalInteractive',
   'focusInTopModal',
+  'responsiveLayoutMode',
+  'scrollOwnershipFailures',
+  'lastItemReachabilityFailures',
+  'lastItemsChecked',
+  'dialogViewportOverflowPx',
+  'railViewportOverflowPx',
+  'topStripViewportOverflowPx',
+  'requiredControlVisibilityFailures',
 ] as const;
 
 const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
@@ -54,6 +62,13 @@ const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
   'lowerModalInert',
   'topModalInteractive',
   'focusInTopModal',
+  'scrollOwnershipFailures',
+  'lastItemReachabilityFailures',
+  'lastItemsChecked',
+  'dialogViewportOverflowPx',
+  'railViewportOverflowPx',
+  'topStripViewportOverflowPx',
+  'requiredControlVisibilityFailures',
 ]);
 
 const UI_AUDIT_FEEDBACK_FIXTURES = [
@@ -65,10 +80,17 @@ const UI_AUDIT_FEEDBACK_FIXTURES = [
 
 const UI_AUDIT_INTERACTION_FIXTURES = ['finding-006'] as const;
 
+const UI_AUDIT_LAYOUT_FIXTURES = [
+  'finding-001-empty',
+  'finding-001-populated',
+  'finding-001-long',
+] as const;
+
 export type UiAuditMetric = typeof UI_AUDIT_METRICS[number];
 export type UiAuditOperator = 'atMost' | 'atLeast' | 'equals';
 export type UiAuditFeedbackFixture = typeof UI_AUDIT_FEEDBACK_FIXTURES[number];
 export type UiAuditInteractionFixture = typeof UI_AUDIT_INTERACTION_FIXTURES[number];
+export type UiAuditLayoutFixture = typeof UI_AUDIT_LAYOUT_FIXTURES[number];
 
 export type UiAuditAssertion = {
   metric: UiAuditMetric;
@@ -86,6 +108,7 @@ export type UiAuditCase = {
   locale: 'en' | 'zh-CN';
   feedbackFixture?: UiAuditFeedbackFixture;
   interactionFixture?: UiAuditInteractionFixture;
+  layoutFixture?: UiAuditLayoutFixture;
   setup: string[];
   cleanup: string[];
   screenshot: string;
@@ -216,6 +239,10 @@ export function validateUiAuditManifest(input: unknown): UiAuditManifest {
         candidate.interactionFixture as UiAuditInteractionFixture,
       )) {
       throw new Error(`${field}.interactionFixture is unsupported`);
+    }
+    if (candidate.layoutFixture !== undefined
+      && !UI_AUDIT_LAYOUT_FIXTURES.includes(candidate.layoutFixture as UiAuditLayoutFixture)) {
+      throw new Error(`${field}.layoutFixture is unsupported`);
     }
     validateInstructions(candidate.setup, `${field}.setup`);
     validateInstructions(candidate.cleanup, `${field}.cleanup`);
