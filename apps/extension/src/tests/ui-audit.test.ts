@@ -77,6 +77,29 @@ const interactionManifestInput = {
   }],
 };
 
+const responsiveManifestInput = {
+  ...manifestInput,
+  cases: [{
+    ...manifestInput.cases[0],
+    id: 'FINDING-001',
+    description: 'Narrow New Tab content reflows into one reachable document flow',
+    viewport: { width: 390, height: 844 },
+    layoutFixture: 'finding-001-long',
+    screenshot: 'FINDING-001.png',
+    assertions: [
+      { metric: 'horizontalOverflowPx', operator: 'atMost', value: 0 },
+      { metric: 'responsiveLayoutMode', operator: 'equals', value: 'single-flow' },
+      { metric: 'scrollOwnershipFailures', operator: 'equals', value: 0 },
+      { metric: 'lastItemReachabilityFailures', operator: 'equals', value: 0 },
+      { metric: 'lastItemsChecked', operator: 'equals', value: 3 },
+      { metric: 'dialogViewportOverflowPx', operator: 'atMost', value: 0 },
+      { metric: 'railViewportOverflowPx', operator: 'atMost', value: 0 },
+      { metric: 'topStripViewportOverflowPx', operator: 'atMost', value: 0 },
+      { metric: 'requiredControlVisibilityFailures', operator: 'equals', value: 0 },
+    ],
+  }],
+};
+
 describe('UI audit command', () => {
   it('parses a named case and deterministic output settings', () => {
     expect(parseUiAuditArguments([
@@ -146,6 +169,10 @@ describe('UI audit manifest', () => {
     expect(validateUiAuditManifest(interactionManifestInput)).toEqual(interactionManifestInput);
   });
 
+  it('accepts the focused FINDING-001 responsive layout fixture', () => {
+    expect(validateUiAuditManifest(responsiveManifestInput)).toEqual(responsiveManifestInput);
+  });
+
   it('keeps the checked-in case manifest valid', () => {
     const checkedInManifest = JSON.parse(readFileSync(
       new URL('../../scripts/ui-audit-cases.json', import.meta.url),
@@ -159,7 +186,27 @@ describe('UI audit manifest', () => {
       'FINDING-004',
       'FINDING-006-DESKTOP',
       'FINDING-006',
+      'FINDING-001-DESKTOP',
+      'FINDING-001-1024',
+      'FINDING-001-768',
+      'FINDING-001',
+      'FINDING-001-ZOOM',
     ]);
+  });
+
+  it('checks long collection reachability at 390 pixels', () => {
+    const checkedInManifest = validateUiAuditManifest(JSON.parse(readFileSync(
+      new URL('../../scripts/ui-audit-cases.json', import.meta.url),
+      'utf8',
+    )));
+    const narrowCase = checkedInManifest.cases.find(({ id }) => id === 'FINDING-001');
+
+    expect(narrowCase).toMatchObject({
+      layoutFixture: 'finding-001-long',
+      assertions: expect.arrayContaining([
+        { metric: 'lastItemsChecked', operator: 'equals', value: 3 },
+      ]),
+    });
   });
 
   it('rejects a case name that is absent from the manifest', () => {
@@ -182,6 +229,14 @@ describe('UI audit manifest', () => {
     invalidManifest.cases[0]!.interactionFixture = 'custom-actions';
     expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
       'interactionFixture is unsupported',
+    );
+  });
+
+  it('rejects an unknown responsive layout fixture', () => {
+    const invalidManifest = structuredClone(responsiveManifestInput);
+    invalidManifest.cases[0]!.layoutFixture = 'custom-layout';
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'layoutFixture is unsupported',
     );
   });
 
@@ -225,6 +280,14 @@ describe('UI audit assertions', () => {
       lowerModalInert: 0,
       topModalInteractive: 0,
       focusInTopModal: 0,
+      responsiveLayoutMode: '',
+      scrollOwnershipFailures: 0,
+      lastItemReachabilityFailures: 0,
+      lastItemsChecked: 0,
+      dialogViewportOverflowPx: 0,
+      railViewportOverflowPx: 0,
+      topStripViewportOverflowPx: 0,
+      requiredControlVisibilityFailures: 0,
     }, []);
 
     expect(result.passed).toBe(false);
@@ -262,6 +325,14 @@ describe('UI audit assertions', () => {
       lowerModalInert: 0,
       topModalInteractive: 0,
       focusInTopModal: 0,
+      responsiveLayoutMode: '',
+      scrollOwnershipFailures: 0,
+      lastItemReachabilityFailures: 0,
+      lastItemsChecked: 0,
+      dialogViewportOverflowPx: 0,
+      railViewportOverflowPx: 0,
+      topStripViewportOverflowPx: 0,
+      requiredControlVisibilityFailures: 0,
     }, ['Unhandled exception']);
 
     expect(result.assertions.every((assertion) => assertion.passed)).toBe(true);

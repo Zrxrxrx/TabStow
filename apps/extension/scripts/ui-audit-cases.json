@@ -406,6 +406,162 @@
           "value": 1
         }
       ]
+    },
+    {
+      "id": "FINDING-001-DESKTOP",
+      "description": "Long New Tab collections retain independent region scrolling at the desktop width",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "layoutFixture": "finding-001-long",
+      "setup": [
+        "Insert audit-only long collection rows after the production New Tab renders to exercise the real scroll containers."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-001-DESKTOP.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "responsiveLayoutMode", "operator": "equals", "value": "fixed" },
+        { "metric": "scrollOwnershipFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemReachabilityFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemsChecked", "operator": "equals", "value": 3 },
+        { "metric": "dialogViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "railViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "requiredControlVisibilityFailures", "operator": "equals", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-001-1024",
+      "description": "Representative New Tab collections retain the fixed shell at the desktop boundary",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1024,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "dark",
+      "locale": "zh-CN",
+      "layoutFixture": "finding-001-populated",
+      "setup": [
+        "Insert audit-only representative collection rows after the production New Tab renders and select the requested production theme and language controls."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-001-1024.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "responsiveLayoutMode", "operator": "equals", "value": "fixed" },
+        { "metric": "themeMode", "operator": "equals", "value": "dark" },
+        { "metric": "locale", "operator": "equals", "value": "zh-CN" },
+        { "metric": "scrollOwnershipFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemReachabilityFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemsChecked", "operator": "equals", "value": 3 },
+        { "metric": "dialogViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "railViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "requiredControlVisibilityFailures", "operator": "equals", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-001-768",
+      "description": "Long New Tab collections use a sticky rail and document-owned stacked workspace scrolling",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 768,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "layoutFixture": "finding-001-long",
+      "setup": [
+        "Insert audit-only long collection rows after the production New Tab renders to exercise tablet rail and document scroll ownership."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-001-768.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "responsiveLayoutMode", "operator": "equals", "value": "sticky-rail" },
+        { "metric": "scrollOwnershipFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemReachabilityFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemsChecked", "operator": "equals", "value": 3 },
+        { "metric": "dialogViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "railViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "topStripViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "requiredControlVisibilityFailures", "operator": "equals", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-001",
+      "description": "Long narrow New Tab collections use one reachable document flow without hiding controls",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 390,
+        "height": 844
+      },
+      "zoom": 1,
+      "theme": "dark",
+      "locale": "zh-CN",
+      "layoutFixture": "finding-001-long",
+      "setup": [
+        "Insert audit-only long collection rows after the production New Tab renders and select the requested production theme and language controls."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-001.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "responsiveLayoutMode", "operator": "equals", "value": "single-flow" },
+        { "metric": "themeMode", "operator": "equals", "value": "dark" },
+        { "metric": "locale", "operator": "equals", "value": "zh-CN" },
+        { "metric": "scrollOwnershipFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemReachabilityFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemsChecked", "operator": "equals", "value": 3 },
+        { "metric": "dialogViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "railViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "requiredControlVisibilityFailures", "operator": "equals", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-001-ZOOM",
+      "description": "A 200 percent zoomed New Tab uses the effective narrow viewport and keeps long content reachable",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1024,
+        "height": 900
+      },
+      "zoom": 2,
+      "theme": "light",
+      "locale": "en",
+      "layoutFixture": "finding-001-long",
+      "setup": [
+        "Set the production extension tab to 200 percent zoom and insert audit-only long collection rows after the New Tab renders."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-001-ZOOM.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "responsiveLayoutMode", "operator": "equals", "value": "single-flow" },
+        { "metric": "zoom", "operator": "equals", "value": 2 },
+        { "metric": "scrollOwnershipFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemReachabilityFailures", "operator": "equals", "value": 0 },
+        { "metric": "lastItemsChecked", "operator": "equals", "value": 3 },
+        { "metric": "dialogViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "railViewportOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "requiredControlVisibilityFailures", "operator": "equals", "value": 0 }
+      ]
     }
   ]
 }

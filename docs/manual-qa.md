@@ -67,11 +67,29 @@ bun run audit:ui -- --port 9333 --case FINDING-006 --output .artifacts/ui-audit/
 
 Both cases use real CDP Tab input and production controls. They record the complete focus trace, exercise Quick Link modal focus containment and restoration, then leave Extra with its nested Add todo form open for evidence. Require the compressed region order `top|quick-links|active|saved|auxiliary`, a complete Tab sequence, zero Quick Link modal isolation failures, two body-level modal portals, an inert application root and lower backdrop, and focus inside the interactive top modal. The 768px case does not assert horizontal overflow; responsive reflow is covered separately by FINDING-001.
 
+### FINDING-001 responsive New Tab reflow
+
+Run the fixed responsive matrix against the same clean production build:
+
+```bash
+bun run audit:ui -- --port 9333 --case FINDING-001-DESKTOP --output .artifacts/ui-audit/<commit>/FINDING-001-DESKTOP
+bun run audit:ui -- --port 9333 --case FINDING-001-1024 --output .artifacts/ui-audit/<commit>/FINDING-001-1024
+bun run audit:ui -- --port 9333 --case FINDING-001-768 --output .artifacts/ui-audit/<commit>/FINDING-001-768
+bun run audit:ui -- --port 9333 --case FINDING-001 --output .artifacts/ui-audit/<commit>/FINDING-001
+bun run audit:ui -- --port 9333 --case FINDING-001-ZOOM --output .artifacts/ui-audit/<commit>/FINDING-001-ZOOM
+```
+
+The cases cover `1440@100%`, `1024@100%`, `768@100%`, `390@100%`, and `1024@200%`. They apply the requested production zoom, theme, and language, then use focused audit-only empty, representative, or long collection rows to isolate the production scroll geometry. Require zero horizontal document overflow, the expected fixed/sticky-rail/single-flow scroll ownership, visible and reachable language, theme, sync, Stow, Extra, and Settings controls, viewport-bounded Quick Link dialogs, and reachability of the final Quick Link, Active Tab, and Saved Tab in populated and long states.
+
+At 1024 pixels and wider, Quick Links, Active Tabs, and Saved for Later retain independent scrolling. From 768 through 1023 pixels, the rail remains viewport-height while the document scrolls stacked Active and Saved regions. Below 768 pixels and at the effective viewport produced by 200% zoom, every region uses one document flow. Internal horizontal scrolling in the window filter remains allowed; the document itself must not scroll horizontally.
+
+Repeat empty, representative, and long collections in light/dark and English/Simplified Chinese. During the long-state pass, drag within Quick Links, Active Tabs, and Saved for Later toward the current scroll edge and confirm Chromium auto-scroll continues without changing existing drag semantics.
+
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
 - Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved for Later region.
 - At 1440px, 1180px, and 1024px widths, confirm all three regions remain visible, the page has no horizontal overflow, and Active/Saved scroll independently.
 - Repeat the width matrix in light/dark mode and English/Simplified Chinese. Confirm the saved theme is applied before content appears and no light-mode flash occurs.
-- Verify empty, typical, and long Quick Link/Active/Saved collections. Rail branding and utility controls stay fixed while the Quick Link list scrolls.
+- Verify empty, typical, and long Quick Link/Active/Saved collections. At desktop widths, rail branding and utility controls stay fixed while the Quick Link list scrolls. At tablet widths, the Quick Links rail stays sticky and auxiliary controls remain reachable at the end of the document. Below 768px, every region remains reachable in document flow.
 - Click the extension toolbar icon and confirm the current window's eligible tabs are stowed and no popup opens.
 - Open several ordinary web tabs and use **Stow current window**.
 - Open two normal Chrome windows with pinned, ungrouped, and natively grouped web tabs.
@@ -83,7 +101,7 @@ Both cases use real CDP Tab input and production controls. They record the compl
 - Reload Tabstow and confirm no local URL/manual grouping or stale local order returns.
 - Confirm Active, Saved, Recovery, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails. Explicit Quick Link emoji and uploaded images remain intact.
 - Confirm only Chrome tabs with `audible === true` show Audible and only tabs with `discarded === true` show Sleeping. Sleep and policy controls must not send discard/wake mutations.
-- Use the All/current/other-window filters and confirm real counts, horizontal overflow for many windows, and no change to Chrome-owned tab order.
+- Use the All/current/other-window filters and confirm real counts, internal horizontal scrolling for many windows without document overflow, and no change to Chrome-owned tab order.
 - Close one tab, close a group, and close duplicates.
 - Add and open a quick link.
 - Enter Quick Link Edit mode, add/edit/upload/remove links, and drag the full row before another link or to the end. Confirm ordinary mode opens links and offers no reorder buttons.

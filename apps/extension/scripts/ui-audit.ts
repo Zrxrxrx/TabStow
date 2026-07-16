@@ -25,6 +25,7 @@ import {
   type UiAuditBuildEntry,
   type UiAuditExtensionManifest,
   type UiAuditFeedbackFixture,
+  type UiAuditLayoutFixture,
   type UiAuditMetrics,
 } from './ui-audit-core';
 
@@ -69,6 +70,26 @@ type Finding006Interaction = {
   focusInTopModal: number;
   trace: Array<Record<string, unknown>>;
 };
+
+type ResponsiveLayoutMode = '' | 'fixed' | 'sticky-rail' | 'single-flow' | 'unknown';
+
+type Finding001Controls = {
+  dialogViewportOverflowPx: number;
+  requiredControlVisibilityFailures: number;
+  trace: Array<Record<string, unknown>>;
+};
+
+type Finding001Scroll = {
+  responsiveLayoutMode: ResponsiveLayoutMode;
+  scrollOwnershipFailures: number;
+  lastItemReachabilityFailures: number;
+  lastItemsChecked: number;
+  railViewportOverflowPx: number;
+  topStripViewportOverflowPx: number;
+  trace: Array<Record<string, unknown>>;
+};
+
+type Finding001Layout = Finding001Controls & Finding001Scroll;
 
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(scriptDirectory, '..');
@@ -287,6 +308,64 @@ async function waitForDomQuiet(cdp: CdpConnection, sessionId: string): Promise<v
     })
   ))()`);
   if (result.timedOut) throw new Error('Extension page did not reach a quiet DOM state');
+}
+
+async function applyRequestedEnvironment(
+  cdp: CdpConnection,
+  sessionId: string,
+  requested: { locale: 'en' | 'zh-CN'; theme: 'light' | 'dark'; zoom: number },
+): Promise<void> {
+  await evaluate(cdp, sessionId, String.raw`(async () => {
+    const tab = await chrome.tabs.getCurrent();
+    if (tab?.id == null) throw new Error('UI audit could not resolve its extension tab');
+    const requestedZoom = ${JSON.stringify(requested.zoom)};
+    if (Math.abs((await chrome.tabs.getZoom(tab.id)) - requestedZoom) > 0.001) {
+      await chrome.tabs.setZoom(tab.id, requestedZoom);
+    }
+    return true;
+  })()`);
+
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    const state = await evaluate<{
+      locale: string;
+      theme: string;
+      zoom: number;
+    }>(cdp, sessionId, String.raw`(async () => {
+      const tab = await chrome.tabs.getCurrent();
+      return {
+        locale: document.documentElement.lang,
+        theme: document.documentElement.dataset.themeMode ?? '',
+        zoom: tab?.id == null ? Number.NaN : await chrome.tabs.getZoom(tab.id),
+      };
+    })()`);
+    if (state.locale === requested.locale
+      && state.theme === requested.theme
+      && Math.abs(state.zoom - requested.zoom) <= 0.001) {
+      return;
+    }
+
+    await evaluate(cdp, sessionId, String.raw`(() => {
+      const requestedLocale = ${JSON.stringify(requested.locale)};
+      const requestedTheme = ${JSON.stringify(requested.theme)};
+      const controls = [...document.querySelectorAll('.top-strip-control')];
+      if (document.documentElement.lang !== requestedLocale) {
+        if (!(controls[0] instanceof HTMLButtonElement)) {
+          throw new Error('UI audit could not find the language control');
+        }
+        controls[0].click();
+      }
+      if (document.documentElement.dataset.themeMode !== requestedTheme) {
+        if (!(controls[1] instanceof HTMLButtonElement)) {
+          throw new Error('UI audit could not find the theme control');
+        }
+        controls[1].click();
+      }
+      return true;
+    })()`);
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  throw new Error('Extension did not apply the requested zoom, theme, and locale');
 }
 
 async function dispatchKey(
@@ -516,6 +595,372 @@ async function runFinding006Interaction(
   };
 }
 
+async function auditFinding001Controls(
+  cdp: CdpConnection,
+  sessionId: string,
+): Promise<Finding001Controls> {
+  return evaluate<Finding001Controls>(cdp, sessionId, String.raw`(async () => {
+    const settle = () => new Promise((resolvePromise) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolvePromise(true)));
+    });
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      return element.getClientRects().length > 0
+        && style.display !== 'none'
+        && style.visibility !== 'hidden';
+    };
+    const requiredControls = [
+      ['search', '.top-strip .dashboard-search input', 1],
+      ['language-theme', '.top-strip-control', 2],
+      ['sync', '.top-strip .newtab-sync-status', 1],
+      ['stow', '.top-strip .stow-current-button', 1],
+      ['utilities', '.rail-utilities .rail-utility-button', 2],
+    ];
+    const checks = requiredControls.map(([name, selector, expectedCount]) => {
+      const elements = [...document.querySelectorAll(selector)];
+      const visibleCount = elements.filter(visible).length;
+      return { name, expectedCount, actualCount: elements.length, visibleCount };
+    });
+    let failures = checks.reduce(
+      (count, check) => count
+        + (check.actualCount === check.expectedCount && check.visibleCount === check.expectedCount ? 0 : 1),
+      0,
+    );
+    const reachability = [];
+    for (const [, selector] of requiredControls) {
+      for (const element of document.querySelectorAll(selector)) {
+        if (!(element instanceof HTMLElement)) continue;
+        element.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+        await settle();
+        const rect = element.getBoundingClientRect();
+        const passed = rect.top >= -2
+          && rect.right <= innerWidth + 2
+          && rect.bottom <= innerHeight + 2
+          && rect.left >= -2;
+        if (!passed) failures += 1;
+        reachability.push({
+          selector,
+          passed,
+          rect: {
+            top: Math.round(rect.top),
+            right: Math.round(rect.right),
+            bottom: Math.round(rect.bottom),
+            left: Math.round(rect.left),
+          },
+        });
+      }
+    }
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    await settle();
+
+    let dialogViewportOverflowPx = 1_000_000;
+    const header = document.querySelector('.rail-links-scroll .quick-links-panel .section-header');
+    const editButton = header?.querySelector('button[aria-pressed]');
+    if (editButton instanceof HTMLButtonElement) {
+      editButton.click();
+      await settle();
+      const addButton = [...(header?.querySelectorAll('button.icon-button') ?? [])]
+        .find((button) => button !== editButton);
+      if (addButton instanceof HTMLButtonElement) {
+        addButton.click();
+        await settle();
+        const dialog = [...document.querySelectorAll('[role="dialog"]')].at(-1);
+        if (dialog instanceof HTMLElement) {
+          const rect = dialog.getBoundingClientRect();
+          dialogViewportOverflowPx = Math.ceil(
+            Math.max(0, -rect.left)
+            + Math.max(0, rect.right - innerWidth)
+            + Math.max(0, -rect.top)
+            + Math.max(0, rect.bottom - innerHeight)
+          );
+          const closeButton = dialog.querySelector('.dialog-header button');
+          if (closeButton instanceof HTMLButtonElement) closeButton.click();
+          await settle();
+        }
+      }
+    }
+
+    return {
+      dialogViewportOverflowPx,
+      requiredControlVisibilityFailures: failures,
+      trace: [
+        { step: 'required-controls', checks, reachability },
+        { step: 'dialog-bounds', overflowPx: dialogViewportOverflowPx },
+      ],
+    };
+  })()`);
+}
+
+async function installFinding001Fixture(
+  cdp: CdpConnection,
+  sessionId: string,
+  fixture: UiAuditLayoutFixture,
+): Promise<void> {
+  if (fixture === 'finding-001-empty') return;
+  await evaluate(cdp, sessionId, String.raw`(async () => {
+    const fixture = ${JSON.stringify(fixture)};
+    const count = fixture === 'finding-001-long' ? 60 : 6;
+    const settle = () => new Promise((resolvePromise) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolvePromise(true)));
+    });
+    const labelFor = (region, index) => (
+      region + ' audit item ' + (index + 1)
+      + ' — a deliberately long responsive label that must remain contained and reachable'
+    );
+    const appendRows = (container, region, className) => {
+      for (let index = 0; index < count; index += 1) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = className;
+        button.dataset.uiAuditLayoutFixture = fixture;
+        button.style.minHeight = '44px';
+        button.style.minWidth = '0';
+        button.style.overflowWrap = 'anywhere';
+        button.style.width = '100%';
+        if (region === 'quick-links') {
+          const icon = document.createElement('span');
+          icon.className = 'favicon tone-green';
+          icon.textContent = String((index % 9) + 1);
+          const label = document.createElement('span');
+          label.className = 'quick-link-label';
+          label.style.overflowWrap = 'anywhere';
+          label.textContent = labelFor('Quick Link', index);
+          button.append(icon, label);
+        } else {
+          button.style.display = 'flex';
+          button.style.justifyContent = 'flex-start';
+          button.textContent = labelFor(region === 'active' ? 'Active Tab' : 'Saved Tab', index);
+        }
+        if (index === count - 1) button.dataset.uiAuditLastItem = region;
+        container.append(button);
+      }
+    };
+
+    const quickPanel = document.querySelector('.rail-links-scroll .quick-links-panel');
+    const activeList = document.querySelector('.active-window-list');
+    const sessionList = document.querySelector('.saved-sessions .session-list');
+    if (!(quickPanel instanceof HTMLElement)
+      || !(activeList instanceof HTMLElement)
+      || !(sessionList instanceof HTMLElement)) {
+      throw new Error('FINDING-001 requires the production collection regions');
+    }
+    quickPanel.querySelector('.utility-empty-state')?.remove();
+    let quickGrid = quickPanel.querySelector('.quick-link-grid');
+    if (!(quickGrid instanceof HTMLElement)) {
+      quickGrid = document.createElement('div');
+      quickGrid.className = 'quick-link-grid';
+      quickPanel.append(quickGrid);
+    }
+    sessionList.querySelector(':scope > .empty-state')?.remove();
+    appendRows(quickGrid, 'quick-links', 'quick-link-card');
+    appendRows(activeList, 'active', 'tab-row');
+    appendRows(sessionList, 'saved', 'saved-tab-row');
+    await settle();
+    return true;
+  })()`);
+}
+
+async function auditFinding001Scroll(
+  cdp: CdpConnection,
+  sessionId: string,
+  fixture: UiAuditLayoutFixture,
+): Promise<Finding001Scroll> {
+  return evaluate<Finding001Scroll>(cdp, sessionId, String.raw`(async () => {
+    const fixture = ${JSON.stringify(fixture)};
+    const settle = () => new Promise((resolvePromise) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolvePromise(true)));
+    });
+    const overflowForRect = (rect) => Math.ceil(
+      Math.max(0, -rect.left)
+      + Math.max(0, rect.right - innerWidth)
+      + Math.max(0, -rect.top)
+      + Math.max(0, rect.bottom - innerHeight)
+    );
+
+    const root = document.querySelector('#root');
+    const stage = document.querySelector('.newtab-stage');
+    const topStrip = document.querySelector('.top-strip');
+    const rail = document.querySelector('.quick-links-rail');
+    const railLinks = document.querySelector('.rail-links-scroll');
+    const active = document.querySelector('.active-region');
+    const saved = document.querySelector('.saved-region');
+    if (!(root instanceof HTMLElement)
+      || !(stage instanceof HTMLElement)
+      || !(topStrip instanceof HTMLElement)
+      || !(rail instanceof HTMLElement)
+      || !(railLinks instanceof HTMLElement)
+      || !(active instanceof HTMLElement)
+      || !(saved instanceof HTMLElement)) {
+      throw new Error('FINDING-001 requires the production New Tab layout regions');
+    }
+
+    const rootStyle = getComputedStyle(root);
+    const topStripStyle = getComputedStyle(topStrip);
+    const railStyle = getComputedStyle(rail);
+    const railLinksStyle = getComputedStyle(railLinks);
+    const activeStyle = getComputedStyle(active);
+    const savedStyle = getComputedStyle(saved);
+    const stageStyle = getComputedStyle(stage);
+    const scrollableOverflow = (value) => value === 'auto' || value === 'scroll';
+    const visibleOverflow = (value) => value === 'visible';
+    const columnCount = stageStyle.gridTemplateColumns.trim().split(/\s+/).filter(Boolean).length;
+    const responsiveLayoutMode = rootStyle.overflowY === 'hidden'
+      && scrollableOverflow(activeStyle.overflowY)
+      && scrollableOverflow(savedStyle.overflowY)
+      ? 'fixed'
+      : railStyle.position === 'sticky'
+        && visibleOverflow(activeStyle.overflowY)
+        && visibleOverflow(savedStyle.overflowY)
+        && columnCount === 2
+        ? 'sticky-rail'
+        : railStyle.position !== 'sticky'
+          && visibleOverflow(activeStyle.overflowY)
+          && visibleOverflow(savedStyle.overflowY)
+          && columnCount === 1
+          ? 'single-flow'
+          : 'unknown';
+    const expectedLayoutMode = innerWidth >= 1024
+      ? 'fixed'
+      : innerWidth >= 768
+        ? 'sticky-rail'
+        : 'single-flow';
+    const ownershipChecks = [];
+    const requireOwnership = (name, passed) => ownershipChecks.push({ name, passed });
+    requireOwnership('layout-mode', responsiveLayoutMode === expectedLayoutMode);
+    if (expectedLayoutMode === 'fixed') {
+      requireOwnership('root-lock', rootStyle.overflowY === 'hidden');
+      requireOwnership('rail-scroll', scrollableOverflow(railLinksStyle.overflowY));
+      requireOwnership('active-scroll', scrollableOverflow(activeStyle.overflowY));
+      requireOwnership('saved-scroll', scrollableOverflow(savedStyle.overflowY));
+    } else if (expectedLayoutMode === 'sticky-rail') {
+      requireOwnership('root-document-scroll', rootStyle.overflowY !== 'hidden');
+      requireOwnership('top-strip-sticky', topStripStyle.position === 'sticky');
+      requireOwnership('rail-sticky', railStyle.position === 'sticky');
+      requireOwnership('rail-scroll', scrollableOverflow(railLinksStyle.overflowY));
+      requireOwnership('active-document-scroll', visibleOverflow(activeStyle.overflowY));
+      requireOwnership('saved-document-scroll', visibleOverflow(savedStyle.overflowY));
+    } else {
+      requireOwnership('root-document-scroll', rootStyle.overflowY !== 'hidden');
+      requireOwnership('rail-in-document', railStyle.position !== 'sticky');
+      requireOwnership('quick-links-document-scroll', visibleOverflow(railLinksStyle.overflowY));
+      requireOwnership('active-document-scroll', visibleOverflow(activeStyle.overflowY));
+      requireOwnership('saved-document-scroll', visibleOverflow(savedStyle.overflowY));
+    }
+    if (fixture === 'finding-001-long') {
+      if (expectedLayoutMode === 'fixed') {
+        requireOwnership('long-rail-scroll-range', railLinks.scrollHeight > railLinks.clientHeight);
+        requireOwnership('long-active-scroll-range', active.scrollHeight > active.clientHeight);
+        requireOwnership('long-saved-scroll-range', saved.scrollHeight > saved.clientHeight);
+      } else {
+        const documentScroller = document.scrollingElement;
+        requireOwnership(
+          'long-document-scroll-range',
+          Boolean(documentScroller && documentScroller.scrollHeight > documentScroller.clientHeight),
+        );
+        if (expectedLayoutMode === 'sticky-rail') {
+          requireOwnership('long-rail-scroll-range', railLinks.scrollHeight > railLinks.clientHeight);
+        }
+      }
+    }
+    const scrollOwnershipFailures = ownershipChecks.filter((check) => !check.passed).length;
+
+    const reachabilityTrace = [];
+    let lastItemReachabilityFailures = 0;
+    const lastItems = [...document.querySelectorAll('[data-ui-audit-last-item]')];
+    for (const item of lastItems) {
+      if (!(item instanceof HTMLElement)) continue;
+      const region = item.dataset.uiAuditLastItem ?? '';
+      const owner = expectedLayoutMode === 'fixed'
+        ? region === 'quick-links'
+          ? railLinks
+          : region === 'active'
+            ? active
+            : saved
+        : expectedLayoutMode === 'sticky-rail' && region === 'quick-links'
+          ? railLinks
+          : document.scrollingElement;
+      item.focus({ preventScroll: true });
+      item.scrollIntoView({ block: 'end', inline: 'nearest' });
+      await settle();
+      const itemRect = item.getBoundingClientRect();
+      const ownerRect = owner instanceof HTMLElement && owner !== document.documentElement
+        ? owner.getBoundingClientRect()
+        : { top: 0, right: innerWidth, bottom: innerHeight, left: 0 };
+      const bounds = {
+        top: Math.max(0, ownerRect.top),
+        right: Math.min(innerWidth, ownerRect.right),
+        bottom: Math.min(innerHeight, ownerRect.bottom),
+        left: Math.max(0, ownerRect.left),
+      };
+      const passed = document.activeElement === item
+        && itemRect.top >= bounds.top - 2
+        && itemRect.right <= bounds.right + 2
+        && itemRect.bottom <= bounds.bottom + 2
+        && itemRect.left >= bounds.left - 2;
+      if (!passed) lastItemReachabilityFailures += 1;
+      reachabilityTrace.push({
+        region,
+        owner: owner === document.scrollingElement ? 'document' : owner?.className ?? 'missing',
+        passed,
+        itemRect: {
+          top: Math.round(itemRect.top),
+          right: Math.round(itemRect.right),
+          bottom: Math.round(itemRect.bottom),
+          left: Math.round(itemRect.left),
+        },
+      });
+    }
+
+    if (expectedLayoutMode === 'sticky-rail' && document.scrollingElement) {
+      const maxScroll = document.scrollingElement.scrollHeight - document.scrollingElement.clientHeight;
+      document.scrollingElement.scrollTop = Math.round(maxScroll / 2);
+      await settle();
+    }
+    const railViewportOverflowPx = expectedLayoutMode === 'single-flow'
+      ? 0
+      : overflowForRect(rail.getBoundingClientRect());
+    const topStripViewportOverflowPx = expectedLayoutMode === 'sticky-rail'
+      ? overflowForRect(topStrip.getBoundingClientRect())
+      : 0;
+
+    if (document.scrollingElement) document.scrollingElement.scrollTop = 0;
+    railLinks.scrollTop = 0;
+    active.scrollTop = 0;
+    saved.scrollTop = 0;
+    await settle();
+
+    return {
+      responsiveLayoutMode,
+      scrollOwnershipFailures,
+      lastItemReachabilityFailures,
+      lastItemsChecked: lastItems.length,
+      railViewportOverflowPx,
+      topStripViewportOverflowPx,
+      trace: [
+        { step: 'scroll-ownership', expectedLayoutMode, responsiveLayoutMode, checks: ownershipChecks },
+        { step: 'last-item-reachability', checks: reachabilityTrace },
+        { step: 'sticky-viewport-bounds', railViewportOverflowPx, topStripViewportOverflowPx },
+      ],
+    };
+  })()`);
+}
+
+async function runFinding001Layout(
+  cdp: CdpConnection,
+  sessionId: string,
+  fixture: UiAuditLayoutFixture,
+): Promise<Finding001Layout> {
+  const controls = await auditFinding001Controls(cdp, sessionId);
+  await installFinding001Fixture(cdp, sessionId, fixture);
+  const scroll = await auditFinding001Scroll(cdp, sessionId, fixture);
+  return {
+    ...controls,
+    ...scroll,
+    trace: [...controls.trace, ...scroll.trace],
+  };
+}
+
 async function collectBuildEntries(
   root: string,
   directory = root,
@@ -699,6 +1144,11 @@ async function runUiAudit(): Promise<number> {
     if (navigation.errorText) throw new Error(`Could not navigate to built extension: ${navigation.errorText}`);
     await waitForPage(cdp, sessionId);
     await waitForDomQuiet(cdp, sessionId);
+    await applyRequestedEnvironment(cdp, sessionId, {
+      locale: auditCase.locale,
+      theme: auditCase.theme,
+      zoom: auditCase.zoom,
+    });
 
     const feedbackFixtureId = auditCase.feedbackFixture ?? 'none';
     const feedbackFixture = feedbackFixtureId === 'none'
@@ -742,9 +1192,25 @@ async function runUiAudit(): Promise<number> {
           trace: [],
         };
 
+    const layoutFixtureId = auditCase.layoutFixture ?? 'none';
+    const layout: Finding001Layout = layoutFixtureId === 'none'
+      ? {
+          responsiveLayoutMode: '',
+          scrollOwnershipFailures: 0,
+          lastItemReachabilityFailures: 0,
+          lastItemsChecked: 0,
+          dialogViewportOverflowPx: 0,
+          railViewportOverflowPx: 0,
+          topStripViewportOverflowPx: 0,
+          requiredControlVisibilityFailures: 0,
+          trace: [],
+        }
+      : await runFinding001Layout(cdp, sessionId, layoutFixtureId);
+
     const observation = await evaluate<RuntimeObservation>(cdp, sessionId, String.raw`(async () => {
       const auditPage = ${JSON.stringify(auditCase.page)};
       const interaction = ${JSON.stringify(interaction)};
+      const layout = ${JSON.stringify(layout)};
       const sha256 = async (path) => {
         const response = await fetch(chrome.runtime.getURL(path), { cache: 'no-store' });
         if (!response.ok) throw new Error('Could not read runtime resource: ' + path);
@@ -825,8 +1291,16 @@ async function runUiAudit(): Promise<number> {
           lowerModalInert: interaction.lowerModalInert,
           topModalInteractive: interaction.topModalInteractive,
           focusInTopModal: interaction.focusInTopModal,
+          responsiveLayoutMode: layout.responsiveLayoutMode,
+          scrollOwnershipFailures: layout.scrollOwnershipFailures,
+          lastItemReachabilityFailures: layout.lastItemReachabilityFailures,
+          lastItemsChecked: layout.lastItemsChecked,
+          dialogViewportOverflowPx: layout.dialogViewportOverflowPx,
+          railViewportOverflowPx: layout.railViewportOverflowPx,
+          topStripViewportOverflowPx: layout.topStripViewportOverflowPx,
+          requiredControlVisibilityFailures: layout.requiredControlVisibilityFailures,
         },
-        interactionTrace: interaction.trace,
+        interactionTrace: [...interaction.trace, ...layout.trace],
         runtimeId: chrome.runtime.id,
         manifest: chrome.runtime.getManifest(),
         resourceHashes: {
@@ -895,6 +1369,7 @@ async function runUiAudit(): Promise<number> {
           locale: auditCase.locale,
           feedbackFixture: feedbackFixtureId,
           interactionFixture: interactionFixtureId,
+          layoutFixture: layoutFixtureId,
         },
         setup: auditCase.setup,
         cleanup: auditCase.cleanup,
