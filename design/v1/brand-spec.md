@@ -1,6 +1,6 @@
 # Tabstow brand extraction
 
-Source reviewed: `/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/newtab/styles.css` and `/Users/zrx/Dev/tabstow/apps/extension/src/entrypoints/options/styles.css`.
+Source reviewed: `apps/extension/src/entrypoints/newtab/styles.css` and `apps/extension/src/entrypoints/options/styles.css`.
 
 ## Tokens
 

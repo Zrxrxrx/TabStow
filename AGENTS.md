@@ -1,7 +1,5 @@
 # AGENTS.md
 
-@/Users/zrx/.codex/RTK.md
-
 Project-specific override: use Bun for package management and scripts in this repository. Do not use pnpm, npm, npx, or yarn commands for project dependency work.
 
 Commit messages must use `type(scope): msg`, for example `feat(auth): add login page`.
