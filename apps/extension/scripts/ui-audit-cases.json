@@ -562,6 +562,178 @@
         { "metric": "railViewportOverflowPx", "operator": "atMost", "value": 0 },
         { "metric": "requiredControlVisibilityFailures", "operator": "equals", "value": 0 }
       ]
+    },
+    {
+      "id": "FINDING-003-NEWTAB-DESKTOP",
+      "description": "The desktop New Tab preserves its computed V2 appearance while consuming shared semantic tokens",
+      "page": "newtab.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "appearanceFixture": "finding-003",
+      "setup": [
+        "Cycle the production page through no theme attribute, explicit light, and explicit dark without writing theme storage."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-003-NEWTAB-DESKTOP.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "pagePath", "operator": "equals", "value": "/newtab.html" },
+        { "metric": "themeMode", "operator": "equals", "value": "light" },
+        { "metric": "appearanceStateCount", "operator": "equals", "value": 3 },
+        { "metric": "appearanceRuntimeFailures", "operator": "equals", "value": 0 },
+        { "metric": "sharedTokenSignatures", "operator": "equals", "value": "none:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|light:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|dark:b7b7da459e27569131c1221982781055684b8805c61a29a11f978db4bc24450c" },
+        { "metric": "newtabComputedStyleSignatures", "operator": "equals", "value": "none:58ddd99c3a4abc8e416791700ae925d233860a54e0291aa5520a637bde26b62f|light:58ddd99c3a4abc8e416791700ae925d233860a54e0291aa5520a637bde26b62f|dark:4a804a57bda5a049c3a9d9a651d969f0d456ae6adfe6338a9f38dba5514e1390" }
+      ]
+    },
+    {
+      "id": "FINDING-003-NEWTAB-NARROW",
+      "description": "The narrow New Tab preserves its computed V2 appearance while consuming shared semantic tokens",
+      "page": "newtab.html",
+      "viewport": { "width": 390, "height": 844 },
+      "zoom": 1,
+      "theme": "dark",
+      "locale": "en",
+      "appearanceFixture": "finding-003",
+      "setup": [
+        "Cycle the production page through no theme attribute, explicit light, and explicit dark without writing theme storage."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-003-NEWTAB-NARROW.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "pagePath", "operator": "equals", "value": "/newtab.html" },
+        { "metric": "themeMode", "operator": "equals", "value": "dark" },
+        { "metric": "appearanceStateCount", "operator": "equals", "value": 3 },
+        { "metric": "appearanceRuntimeFailures", "operator": "equals", "value": 0 },
+        { "metric": "sharedTokenSignatures", "operator": "equals", "value": "none:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|light:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|dark:b7b7da459e27569131c1221982781055684b8805c61a29a11f978db4bc24450c" },
+        { "metric": "newtabComputedStyleSignatures", "operator": "equals", "value": "none:afb810d9e7ec18a06a8bfa3342719b70ae1ef35d49fa4dd3c8d33c5242d735f7|light:afb810d9e7ec18a06a8bfa3342719b70ae1ef35d49fa4dd3c8d33c5242d735f7|dark:df810768953ba773d36ee6cf7e50dae28a1a44f24bceb089c688906a03166390" }
+      ]
+    },
+    {
+      "id": "FINDING-003-SETTINGS-DESKTOP",
+      "description": "Desktop Settings shares Tabstow identity, semantic tokens, and workspace navigation",
+      "page": "options.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "appearanceFixture": "finding-003",
+      "setup": [
+        "Cycle the production page through no theme attribute, explicit light, and explicit dark without observing theme storage."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-003-SETTINGS-DESKTOP.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "pagePath", "operator": "equals", "value": "/options.html" },
+        { "metric": "themeMode", "operator": "equals", "value": "light" },
+        { "metric": "appearanceStateCount", "operator": "equals", "value": 3 },
+        { "metric": "appearanceRuntimeFailures", "operator": "equals", "value": 0 },
+        { "metric": "sharedTokenSignatures", "operator": "equals", "value": "none:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|light:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|dark:b7b7da459e27569131c1221982781055684b8805c61a29a11f978db4bc24450c" },
+        { "metric": "newtabComputedStyleSignatures", "operator": "equals", "value": "not-applicable" },
+        { "metric": "utilityShellFailures", "operator": "equals", "value": 0 },
+        { "metric": "utilityBackRouteFailures", "operator": "equals", "value": 0 },
+        { "metric": "backControlHeightPx", "operator": "atLeast", "value": 44 },
+        { "metric": "backViewportOverflowPx", "operator": "atMost", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-003-SETTINGS-NARROW",
+      "description": "Narrow Settings shares Tabstow identity, semantic tokens, and workspace navigation",
+      "page": "options.html",
+      "viewport": { "width": 390, "height": 844 },
+      "zoom": 1,
+      "theme": "dark",
+      "locale": "en",
+      "appearanceFixture": "finding-003",
+      "setup": [
+        "Cycle the production page through no theme attribute, explicit light, and explicit dark without observing theme storage."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-003-SETTINGS-NARROW.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "pagePath", "operator": "equals", "value": "/options.html" },
+        { "metric": "themeMode", "operator": "equals", "value": "dark" },
+        { "metric": "appearanceStateCount", "operator": "equals", "value": 3 },
+        { "metric": "appearanceRuntimeFailures", "operator": "equals", "value": 0 },
+        { "metric": "sharedTokenSignatures", "operator": "equals", "value": "none:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|light:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|dark:b7b7da459e27569131c1221982781055684b8805c61a29a11f978db4bc24450c" },
+        { "metric": "newtabComputedStyleSignatures", "operator": "equals", "value": "not-applicable" },
+        { "metric": "utilityShellFailures", "operator": "equals", "value": 0 },
+        { "metric": "utilityBackRouteFailures", "operator": "equals", "value": 0 },
+        { "metric": "backControlHeightPx", "operator": "atLeast", "value": 44 },
+        { "metric": "backViewportOverflowPx", "operator": "atMost", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-003-HISTORY-DESKTOP",
+      "description": "Desktop History shares Tabstow identity, semantic tokens, and workspace navigation",
+      "page": "saved-history.html",
+      "viewport": { "width": 1440, "height": 900 },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "appearanceFixture": "finding-003",
+      "setup": [
+        "Cycle the production page through no theme attribute, explicit light, and explicit dark without observing theme storage."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-003-HISTORY-DESKTOP.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "pagePath", "operator": "equals", "value": "/saved-history.html" },
+        { "metric": "themeMode", "operator": "equals", "value": "light" },
+        { "metric": "appearanceStateCount", "operator": "equals", "value": 3 },
+        { "metric": "appearanceRuntimeFailures", "operator": "equals", "value": 0 },
+        { "metric": "sharedTokenSignatures", "operator": "equals", "value": "none:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|light:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|dark:b7b7da459e27569131c1221982781055684b8805c61a29a11f978db4bc24450c" },
+        { "metric": "newtabComputedStyleSignatures", "operator": "equals", "value": "not-applicable" },
+        { "metric": "utilityShellFailures", "operator": "equals", "value": 0 },
+        { "metric": "utilityBackRouteFailures", "operator": "equals", "value": 0 },
+        { "metric": "backControlHeightPx", "operator": "atLeast", "value": 44 },
+        { "metric": "backViewportOverflowPx", "operator": "atMost", "value": 0 }
+      ]
+    },
+    {
+      "id": "FINDING-003-HISTORY-NARROW",
+      "description": "Narrow History shares Tabstow identity, semantic tokens, and workspace navigation",
+      "page": "saved-history.html",
+      "viewport": { "width": 390, "height": 844 },
+      "zoom": 1,
+      "theme": "dark",
+      "locale": "en",
+      "appearanceFixture": "finding-003",
+      "setup": [
+        "Cycle the production page through no theme attribute, explicit light, and explicit dark without observing theme storage."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-003-HISTORY-NARROW.png",
+      "assertions": [
+        { "metric": "horizontalOverflowPx", "operator": "atMost", "value": 0 },
+        { "metric": "pagePath", "operator": "equals", "value": "/saved-history.html" },
+        { "metric": "themeMode", "operator": "equals", "value": "dark" },
+        { "metric": "appearanceStateCount", "operator": "equals", "value": 3 },
+        { "metric": "appearanceRuntimeFailures", "operator": "equals", "value": 0 },
+        { "metric": "sharedTokenSignatures", "operator": "equals", "value": "none:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|light:28964ce746739969ae042c701f7c6dffcdee695ae3853ab5b9ed88bb2e121e08|dark:b7b7da459e27569131c1221982781055684b8805c61a29a11f978db4bc24450c" },
+        { "metric": "newtabComputedStyleSignatures", "operator": "equals", "value": "not-applicable" },
+        { "metric": "utilityShellFailures", "operator": "equals", "value": 0 },
+        { "metric": "utilityBackRouteFailures", "operator": "equals", "value": 0 },
+        { "metric": "backControlHeightPx", "operator": "atLeast", "value": 44 },
+        { "metric": "backViewportOverflowPx", "operator": "atMost", "value": 0 }
+      ]
     }
   ]
 }

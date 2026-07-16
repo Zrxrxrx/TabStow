@@ -191,7 +191,7 @@ describe('i18n', () => {
     expect(t('en', 'historyConfirmDelete')).toBe(
       'Delete this History entry permanently?',
     );
-    expect(t('en', 'historyBackToTabstow')).toBe('Back to Tabstow');
+    expect(t('en', 'backToWorkspace')).toBe('Back to workspace');
 
     expect(t('zh-CN', 'history')).toBe('历史记录');
     expect(t('zh-CN', 'historyEmpty')).toBe('历史记录为空。');
@@ -202,7 +202,7 @@ describe('i18n', () => {
     expect(t('zh-CN', 'historyRestore')).toBe('恢复到稍后查看');
     expect(t('zh-CN', 'historyDeletePermanently')).toBe('永久删除');
     expect(t('zh-CN', 'historyConfirmDelete')).toBe('要永久删除这条历史记录吗？');
-    expect(t('zh-CN', 'historyBackToTabstow')).toBe('返回 Tabstow');
+    expect(t('zh-CN', 'backToWorkspace')).toBe('返回工作区');
   });
 
   it('interpolates variables in message templates', async () => {

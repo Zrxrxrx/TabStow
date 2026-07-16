@@ -57,11 +57,32 @@ describe('OptionsApp', () => {
     document.body.appendChild(container);
     root = createRoot(container);
     sendExtensionMessage.mockReset();
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: {
+        runtime: {
+          getURL: vi.fn((path: string) => `chrome-extension://tabstow-test${path}`),
+        },
+      },
+    });
   });
 
   afterEach(async () => {
     await act(async () => root.unmount());
     container.remove();
+    vi.restoreAllMocks();
+  });
+
+  it('shares Tabstow identity and a reliable workspace return route', async () => {
+    respondWith(DISCONNECTED);
+
+    await act(async () => root.render(<OptionsApp />));
+
+    expect(container.querySelector('h1')?.textContent).toBe('Settings');
+    expect(container.textContent).toContain('Tabstow');
+    const backLink = [...container.querySelectorAll('a')]
+      .find((link) => link.textContent?.includes('Back to workspace'));
+    expect(backLink?.getAttribute('href')).toBe('chrome-extension://tabstow-test/newtab.html');
   });
 
   it('replaces token fields with GitHub Device Flow connect', async () => {

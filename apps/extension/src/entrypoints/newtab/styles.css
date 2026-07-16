@@ -1,38 +1,33 @@
 :root {
-  color-scheme: light dark;
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --bg: #0b1020;
-  --surface: #131b2f;
-  --surface-warm: #182343;
-  --fg: #f8fafc;
-  --fg-2: #cbd5e1;
-  --muted: #8ea0b8;
-  --meta: #60a5fa;
-  --border: #293653;
-  --border-soft: #1e2a43;
-  --accent: #60a5fa;
-  --accent-on: #06111f;
-  --success: #22c55e;
-  --warn: #fbbf24;
-  --danger: #fb7185;
+  font-family: var(--ts-font-body);
+  --bg: var(--ts-bg);
+  --surface: var(--ts-surface);
+  --surface-warm: var(--ts-surface-muted);
+  --fg: var(--ts-text);
+  --fg-2: var(--ts-text-secondary);
+  --muted: var(--ts-text-muted);
+  --meta: var(--ts-meta);
+  --border: var(--ts-border);
+  --border-soft: var(--ts-border-soft);
+  --accent: var(--ts-accent);
+  --accent-on: var(--ts-on-accent);
+  --success: var(--ts-success);
+  --warn: var(--ts-warning);
+  --danger: var(--ts-danger);
   --page-background: var(--bg);
   --text-color: var(--fg);
-  --surface-rgb: 19, 27, 47;
   --muted-text: var(--muted);
-  --radius-sm: 8px;
-  --radius-md: 12px;
-  --radius-lg: 20px;
-  --radius-pill: 9999px;
+  --rail: #e8ede9;
+  --grid: rgba(31, 74, 43, 0.035);
+  --radius-sm: 0;
+  --radius-md: 0;
+  --radius-lg: 0;
+  --radius-pill: 0;
   --elev-ring: 0 0 0 1px var(--border);
   --elev-raised: 0 24px 72px rgba(0, 0, 0, 0.36);
-  --focus-ring: 0 0 0 4px rgba(96, 165, 250, 0.28);
+  --focus-ring: var(--ts-focus-ring);
   background: var(--page-background);
   color: var(--text-color);
-}
-
-:root:not([data-theme-mode]) body {
-  visibility: hidden;
 }
 
 * {
@@ -505,7 +500,7 @@ h3 {
   padding: 2px 4px;
   color: var(--muted);
   border: 1px solid var(--border);
-  font: 800 7px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font: 800 7px/1 var(--ts-font-display);
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
@@ -755,18 +750,18 @@ h3 {
 }
 
 .status-message--info {
-  background: color-mix(in oklab, var(--accent), transparent 84%);
-  color: var(--fg);
+  background: var(--ts-status-info-bg);
+  color: var(--ts-status-info-text);
 }
 
 .status-message--success {
-  background: color-mix(in oklab, var(--success), transparent 84%);
-  color: var(--fg);
+  background: var(--ts-status-success-bg);
+  color: var(--ts-status-success-text);
 }
 
 .status-message--error {
-  background: color-mix(in oklab, var(--danger), transparent 84%);
-  color: var(--fg);
+  background: var(--ts-status-error-bg);
+  color: var(--ts-status-error-text);
 }
 
 .newtab-sync-status {
@@ -800,7 +795,7 @@ h3 {
 
 .sync-detail-list dt {
   color: var(--muted);
-  font: 800 8px/1.2 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font: 800 8px/1.2 var(--ts-font-display);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }
@@ -1037,76 +1032,15 @@ h3 {
   align-items: start;
 }
 
-:root[data-theme-mode="light"] {
-  color-scheme: light;
-  --bg: #ffffff;
-  --surface: #ffffff;
-  --surface-warm: #f6f8fb;
-  --fg: #111827;
-  --fg-2: #334155;
-  --muted: #64748b;
-  --meta: #2563eb;
-  --border: #d8e0ec;
-  --border-soft: #e7ecf4;
-  --accent: #2563eb;
-  --accent-on: #ffffff;
-  --success: #16a34a;
-  --warn: #d97706;
-  --danger: #dc2626;
-  --page-background: var(--bg);
-  --text-color: var(--fg);
-  --surface-rgb: 255, 255, 255;
-}
-
-:root[data-theme-mode="dark"] {
-  color-scheme: dark;
-}
-
 /* V2 desktop shell */
 :root[data-theme-mode="dark"] {
-  --bg: #070908;
-  --surface: #0d110e;
-  --surface-warm: #121713;
-  --fg: #edf4ed;
-  --fg-2: #c8d2c9;
-  --muted: #8a998c;
-  --meta: #43704b;
-  --border: #29332b;
-  --border-soft: #1d251f;
-  --accent: #c8ff2c;
-  --accent-on: #111800;
-  --success: #72c880;
-  --warn: #ffc44d;
-  --danger: #ff684f;
   --rail: #0a0d0b;
   --grid: rgba(200, 255, 44, 0.023);
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-pill: 0;
 }
 
 :root[data-theme-mode="light"] {
-  --bg: #f2f5f2;
-  --surface: #fbfdfb;
-  --surface-warm: #f0f4f0;
-  --fg: #172019;
-  --fg-2: #344238;
-  --muted: #617064;
-  --meta: #2f6840;
-  --border: #c9d2ca;
-  --border-soft: #dde4de;
-  --accent: #b8ed20;
-  --accent-on: #132000;
-  --success: #2f6840;
-  --warn: #a66b00;
-  --danger: #b93626;
   --rail: #e8ede9;
   --grid: rgba(31, 74, 43, 0.035);
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
-  --radius-pill: 0;
 }
 
 html,
@@ -1166,14 +1100,14 @@ svg {
   border-radius: 0;
   clip-path: polygon(0 0, 28px 0, 100% 10px, 100% 100%, 0 100%);
   box-shadow: none;
-  font-family: "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font-family: var(--ts-font-display);
   font-size: 15px;
   font-weight: 900;
 }
 
 .rail-brand h1 {
   overflow: hidden;
-  font-family: "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font-family: var(--ts-font-display);
   font-size: 18px;
   font-weight: 900;
   letter-spacing: -0.04em;
@@ -1186,7 +1120,7 @@ svg {
   margin-top: 6px;
   overflow: hidden;
   color: var(--muted);
-  font: 800 8px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font: 800 8px/1 var(--ts-font-display);
   letter-spacing: 0.12em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -1397,7 +1331,7 @@ svg {
 .stow-current-copy strong,
 .stow-current-copy small {
   overflow: hidden;
-  font-family: "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font-family: var(--ts-font-display);
   text-overflow: ellipsis;
   text-transform: uppercase;
   white-space: nowrap;
@@ -1481,7 +1415,7 @@ svg {
 
 .suggestion-source {
   color: var(--meta);
-  font: 900 7px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font: 900 7px/1 var(--ts-font-display);
   letter-spacing: 0.12em;
   text-transform: uppercase;
 }
@@ -1646,7 +1580,7 @@ svg {
   min-width: 0;
   margin: 0;
   overflow: hidden;
-  font: 800 11px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font: 800 11px/1 var(--ts-font-display);
   letter-spacing: 0.07em;
   text-overflow: ellipsis;
   text-transform: uppercase;
@@ -1660,7 +1594,7 @@ svg {
   border: 0;
   border-radius: 0;
   background: transparent;
-  font: 800 7px/1 "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  font: 800 7px/1 var(--ts-font-display);
   letter-spacing: 0.1em;
   text-transform: uppercase;
 }

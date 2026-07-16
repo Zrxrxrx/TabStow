@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
 import { StatusMessage } from '@/components/StatusMessage';
+import { UtilityPageShell } from '@/components/UtilityPageShell';
 import type { HistoryEntry } from '@/features/history/types';
 import {
   getLanguagePreference,
@@ -105,9 +106,10 @@ export function HistoryApp() {
   }
 
   return (
-    <main className="history-shell">
-      <a href={chrome.runtime.getURL('/newtab.html')}>{t(locale, 'historyBackToTabstow')}</a>
-      <h1>{t(locale, 'history')}</h1>
+    <UtilityPageShell
+      backToWorkspaceLabel={t(locale, 'backToWorkspace')}
+      pageLabel={t(locale, 'history')}
+    >
       <StatusMessage message={status.message} tone={status.tone} />
       {loading ? <p>{t(locale, 'historyLoading')}</p> : null}
       {!loading && status.tone !== 'error' && entries.length === 0 ? (
@@ -167,6 +169,6 @@ export function HistoryApp() {
           </article>
         ))}
       </div>
-    </main>
+    </UtilityPageShell>
   );
 }
