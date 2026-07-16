@@ -5,14 +5,21 @@ import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import {
   mkdir,
+  lstat,
   readFile,
   readdir,
+  realpath,
   stat,
   writeFile,
 } from 'node:fs/promises';
-import { dirname, isAbsolute, relative, resolve, sep } from 'node:path';
+import { dirname, relative, resolve, sep } from 'node:path';
 import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
+
+import {
+  isAbsoluteFilesystemPath,
+  toRelativeDisplayPath,
+} from '../../../scripts/path-policy';
 import {
   evaluateUiAuditCase,
   getUiAuditBrowserArgumentErrors,
@@ -20,6 +27,7 @@ import {
   hashUiAuditEntries,
   normalizeCdpRuntimeError,
   parseUiAuditArguments,
+  sanitizeUiAuditError,
   selectUiAuditCase,
   validateUiAuditManifest,
   type UiAuditBuildEntry,
@@ -63,7 +71,7 @@ const buildDirectory = resolve(extensionRoot, '.output/chrome-mv3');
 const casesPath = resolve(scriptDirectory, 'ui-audit-cases.json');
 
 function toRepositoryPath(path: string): string {
-  return relative(repositoryRoot, path).split(sep).join('/');
+  return toRelativeDisplayPath(repositoryRoot, path);
 }
 
 const helpText = `Tabstow built-extension UI audit
@@ -277,11 +285,41 @@ async function collectBuildEntries(
   return entries;
 }
 
-async function ensureEmptyOutputDirectory(path: string): Promise<void> {
+function isWithinDirectory(root: string, candidate: string): boolean {
+  const pathFromRoot = relative(root, candidate);
+  return pathFromRoot === ''
+    || (
+      pathFromRoot !== '..'
+      && !pathFromRoot.startsWith(`..${sep}`)
+      && !isAbsoluteFilesystemPath(pathFromRoot)
+    );
+}
+
+export async function ensureEmptyOutputDirectory(
+  path: string,
+  root = repositoryRoot,
+): Promise<void> {
+  if (!isWithinDirectory(root, path)) {
+    throw new Error('Evidence directory must stay within the repository');
+  }
+  const pathFromRoot = relative(root, path);
+  let currentPath = root;
+  for (const segment of pathFromRoot.split(sep).filter(Boolean)) {
+    currentPath = resolve(currentPath, segment);
+    if (existsSync(currentPath) && (await lstat(currentPath)).isSymbolicLink()) {
+      throw new Error(
+        `Evidence directory must not use symbolic links: ${toRelativeDisplayPath(root, currentPath)}`,
+      );
+    }
+  }
   if (existsSync(path) && (await readdir(path)).length > 0) {
-    throw new Error(`Evidence directory is not empty: ${path}`);
+    throw new Error(`Evidence directory is not empty: ${toRelativeDisplayPath(root, path)}`);
   }
   await mkdir(path, { recursive: true });
+  const [realRoot, realOutput] = await Promise.all([realpath(root), realpath(path)]);
+  if (!isWithinDirectory(realRoot, realOutput)) {
+    throw new Error('Evidence directory must stay within the repository');
+  }
 }
 
 function gitOutput(args: string[]): string {
@@ -338,7 +376,7 @@ async function runUiAudit(): Promise<number> {
   const auditCase = selectUiAuditCase(manifest, args.caseId);
   const localManifestPath = resolve(buildDirectory, 'manifest.json');
   if (!existsSync(localManifestPath)) {
-    throw new Error(`Missing production extension build: ${localManifestPath}`);
+    throw new Error(`Missing production extension build: ${toRepositoryPath(localManifestPath)}`);
   }
   const localManifestText = await readFile(localManifestPath, 'utf8');
   const localManifest = JSON.parse(localManifestText) as UiAuditExtensionManifest;
@@ -359,9 +397,7 @@ async function runUiAudit(): Promise<number> {
   const defaultOutput = resolve(repositoryRoot, '.artifacts/ui-audit', commitSha, auditCase.id);
   const outputDirectory = args.outputDirectory === '.artifacts/ui-audit'
     ? defaultOutput
-    : isAbsolute(args.outputDirectory)
-      ? args.outputDirectory
-      : resolve(repositoryRoot, args.outputDirectory);
+    : resolve(repositoryRoot, args.outputDirectory);
   await ensureEmptyOutputDirectory(outputDirectory);
 
   const startedAt = Date.now();
@@ -590,7 +626,7 @@ if (import.meta.main) {
   runUiAudit().then((exitCode) => {
     process.exitCode = exitCode;
   }).catch((error) => {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(sanitizeUiAuditError(error instanceof Error ? error.message : error));
     process.exitCode = 1;
   });
 }

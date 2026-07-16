@@ -113,7 +113,7 @@ Create `AGENTS.md`:
 ```markdown
 # AGENTS.md
 
-@/Users/zrx/.codex/RTK.md
+@../../.codex/RTK.md
 
 Project-specific override: use Bun for package management and scripts in this repository. Do not use pnpm, npm, npx, or yarn commands for project dependency work.
 

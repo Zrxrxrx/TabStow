@@ -1,8 +1,12 @@
 // @vitest-environment node
 
 import { readFileSync } from 'node:fs';
+import { mkdir, mkdtemp, rm, symlink } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+import { ensureEmptyOutputDirectory } from '../../scripts/ui-audit';
 import {
   evaluateUiAuditCase,
   getUiAuditBrowserArgumentErrors,
@@ -89,6 +93,57 @@ describe('UI audit command', () => {
       '--extension-id',
       'not-an-extension-id',
     ])).toThrow('Invalid --extension-id');
+  });
+
+  it('rejects an absolute evidence output path', () => {
+    const windowsOutputPath = ['C:', 'Users', 'example', 'evidence'].join('\\');
+    const windowsDriveRelativePath = ['D:', 'evidence'].join('');
+
+    expect(() => parseUiAuditArguments([
+      '--case',
+      'BASELINE',
+      '--output',
+      resolve('evidence'),
+    ])).toThrow('--output must be repository-relative');
+    expect(() => parseUiAuditArguments([
+      '--case',
+      'BASELINE',
+      '--output',
+      windowsOutputPath,
+    ])).toThrow('--output must be repository-relative');
+    expect(() => parseUiAuditArguments([
+      '--case',
+      'BASELINE',
+      '--output',
+      windowsDriveRelativePath,
+    ])).toThrow('--output must be repository-relative');
+  });
+
+  it('rejects an evidence output path that escapes the repository', () => {
+    expect(() => parseUiAuditArguments([
+      '--case',
+      'BASELINE',
+      '--output',
+      '../evidence',
+    ])).toThrow('--output must stay within the repository');
+  });
+
+  it('rejects an evidence output path that uses a symbolic link', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'tabstow-ui-audit-root-'));
+    const outside = await mkdtemp(resolve(tmpdir(), 'tabstow-ui-audit-outside-'));
+    const linkedOutput = resolve(root, 'evidence');
+    try {
+      await mkdir(resolve(outside, 'target'));
+      await symlink(resolve(outside, 'target'), linkedOutput, 'dir');
+      await expect(ensureEmptyOutputDirectory(linkedOutput, root)).rejects.toThrow(
+        'Evidence directory must not use symbolic links: evidence',
+      );
+    } finally {
+      await Promise.all([
+        rm(root, { recursive: true, force: true }),
+        rm(outside, { recursive: true, force: true }),
+      ]);
+    }
   });
 });
 
@@ -183,6 +238,28 @@ describe('CDP runtime error gate', () => {
       params: { type: 'log', args: [{ value: 'diagnostic' }] },
     })).toBeNull();
   });
+
+  it('removes filesystem paths before errors reach reports or terminal output', () => {
+    const posixSourcePath = resolve(tmpdir(), 'tabstow-ui-audit.example', 'bundle.js');
+    const windowsSourcePath = ['C:', 'Users', 'example', 'project', 'bundle.js'].join('\\');
+
+    expect(normalizeCdpRuntimeError({
+      method: 'Runtime.exceptionThrown',
+      params: {
+        exceptionDetails: {
+          exception: { description: `Error at ${posixSourcePath}:12:3` },
+        },
+      },
+    })).toBe('Error at [path]:12:3');
+    expect(normalizeCdpRuntimeError({
+      method: 'Runtime.exceptionThrown',
+      params: {
+        exceptionDetails: {
+          exception: { description: `Error at ${windowsSourcePath}:7:2` },
+        },
+      },
+    })).toBe('Error at [path]:7:2');
+  });
 });
 
 describe('UI audit build identity', () => {
@@ -246,24 +323,26 @@ describe('UI audit build identity', () => {
 
 describe('UI audit browser isolation', () => {
   it('requires a disposable profile and the exact production build flags', () => {
-    const buildDirectory = '/repo/apps/extension/.output/chrome-mv3';
+    const buildDirectory = resolve('fixtures/build/chrome-mv3');
+    const temporaryDirectory = tmpdir();
+    const profileDirectory = resolve(temporaryDirectory, 'tabstow-ui-audit.example');
     expect(getUiAuditBrowserArgumentErrors([
-      '/path/to/chrome',
+      'chrome',
       '--enable-automation',
       '--remote-debugging-address=127.0.0.1',
-      '--user-data-dir=/tmp/tabstow-ui-audit.example',
+      `--user-data-dir=${profileDirectory}`,
       `--disable-extensions-except=${buildDirectory}`,
       `--load-extension=${buildDirectory}`,
     ], buildDirectory, {
-      temporaryDirectory: '/tmp',
+      temporaryDirectory,
       profileMarkerExists: true,
     })).toEqual([]);
     expect(getUiAuditBrowserArgumentErrors([
-      '/path/to/chrome',
+      'chrome',
       '--enable-automation',
       '--remote-debugging-address=127.0.0.1',
     ], buildDirectory, {
-      temporaryDirectory: '/tmp',
+      temporaryDirectory,
       profileMarkerExists: false,
     })).toEqual([
       'Chrome must use an explicit non-default --user-data-dir',
@@ -273,14 +352,16 @@ describe('UI audit browser isolation', () => {
   });
 
   it('rejects a daily-use profile even when Chrome receives an explicit path', () => {
-    const buildDirectory = '/repo/apps/extension/.output/chrome-mv3';
+    const buildDirectory = resolve('fixtures/build/chrome-mv3');
+    const temporaryDirectory = tmpdir();
+    const dailyProfileDirectory = resolve(temporaryDirectory, '..', 'daily-profile');
     expect(getUiAuditBrowserArgumentErrors([
-      '/path/to/chrome',
-      '--user-data-dir=/Users/example/Library/Application Support/Google/Chrome',
+      'chrome',
+      `--user-data-dir=${dailyProfileDirectory}`,
       `--disable-extensions-except=${buildDirectory}`,
       `--load-extension=${buildDirectory}`,
     ], buildDirectory, {
-      temporaryDirectory: '/tmp',
+      temporaryDirectory,
       profileMarkerExists: false,
     })).toContain(
       'Chrome profile must be a marked tabstow-ui-audit directory under the system temp directory',

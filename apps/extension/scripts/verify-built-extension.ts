@@ -3,13 +3,24 @@ import { existsSync, readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  reportFatalPathSafeError,
+  toRelativeDisplayPath,
+} from '../../../scripts/path-policy';
+
+process.once('uncaughtException', reportFatalPathSafeError);
+process.once('unhandledRejection', reportFatalPathSafeError);
+
 const outputDirectory = resolve(
   dirname(fileURLToPath(import.meta.url)),
   '../.output/chrome-mv3',
 );
 const manifestPath = resolve(outputDirectory, 'manifest.json');
 
-assert.ok(existsSync(manifestPath), `Missing built manifest: ${manifestPath}`);
+assert.ok(
+  existsSync(manifestPath),
+  `Missing built manifest: ${toRelativeDisplayPath(process.cwd(), manifestPath)}`,
+);
 
 const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
   chrome_url_overrides?: Record<string, string>;

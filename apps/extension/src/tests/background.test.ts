@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+const wxtMocks = vi.hoisted(() => ({
+  defineBackground: vi.fn((callback: () => void) => callback()),
+}));
+
 const browserMocks = vi.hoisted(() => ({
   alarms: {
     clear: vi.fn(),
@@ -152,6 +156,7 @@ const quickLinkMocks = vi.hoisted(() => ({
 vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
+vi.mock('wxt/utils/define-background', () => wxtMocks);
 
 vi.mock('@/features/action-feedback/action-feedback', () => actionFeedbackMocks);
 vi.mock('@/features/context-menu/context-menu', () => contextMenuMocks);
@@ -209,13 +214,6 @@ describe('background message routing', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    (
-      globalThis as typeof globalThis & {
-        defineBackground?: (callback: () => void) => void;
-      }
-    ).defineBackground = (callback) => {
-      callback();
-    };
   });
 
   it('passes sender window id to the stow-current-window handler', async () => {

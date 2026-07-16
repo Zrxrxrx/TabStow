@@ -1,6 +1,6 @@
 # AGENTS.md
 
-@/Users/zrx/.codex/RTK.md
+@../../.codex/RTK.md
 
 Project-specific override: use Bun for package management and scripts in this repository. Do not use pnpm, npm, npx, or yarn commands for project dependency work.
 
@@ -16,3 +16,5 @@ Browser-extension constraints:
 - Store durable tab sessions in IndexedDB.
 - Store lightweight settings through extension storage.
 - Do not commit real tokens, credentials, or user-specific values.
+- Use repository-relative paths in tracked files and project-owned diagnostics or reports. Project
+  code may resolve absolute paths internally when required, but must never print or persist them.

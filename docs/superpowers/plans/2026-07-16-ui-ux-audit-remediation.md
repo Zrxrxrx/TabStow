@@ -2,7 +2,7 @@
 
 **Status:** engineering-reviewed; implementation started with PR-00 verification infrastructure; no finding fix has started
 
-**Audit source:** `/Users/zrx/.gstack/projects/tabstow/designs/design-audit-20260716/design-audit-tabstow.md`
+**Audit source:** external gstack design audit dated 2026-07-16
 
 **Baseline:** `5bc9f6a765a8464f5bfe74f59620ad4459e87369` on `main`
 

@@ -3,6 +3,15 @@
 import { mkdir } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import {
+  reportFatalPathSafeError,
+  sanitizeFilesystemPaths,
+  toRelativeDisplayPath,
+} from '../../../../scripts/path-policy';
+
+process.once('uncaughtException', reportFatalPathSafeError);
+process.once('unhandledRejection', reportFatalPathSafeError);
+
 function readOption(name: string, fallback?: string): string | undefined {
   const equalsPrefix = `--${name}=`;
   const equalsValue = Bun.argv.find((argument) => argument.startsWith(equalsPrefix));
@@ -13,7 +22,33 @@ function readOption(name: string, fallback?: string): string | undefined {
   return fallback;
 }
 
+async function forwardSanitizedOutput(
+  stream: ReadableStream<Uint8Array>,
+  destination: { write: (chunk: string) => unknown },
+): Promise<void> {
+  const reader = stream.getReader();
+  const decoder = new TextDecoder();
+  let pending = '';
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      pending += decoder.decode(value, { stream: !done });
+      const lines = pending.split('\n');
+      pending = lines.pop() ?? '';
+      for (const line of lines) {
+        destination.write(`${sanitizeFilesystemPaths(line.replace(/\r$/, ''))}\n`);
+      }
+      if (done) break;
+    }
+    if (pending) destination.write(sanitizeFilesystemPaths(pending));
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 const root = resolve(readOption('root', 'apps/extension')!);
+
 const portText = readOption('port', '9333')!;
 const port = Number(portText);
 if (!Number.isInteger(port) || port < 1024 || port > 65535) {
@@ -83,8 +118,8 @@ console.log('[debug-wxt-cdp] ready on http://127.0.0.1:' + port);
 await new Promise(() => {});
 `;
 
-console.log(`[debug-wxt-cdp] root: ${root}`);
-console.log(`[debug-wxt-cdp] profile: ${profile}`);
+console.log(`[debug-wxt-cdp] root: ${toRelativeDisplayPath(process.cwd(), root)}`);
+console.log(`[debug-wxt-cdp] profile: ${toRelativeDisplayPath(process.cwd(), profile)}`);
 console.log(`[debug-wxt-cdp] endpoint: http://127.0.0.1:${port}`);
 console.log(`[debug-wxt-cdp] WXT dev server: http://localhost:${devPort}`);
 
@@ -97,9 +132,13 @@ const child = Bun.spawn([process.execPath, '--eval', serverCode], {
     WXT_CDP_PROFILE: profile,
   },
   stdin: 'inherit',
-  stdout: 'inherit',
-  stderr: 'inherit',
+  stdout: 'pipe',
+  stderr: 'pipe',
 });
+const outputForwarding = Promise.all([
+  forwardSanitizedOutput(child.stdout, process.stdout),
+  forwardSanitizedOutput(child.stderr, process.stderr),
+]).catch(reportFatalPathSafeError);
 
 let forwardingSignal = false;
 function forward(signal: 'SIGINT' | 'SIGTERM') {
@@ -112,4 +151,5 @@ process.once('SIGINT', () => forward('SIGINT'));
 process.once('SIGTERM', () => forward('SIGTERM'));
 
 const exitCode = await child.exited;
+await outputForwarding;
 process.exitCode = exitCode;

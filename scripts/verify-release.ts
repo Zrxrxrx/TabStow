@@ -1,5 +1,7 @@
 import { readFile } from 'node:fs/promises';
 
+import { reportFatalPathSafeError } from './path-policy';
+
 export interface ReleaseVersions {
   packageVersion: string;
   lockVersion: string;
@@ -92,5 +94,5 @@ async function main(): Promise<void> {
 }
 
 if (import.meta.main) {
-  await main();
+  main().catch(reportFatalPathSafeError);
 }

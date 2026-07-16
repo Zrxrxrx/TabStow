@@ -12,12 +12,14 @@
     "build": "(cd packages/core && bun run build) && (cd apps/extension && bun run build)",
     "zip": "(cd apps/extension && bun run zip)",
     "typecheck": "(cd packages/core && bun run typecheck) && (cd apps/extension && bun run typecheck)",
-    "test": "(cd packages/core && bun run test) && (cd apps/extension && bun run test) && bun run test:release",
-    "test:release": "bunx vitest@4.1.10 run scripts/verify-release.test.ts scripts/release-workflow.test.ts scripts/ci-workflow.test.ts",
+    "test": "(cd packages/core && bun run test) && (cd apps/extension && bun run test) && bun run verify:paths && bun run test:release",
+    "test:release": "bunx vitest@4.1.10 run scripts/verify-release.test.ts scripts/release-workflow.test.ts scripts/ci-workflow.test.ts scripts/verify-relative-paths.test.ts",
+    "verify:paths": "bun scripts/verify-relative-paths.ts",
     "audit:ui": "bun apps/extension/scripts/ui-audit.ts",
     "release:verify": "bun scripts/verify-release.ts"
   },
   "devDependencies": {
+    "parse5": "8.0.1",
     "typescript": "6.0.3",
     "vitest": "4.1.10",
     "yaml": "2.8.2"

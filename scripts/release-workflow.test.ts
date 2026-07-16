@@ -380,8 +380,9 @@ describe('release test integration', () => {
   it('makes the canonical test command gate release contracts without recursion', () => {
     expect(packageJson.scripts.test).toMatch(/&& bun run test:release$/);
     expect(packageJson.scripts['test:release']).toBe(
-      'bunx vitest@4.1.10 run scripts/verify-release.test.ts scripts/release-workflow.test.ts scripts/ci-workflow.test.ts',
+      'bunx vitest@4.1.10 run scripts/verify-release.test.ts scripts/release-workflow.test.ts scripts/ci-workflow.test.ts scripts/verify-relative-paths.test.ts',
     );
+    expect(packageJson.scripts['verify:paths']).toBe('bun scripts/verify-relative-paths.ts');
   });
 });
 

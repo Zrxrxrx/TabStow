@@ -3,6 +3,16 @@
 import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { sanitizeUiAuditError } from '../../../../apps/extension/scripts/ui-audit-core';
+import {
+  reportFatalPathSafeError,
+  sanitizeFilesystemPaths,
+  toRelativeDisplayPath,
+} from '../../../../scripts/path-policy';
+
+process.once('uncaughtException', reportFatalPathSafeError);
+process.once('unhandledRejection', reportFatalPathSafeError);
+
 type CdpTarget = {
   targetId: string;
   type: string;
@@ -39,6 +49,7 @@ const defaultRoot = existsSync(resolve('apps/extension/package.json'))
   ? 'apps/extension'
   : '.';
 const root = resolve(readOption('root', defaultRoot)!);
+
 const portText = readOption('port', '9333')!;
 const port = Number(portText);
 const reload = Bun.argv.includes('--reload');
@@ -49,7 +60,9 @@ if (!Number.isInteger(port) || port < 1024 || port > 65535) {
 
 const extensionPath = resolve(root, '.output/chrome-mv3-dev');
 if (!existsSync(resolve(extensionPath, 'manifest.json'))) {
-  throw new Error(`WXT development output is missing: ${extensionPath}`);
+  throw new Error(
+    `WXT development output is missing: ${toRelativeDisplayPath(process.cwd(), extensionPath)}`,
+  );
 }
 
 const cdpBase = `http://127.0.0.1:${port}`;
@@ -127,7 +140,7 @@ socket.addEventListener('message', ({ data }) => {
     const description = message.params.exceptionDetails?.exception?.description
       ?? message.params.exceptionDetails?.text
       ?? 'Runtime exception';
-    runtimeErrors.push({ method: message.method, summary: String(description).slice(0, 500) });
+    runtimeErrors.push({ method: message.method, summary: sanitizeUiAuditError(description) });
   } else if (message.method === 'Runtime.consoleAPICalled') {
     const type = message.params.type as string;
     if (type === 'error' || type === 'assert') {
@@ -135,12 +148,12 @@ socket.addEventListener('message', ({ data }) => {
         .map((argument: { value?: unknown; description?: string }) =>
           argument.value ?? argument.description ?? '')
         .join(' ');
-      consoleErrors.push({ method: message.method, summary: String(summary).slice(0, 500) });
+      consoleErrors.push({ method: message.method, summary: sanitizeUiAuditError(summary) });
     }
   } else if (message.method === 'Log.entryAdded') {
     const entry = message.params.entry;
     if (entry?.level === 'error') {
-      runtimeErrors.push({ method: message.method, summary: String(entry.text).slice(0, 500) });
+      runtimeErrors.push({ method: message.method, summary: sanitizeUiAuditError(entry.text) });
     }
   }
 });
@@ -431,7 +444,8 @@ try {
     },
   };
 
-  console.log(JSON.stringify(output, null, 2));
+  console.log(JSON.stringify(output, (_key, value) =>
+    typeof value === 'string' ? sanitizeFilesystemPaths(value) : value, 2));
 
   const basicChecksPass = Object.values(checks).every(Boolean);
   const reloadChecksPass = !reloadReport

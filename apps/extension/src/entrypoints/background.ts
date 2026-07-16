@@ -1,3 +1,5 @@
+import { defineBackground } from 'wxt/utils/define-background';
+
 import {
   deleteHistoryEntry,
   listHistory,

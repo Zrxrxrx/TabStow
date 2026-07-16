@@ -17,7 +17,7 @@ Use a disposable Chrome for Testing profile. Never connect the audit runner to a
    PROFILE_DIR="$(mktemp -d -t tabstow-ui-audit.XXXXXX)"
    touch "$PROFILE_DIR/.tabstow-ui-audit-profile"
    BUILD_DIR="$(pwd)/apps/extension/.output/chrome-mv3"
-   "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" \
+   open -na "Google Chrome for Testing" --args \
      --user-data-dir="$PROFILE_DIR" \
      --disable-extensions-except="$BUILD_DIR" \
      --load-extension="$BUILD_DIR" \

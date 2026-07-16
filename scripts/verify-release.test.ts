@@ -1,3 +1,6 @@
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
+
 import { describe, expect, it } from 'vitest';
 
 import { extractWorkspaceVersion, validateReleaseVersions } from './verify-release';
@@ -99,5 +102,23 @@ describe('validateReleaseVersions', () => {
     ['tag', 'v1.0.x', 'Invalid tag "v1.0.x": expected numeric vX.Y.Z'],
   ] as const)('rejects a non-numeric %s', (key, value, message) => {
     expect(() => validateReleaseVersions({ ...matchingVersions, [key]: value })).toThrowError(message);
+  });
+});
+
+describe('release verifier diagnostics', () => {
+  it('redacts an absolute manifest path on failure', () => {
+    const missingManifest = resolve('.missing-release-manifest.json');
+    const result = spawnSync('bun', [
+      'scripts/verify-release.ts',
+      'v1.0.0',
+      missingManifest,
+    ], {
+      encoding: 'utf8',
+    });
+    const errorOutput = result.stderr;
+
+    expect(result.status).toBe(1);
+    expect(errorOutput).toContain('[path]');
+    expect(errorOutput).not.toContain(process.cwd());
   });
 });

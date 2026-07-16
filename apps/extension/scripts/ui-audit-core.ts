@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 import { basename, isAbsolute, relative, resolve, sep } from 'node:path';
 
+import {
+  isAbsoluteFilesystemPath,
+  sanitizeFilesystemPaths,
+} from '../../../scripts/path-policy';
+
 export type UiAuditArguments = {
   port: number;
   caseId: string;
@@ -113,11 +118,11 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === 'string' && value.trim().length > 0;
 }
 
-function sanitizeRuntimeError(value: unknown): string {
-  return String(value ?? 'Unknown runtime error')
+export function sanitizeUiAuditError(value: unknown): string {
+  const message = String(value ?? 'Unknown runtime error')
     .replace(/https?:\/\/\S+/g, '[url]')
-    .replace(/chrome-extension:\/\/[a-p]{32}/g, 'chrome-extension://[extension]')
-    .slice(0, 500);
+    .replace(/chrome-extension:\/\/[a-p]{32}/g, 'chrome-extension://[extension]');
+  return sanitizeFilesystemPaths(message).slice(0, 500);
 }
 
 function validateInstructions(value: unknown, field: string): asserts value is string[] {
@@ -216,13 +221,13 @@ export function normalizeCdpRuntimeError(message: unknown): string | null {
       ? message.params.exceptionDetails
       : {};
     const exception = isRecord(details.exception) ? details.exception : {};
-    return sanitizeRuntimeError(exception.description ?? details.text);
+    return sanitizeUiAuditError(exception.description ?? details.text);
   }
 
   if (message.method === 'Runtime.consoleAPICalled'
     && (message.params.type === 'error' || message.params.type === 'assert')) {
     const args = Array.isArray(message.params.args) ? message.params.args : [];
-    return sanitizeRuntimeError(args.map((argument) => {
+    return sanitizeUiAuditError(args.map((argument) => {
       if (!isRecord(argument)) return '';
       return argument.value ?? argument.description ?? '';
     }).join(' ').trim());
@@ -230,7 +235,7 @@ export function normalizeCdpRuntimeError(message: unknown): string | null {
 
   if (message.method === 'Log.entryAdded' && isRecord(message.params.entry)
     && message.params.entry.level === 'error') {
-    return sanitizeRuntimeError(message.params.entry.text);
+    return sanitizeUiAuditError(message.params.entry.text);
   }
 
   return null;
@@ -373,6 +378,7 @@ export function parseUiAuditArguments(argv: string[]): UiAuditArguments {
   const portInput = values.get('--port') ?? '9333';
   const port = Number(portInput);
   const extensionId = values.get('--extension-id');
+  const outputDirectory = values.get('--output') ?? '.artifacts/ui-audit';
   if (!help && !caseId) throw new Error('Missing required --case');
   if (!Number.isInteger(port) || port < 1024 || port > 65_535) {
     throw new Error(`Invalid --port: ${portInput}`);
@@ -380,11 +386,17 @@ export function parseUiAuditArguments(argv: string[]): UiAuditArguments {
   if (extensionId && !/^[a-p]{32}$/.test(extensionId)) {
     throw new Error(`Invalid --extension-id: ${extensionId}`);
   }
+  if (isAbsoluteFilesystemPath(outputDirectory) || /^[A-Za-z]:/.test(outputDirectory)) {
+    throw new Error('--output must be repository-relative');
+  }
+  if (outputDirectory.split(/[\\/]/).includes('..')) {
+    throw new Error('--output must stay within the repository');
+  }
 
   return {
     port,
     caseId,
-    outputDirectory: values.get('--output') ?? '.artifacts/ui-audit',
+    outputDirectory,
     ...(extensionId ? { extensionId } : {}),
     help,
   };
