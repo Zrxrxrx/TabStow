@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "5bc9f6a765a8464f5bfe74f59620ad4459e87369",
+  "cases": [
+    {
+      "id": "BASELINE",
+      "description": "Built New Tab smoke gate at the audited desktop baseline",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "setup": [
+        "Launch a dedicated empty Chrome profile with the production extension build loaded.",
+        "Use an English browser locale and leave the clean profile at its default light theme and 100% tab zoom.",
+        "Open a New Tab once to activate the extension worker; do not add sync credentials or fixture data."
+      ],
+      "cleanup": [
+        "Close the generated audit target and delete the disposable Chrome profile after evidence is collected."
+      ],
+      "screenshot": "BASELINE.png",
+      "assertions": [
+        {
+          "metric": "rootChildCount",
+          "operator": "atLeast",
+          "value": 1
+        },
+        {
+          "metric": "horizontalOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "themeMode",
+          "operator": "equals",
+          "value": "light"
+        },
+        {
+          "metric": "locale",
+          "operator": "equals",
+          "value": "en"
+        },
+        {
+          "metric": "pagePath",
+          "operator": "equals",
+          "value": "/newtab.html"
+        },
+        {
+          "metric": "workspaceLandmarks",
+          "operator": "equals",
+          "value": "Quick links|Active tabs|Saved for later"
+        },
+        {
+          "metric": "viewportWidth",
+          "operator": "equals",
+          "value": 1440
+        },
+        {
+          "metric": "viewportHeight",
+          "operator": "equals",
+          "value": 900
+        },
+        {
+          "metric": "zoom",
+          "operator": "equals",
+          "value": 1
+        }
+      ]
+    }
+  ]
+}
