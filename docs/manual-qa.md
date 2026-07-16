@@ -1,5 +1,47 @@
 # Manual QA
 
+## UI audit evidence
+
+Use a disposable Chrome for Testing profile. Never connect the audit runner to a daily-use profile or a profile containing GitHub credentials.
+
+1. Build the production MV3 extension and inspect the runner contract:
+
+   ```bash
+   bun run build
+   bun run audit:ui -- --help
+   ```
+
+2. From the repository root, launch Chrome for Testing with the production build as the only enabled extension. Chrome 136 and later require a non-default `--user-data-dir` for remote debugging:
+
+   ```bash
+   PROFILE_DIR="$(mktemp -d -t tabstow-ui-audit.XXXXXX)"
+   touch "$PROFILE_DIR/.tabstow-ui-audit-profile"
+   BUILD_DIR="$(pwd)/apps/extension/.output/chrome-mv3"
+   "/Applications/Google Chrome for Testing.app/Contents/MacOS/Google Chrome for Testing" \
+     --user-data-dir="$PROFILE_DIR" \
+     --disable-extensions-except="$BUILD_DIR" \
+     --load-extension="$BUILD_DIR" \
+     --remote-debugging-port=9333 \
+     --lang=en-US \
+     --enable-automation \
+     --no-first-run
+   ```
+
+3. Open a New Tab once so the Manifest V3 worker and override are active. Do not add sync credentials or fixture data. Keep the clean profile at light mode and 100% tab zoom.
+4. Run the baseline case. The output directory must be new or empty so stale evidence cannot be reused:
+
+   ```bash
+   bun run audit:ui -- \
+     --port 9333 \
+     --case BASELINE \
+     --output .artifacts/ui-audit/<commit>/BASELINE
+   ```
+
+   If the clean profile exposes more than one extension target, copy Tabstow's ID from `chrome://extensions` and add `--extension-id <id>`.
+
+5. Attach `assertions.json` and `BASELINE.png` to the PR. The report records the current commit and dirty state, audited baseline, Chrome/CDP versions, production-build SHA-256, requested and observed case metadata, assertion results, sanitized runtime errors, and screenshot hash. A threshold failure or any runtime exception, console error/assert, or Log error exits non-zero.
+6. Close Chrome for Testing and delete `PROFILE_DIR`; discarding the entire profile is the cleanup boundary.
+
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
 - Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved for Later region.
 - At 1440px, 1180px, and 1024px widths, confirm all three regions remain visible, the page has no horizontal overflow, and Active/Saved scroll independently.

@@ -10,5 +10,6 @@ apps/extension/.wxt/
 apps/extension/dist/
 packages/core/dist/
 coverage/
+.artifacts/
 .superpowers/
 .worktrees/
