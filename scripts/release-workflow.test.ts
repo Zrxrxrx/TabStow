@@ -426,13 +426,13 @@ describe('manual QA documentation', () => {
 
     for (const expectedStep of [
       'confirm the dashboard refreshes without manual Refresh or Collapse controls.',
-      'Confirm Active, Saved, Recovery, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails.',
+      'Confirm Active, Saved, History, search suggestion, and Quick Link rows show real favicons and fall back to the neutral page glyph when an icon fails.',
       'confirm only the newest normalized copy remains and query strings remain distinct.',
-      'Use quick tab search and confirm Active tabs and Saved for later filter',
-      'Reorder saved sessions and tabs, move a tab between sessions',
+      'Use quick tab search and confirm Active tabs and Saved windows filter',
+      'Reorder saved windows and tabs, move a tab between saved windows',
       'Left-click a saved tab and confirm it opens in the background, moves to History',
       'middle-click another and confirm it remains saved.',
-      'confirm both move to History and can be restored to Saved for later.',
+      'confirm both move to History and can be restored to Saved windows.',
       'Open a History tab without consuming it and permanently delete a History entry.',
       'confirm Saved URLs deduplicate while local History remains unchanged.',
     ]) {

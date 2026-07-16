@@ -775,7 +775,7 @@ describe('background message routing', () => {
       ok: false,
       error: {
         code: 'session-not-found',
-        message: 'Saved session was not found.',
+        message: 'Saved window was not found.',
       },
     });
     expect(missingTab.response).toEqual({
@@ -799,7 +799,7 @@ describe('background message routing', () => {
       ok: false,
       error: {
         code: 'session-not-found',
-        message: 'Saved session was not found.',
+        message: 'Saved window was not found.',
       },
     });
   });

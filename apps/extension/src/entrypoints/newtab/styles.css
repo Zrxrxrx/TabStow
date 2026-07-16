@@ -194,6 +194,28 @@ h3 {
   justify-content: flex-end;
 }
 
+.saved-sessions > .section-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.saved-sessions > .section-header > :first-child {
+  flex: 1 1 190px;
+  min-width: 0;
+}
+
+.saved-header-actions {
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.saved-history-action {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
 .primary-button {
   background: var(--accent);
   color: var(--accent-on);

@@ -264,7 +264,7 @@ async function openSavedTabUnlocked(
     return storageErrorResult(error);
   }
   if (!session) {
-    return err('session-not-found', 'Saved session was not found.');
+    return err('session-not-found', 'Saved window was not found.');
   }
 
   const tab = session.tabs.find(({ id }) => id === tabId);
@@ -349,10 +349,10 @@ async function restoreSessionUnlocked(
     return storageErrorResult(error);
   }
   if (!session) {
-    return err('session-not-found', 'Saved session was not found.');
+    return err('session-not-found', 'Saved window was not found.');
   }
   if (session.tabs.length === 0) {
-    return err('empty-session', 'Saved session has no tabs to restore.');
+    return err('empty-session', 'Saved window has no tabs to restore.');
   }
 
   if (session.tabs.some(({ url }) => !isOpenableTabUrl(url))) {
@@ -370,7 +370,7 @@ async function restoreSessionUnlocked(
   } catch (error) {
     return err(
       'chrome-tabs-error',
-      `${toErrorMessage(error)} Some tabs may already have opened; the saved session was kept.`,
+      `${toErrorMessage(error)} Some tabs may already have opened; the saved window was kept.`,
     );
   }
 

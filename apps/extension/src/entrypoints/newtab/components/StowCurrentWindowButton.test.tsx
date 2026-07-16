@@ -26,6 +26,14 @@ afterEach(async () => {
 });
 
 describe('StowCurrentWindowButton', () => {
+  it('uses the canonical Stow window label', async () => {
+    sendExtensionMessage.mockResolvedValue({ ok: true, data: { eligibleTabCount: 1 } });
+
+    await renderButton();
+
+    expect(getButton().textContent).toContain('Stow window');
+  });
+
   it('shows the authoritative count and disables itself when no tabs are eligible', async () => {
     sendExtensionMessage.mockResolvedValue({ ok: true, data: { eligibleTabCount: 3 } });
     await renderButton();

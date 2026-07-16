@@ -322,7 +322,7 @@ describe('session service', () => {
       ok: false,
       error: {
         code: 'chrome-tabs-error',
-        message: 'create failed Some tabs may already have opened; the saved session was kept.',
+        message: 'create failed Some tabs may already have opened; the saved window was kept.',
       },
     });
     expect(dbMocks.moveSessionToHistory).not.toHaveBeenCalled();
@@ -727,7 +727,7 @@ describe('session service', () => {
       ok: false,
       error: {
         code: 'empty-session',
-        message: 'Saved session has no tabs to restore.',
+        message: 'Saved window has no tabs to restore.',
       },
     });
     expect(browserMocks.tabs.create).not.toHaveBeenCalled();

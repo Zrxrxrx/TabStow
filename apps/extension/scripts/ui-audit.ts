@@ -648,6 +648,7 @@ async function auditFinding001Controls(
       ['language-theme', '.top-strip-control', 2],
       ['sync', '.top-strip .newtab-sync-status', 1],
       ['stow', '.top-strip .stow-current-button', 1],
+      ['history', '.saved-sessions .saved-history-action', 1],
       ['utilities', '.rail-utilities .rail-utility-button', 2],
     ];
     const checks = requiredControls.map(([name, selector, expectedCount]) => {
@@ -1640,7 +1641,7 @@ async function runUiAudit(): Promise<number> {
           themeMode: document.documentElement.dataset.themeMode ?? '',
           locale: document.documentElement.lang,
           pagePath: location.pathname,
-          workspaceLandmarks: ['Quick links', 'Active tabs', 'Saved for later']
+          workspaceLandmarks: ['Quick links', 'Active tabs', 'Saved windows']
             .filter((label) => headingLabels.has(label))
             .join('|'),
           viewportWidth: innerWidth,

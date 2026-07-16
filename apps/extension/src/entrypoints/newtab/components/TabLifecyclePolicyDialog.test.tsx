@@ -54,7 +54,7 @@ describe('TabLifecyclePolicyDialog', () => {
       '14 days',
       '30 days',
     ]);
-    expect(getCheckbox('Saved for later suggestions').checked).toBe(true);
+    expect(getCheckbox('Saved windows suggestions').checked).toBe(true);
     expect(getSelect('Suggest after observed sleep').value).toBe('14');
     expect(document.body.textContent).toContain('Automatic sleep is available.');
     expect(document.body.textContent).toContain('These settings stay on this device');
@@ -65,7 +65,7 @@ describe('TabLifecyclePolicyDialog', () => {
     const onClose = vi.fn();
     await renderDialog({ onClose });
 
-    await click(getCheckbox('Saved for later suggestions'));
+    await click(getCheckbox('Saved windows suggestions'));
     await click(getButtons('Cancel').find((button) => button.textContent === 'Cancel')!);
 
     expect(messagesOfType('tab-lifecycle:update-policy')).toHaveLength(0);
@@ -114,7 +114,7 @@ describe('TabLifecyclePolicyDialog', () => {
     expect(getSelect('Sleep after inactivity').disabled).toBe(true);
     expect(getSelect('Sleep after inactivity').value).toBe('3');
 
-    await click(getCheckbox('Saved for later suggestions'));
+    await click(getCheckbox('Saved windows suggestions'));
     expect(getSelect('Suggest after observed sleep').disabled).toBe(true);
     expect(getSelect('Suggest after observed sleep').value).toBe('14');
     expect(messagesOfType('tab-lifecycle:update-policy')).toHaveLength(0);
@@ -146,14 +146,14 @@ describe('TabLifecyclePolicyDialog', () => {
     await renderDialog();
 
     expect(getCheckbox('Automatic sleep').disabled).toBe(true);
-    expect(getCheckbox('Saved for later suggestions').disabled).toBe(false);
+    expect(getCheckbox('Saved windows suggestions').disabled).toBe(false);
     expect(document.body.textContent).toContain(
-      'Automatic sleep requires Chrome 121 or later. Update Chrome to use inactivity-based rules. Manual sleep and Saved for later suggestions still work.',
+      'Automatic sleep requires Chrome 121 or later. Update Chrome to use inactivity-based rules. Manual sleep and Saved windows suggestions still work.',
     );
 
     await renderDialog({ locale: 'zh-CN' });
     expect(document.body.textContent).toContain(
-      '自动休眠需要 Chrome 121 或更高版本。请更新 Chrome 后使用基于未访问时长的规则；手动休眠和‘稍后查看’建议仍可使用。',
+      '自动休眠需要 Chrome 121 或更高版本。请更新 Chrome 后使用基于未访问时长的规则；手动休眠和“已保存的窗口”建议仍可使用。',
     );
   });
 
@@ -196,7 +196,7 @@ describe('TabLifecyclePolicyDialog', () => {
         : { ok: true, data: DEFAULT_STATE };
     });
     await renderDialog();
-    await click(getCheckbox('Saved for later suggestions'));
+    await click(getCheckbox('Saved windows suggestions'));
 
     expect(document.body.textContent).toContain(
       'Automatic sleep availability could not be checked. Chrome tabs could not be queried.',
@@ -207,7 +207,7 @@ describe('TabLifecyclePolicyDialog', () => {
     expect(sendExtensionMessage).toHaveBeenCalledTimes(2);
     expect(document.body.textContent).toContain('Automatic sleep is available.');
     expect(getCheckbox('Automatic sleep').disabled).toBe(false);
-    expect(getCheckbox('Saved for later suggestions').checked).toBe(false);
+    expect(getCheckbox('Saved windows suggestions').checked).toBe(false);
   });
 
   it('keeps a loading failure open and offers Retry', async () => {

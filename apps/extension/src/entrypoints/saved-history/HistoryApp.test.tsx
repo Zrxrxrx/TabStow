@@ -23,7 +23,7 @@ vi.mock('#imports', () => ({
 const ENTRY: HistoryEntry = {
   id: 'history-1',
   sourceSessionId: 'session-1',
-  sourceTitle: 'Saved for later',
+  sourceTitle: 'Reading',
   tabs: [
     {
       id: 'tab-1',
@@ -76,7 +76,7 @@ describe('HistoryApp', () => {
     expect(getByRole('link', 'Back to workspace').getAttribute('href')).toBe(
       'chrome-extension://tabstow-test/newtab.html',
     );
-    expect(getByText('Opened from Saved for later')).not.toBeNull();
+    expect(getByText('Opened from Reading')).not.toBeNull();
     expect(getByText('https://example.com/')).not.toBeNull();
     expect(getByRole('button', 'Open Example in background')).not.toBeNull();
     expect(container.querySelector('time')?.getAttribute('datetime')).toBe(ENTRY.movedAt);
@@ -94,7 +94,7 @@ describe('HistoryApp', () => {
 
     await renderHistory();
 
-    expect(getByText('Opened from Saved for later')).not.toBeNull();
+    expect(getByText('Opened from Reading')).not.toBeNull();
     expect(getByText('Restored from Research')).not.toBeNull();
     expect(getByText('Removed from Archive')).not.toBeNull();
   });
@@ -150,7 +150,7 @@ describe('HistoryApp', () => {
       [{ type: 'history:open-tab', historyId: 'history-1', tabId: 'tab-1' }],
     ]);
     expect(getByText('Opened Example in the background.')).not.toBeNull();
-    expect(getByText('Opened from Saved for later')).not.toBeNull();
+    expect(getByText('Opened from Reading')).not.toBeNull();
   });
 
   it('restores a whole History entry and reloads the list', async () => {
@@ -160,14 +160,14 @@ describe('HistoryApp', () => {
       .mockResolvedValueOnce({ ok: true, data: [] });
     await renderHistory();
 
-    await click(getByRole('button', 'Restore to Saved for later'));
+    await click(getByRole('button', 'Restore to Saved windows'));
 
     expect(sendExtensionMessage.mock.calls).toEqual([
       [{ type: 'history:list' }],
       [{ type: 'history:restore', historyId: 'history-1' }],
       [{ type: 'history:list' }],
     ]);
-    expect(getByText('Restored to Saved for later.')).not.toBeNull();
+    expect(getByText('Restored to Saved windows.')).not.toBeNull();
     expect(getByText('History is empty.')).not.toBeNull();
   });
 

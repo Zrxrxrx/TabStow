@@ -8,7 +8,7 @@ Date: 2026-07-15
 Phase 3 and Phase 4 ship as one Tab Lifecycle capability with two independent consent boundaries:
 
 1. Automatically sleep eligible tabs after a configured period of Tab Inactivity.
-2. Suggest that eligible Long-sleeping Tabs be safely stowed in Saved for Later.
+2. Suggest that eligible Long-sleeping Tabs be safely moved to Saved windows.
 
 Success means Tabstow can reduce memory use and later reduce tab-strip clutter without inferring tab opening time, automatically closing a tab, or synchronizing device-specific behavior.
 
@@ -19,7 +19,7 @@ Success means Tabstow can reduce memory use and later reduce tab-strip clutter w
 - A confirmed multi-window action creates one Tab Session per contributing source window after Saved URL deduplication. See [ADR 0023](adr/0023-group-lifecycle-stows-by-source-window.md).
 - Stow is save-first: every resulting session becomes durable in one local transaction before any browser tab may close. See [ADR 0024](adr/0024-make-suggested-stows-save-first.md).
 - Chrome versions without `Tab.lastAccessed` retain all features except automatic sleep. See [ADR 0025](adr/0025-gate-automatic-sleep-by-capability.md).
-- Suggestions preserve Saved for Later's global Saved URL uniqueness and never close a hidden or excluded duplicate. See [ADR 0026](adr/0026-preserve-saved-url-uniqueness-in-stow-suggestions.md).
+- Suggestions preserve Saved windows' global Saved URL uniqueness and never close a hidden or excluded duplicate. See [ADR 0026](adr/0026-preserve-saved-url-uniqueness-in-stow-suggestions.md).
 
 ## Non-goals
 
@@ -116,7 +116,7 @@ A suggestion candidate must currently:
 - Be an HTTP(S) tab in a normal, non-incognito window.
 - Be non-selected, non-pinned, non-audible, and not marked `autoDiscardable: false`.
 - Be neither snoozed nor suppressed for the current period.
-- Have a Saved URL that is not already present in Saved for Later.
+- Have a Saved URL that is not already present in Saved windows.
 
 Candidates are ordered by oldest observed period, then source window and tab index. Multiple live tabs with the same Saved URL are reduced to the earliest observed candidate before Review. The banner count is global across normal windows and is not affected by the current search text or window filter.
 
@@ -139,14 +139,14 @@ Threshold controls remain visible but disabled while their rule is off. Loading 
 
 Recommended unsupported copy:
 
-- English: “Automatic sleep requires Chrome 121 or later. Update Chrome to use inactivity-based rules. Manual sleep and Saved for later suggestions still work.”
-- Chinese: “自动休眠需要 Chrome 121 或更高版本。请更新 Chrome 后使用基于未访问时长的规则；手动休眠和‘稍后查看’建议仍可使用。”
+- English: “Automatic sleep requires Chrome 121 or later. Update Chrome to use inactivity-based rules. Manual sleep and Saved windows suggestions still work.”
+- Chinese: “自动休眠需要 Chrome 121 或更高版本。请更新 Chrome 后使用基于未访问时长的规则；手动休眠和“已保存的窗口”建议仍可使用。”
 
 ### Suggestion banner
 
 An inline banner appears below the Active Tabs tools and above the window filter:
 
-> N tabs have been observed sleeping on this device for at least 14 days. Review them for Saved for later.
+> N tabs have been observed sleeping on this device for at least 14 days. Review them before moving them to Saved windows.
 
 It offers **Review** and **Remind me about these in 7 days**. Snooze applies to the currently listed observation IDs; a newly qualifying tab may still produce a banner.
 
@@ -157,8 +157,8 @@ It offers **Review** and **Remind me about these in 7 days**. Snooze applies to 
 - Each row shows favicon, title, URL/domain, and conservative “observed sleeping for at least N days” copy derived from the live tab.
 - All visible candidates start selected and may be deselected; **Select all** and **Clear all** remain available.
 - **Open tab** focuses and wakes a row. **Keep sleeping** suppresses that observation until it wakes or navigates.
-- The summary shows selected tab count and resulting post-deduplication session count.
-- The primary action says **Save N for later and close original tabs** and is disabled at zero selected rows.
+- The summary shows selected tab count and resulting post-deduplication saved-window count.
+- The primary action says **Move N tabs to Saved windows and close original tabs** and is disabled at zero selected rows.
 - The copy states that nothing is saved or closed before confirmation and does not claim full Undo support.
 
 ## Confirmed Stow transaction
@@ -241,7 +241,7 @@ No new manifest permission or content script is required.
 
 - Dialogs cover loading, retry, unsupported, dirty draft, saving, empty, full success, partial success, and persistence failure states in English and Chinese.
 - Focus management, Escape behavior, labels, checkbox grouping, and disabled actions remain keyboard accessible.
-- A successful Stow refreshes Active Tabs, Saved for Later, and the suggestion count.
+- A successful Stow refreshes Active Tabs, Saved windows, and the suggestion count.
 - The new Stow message schedules synchronization only when at least one tab was saved.
 
 ## Small-commit implementation sequence

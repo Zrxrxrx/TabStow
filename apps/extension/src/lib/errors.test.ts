@@ -6,7 +6,7 @@ describe('toKnownStorageError', () => {
     [
       'Session not found: session-1',
       'session-not-found',
-      'Saved session was not found.',
+      'Saved window was not found.',
     ],
     [
       'Saved tab not found: tab-1',

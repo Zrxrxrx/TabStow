@@ -1,4 +1,4 @@
-import { RotateCcw, Trash2 } from 'lucide-react';
+import { History, RotateCcw, Trash2 } from 'lucide-react';
 import {
   Fragment,
   useMemo,
@@ -327,20 +327,27 @@ export function StowedSessions({
           </h2>
           <p className="subtle">{t(locale, 'savedSessionsSubtitle')}</p>
         </div>
-        <span
-          className="meta-row"
-          id="saved-count"
-          aria-label={t(locale, 'savedCount', {
-            sessions: sessionCount,
-            tabs: tabCount,
-          })}
-        >
-          <span className="meta-pill">{sessionCount}</span>
-          <span className="meta-pill">{tabCount}</span>
-        </span>
-        <button className="icon-button" aria-label={t(locale, 'recoveryBin')} onClick={onOpenRecovery} type="button">
-          <Trash2 aria-hidden="true" size={15} />
-        </button>
+        <div className="header-actions saved-header-actions">
+          <span
+            className="meta-row"
+            id="saved-count"
+            aria-label={t(locale, 'savedCount', {
+              sessions: sessionCount,
+              tabs: tabCount,
+            })}
+          >
+            <span className="meta-pill">{sessionCount}</span>
+            <span className="meta-pill">{tabCount}</span>
+          </span>
+          <button
+            className="secondary-button saved-history-action"
+            onClick={onOpenRecovery}
+            type="button"
+          >
+            <History aria-hidden="true" size={15} />
+            {t(locale, 'history')}
+          </button>
+        </div>
       </header>
 
       <section className="session-list" aria-label={t(locale, 'savedSessions')}>
