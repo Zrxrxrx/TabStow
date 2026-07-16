@@ -253,6 +253,14 @@ let root: Root;
 let promptSpy: ReturnType<typeof vi.spyOn>;
 let chromeChangeEvents: ReturnType<typeof installAppChromeEvents>;
 
+function expectFeedbackBetweenStageRegions(feedback: HTMLElement) {
+  const stage = container.querySelector('.newtab-stage');
+  expect(stage?.children.item(0)).toBe(container.querySelector('.top-strip'));
+  expect(stage?.children.item(1)).toBe(feedback);
+  expect(stage?.children.item(2)).toBe(container.querySelector('.v2-workspace'));
+  expect(stage?.children).toHaveLength(3);
+}
+
 describe('App', () => {
   beforeEach(() => {
     container = document.createElement('div');
@@ -689,9 +697,11 @@ describe('App', () => {
       type: 'sessions:restore',
       sessionId: 'session-1',
     });
-    expect(screen().getByRole('status').textContent).toBe(
+    const restoreFeedback = screen().getByRole('status');
+    expect(restoreFeedback.textContent).toBe(
       'Restored 2 tabs and moved the session to History.',
     );
+    expectFeedbackBetweenStageRegions(restoreFeedback);
   });
 
   it('does not open or drag a saved row from its delete action', async () => {
@@ -1411,6 +1421,10 @@ describe('App', () => {
     expect(container.querySelector('.v2-workspace')).not.toBeNull();
     expect(container.querySelector('.active-region')).not.toBeNull();
     expect(container.querySelector('.saved-region')).not.toBeNull();
+    const stage = container.querySelector('.newtab-stage');
+    expect(stage?.children.item(0)).toBe(container.querySelector('.top-strip'));
+    expect(stage?.children.item(1)).toBe(container.querySelector('.v2-workspace'));
+    expect(stage?.children).toHaveLength(2);
     expect(container.querySelector('.page-shell')).toBeNull();
     expect(container.querySelector('.topbar')).toBeNull();
     expect(container.querySelector('.workspace-grid')).toBeNull();
@@ -2563,9 +2577,11 @@ describe('App', () => {
     await act(async () => {
       await pendingStow.promise;
     });
-    expect(screen().getByRole('status').textContent).toContain(
+    const stowFeedback = screen().getByRole('status');
+    expect(stowFeedback.textContent).toContain(
       'Stowed 1 tabs and closed 0.',
     );
+    expectFeedbackBetweenStageRegions(stowFeedback);
   });
 
   it('guards same-frame stow reentry and only sends one stow message', async () => {

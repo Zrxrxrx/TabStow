@@ -42,6 +42,19 @@ Use a disposable Chrome for Testing profile. Never connect the audit runner to a
 5. Attach `assertions.json` and `BASELINE.png` to the PR. The report records the current commit and dirty state, audited baseline, Chrome/CDP versions, production-build SHA-256, requested and observed case metadata, assertion results, sanitized runtime errors, and screenshot hash. A threshold failure or any runtime exception, console error/assert, or Log error exits non-zero.
 6. Close Chrome for Testing and delete `PROFILE_DIR`; discarding the entire profile is the cleanup boundary.
 
+### FINDING-004 feedback layout
+
+With the production extension and disposable Chrome profile from the preceding workflow running, execute the four-case feedback matrix:
+
+```bash
+bun run audit:ui -- --port 9333 --case FINDING-004-NONE --output .artifacts/ui-audit/<commit>/FINDING-004-NONE
+bun run audit:ui -- --port 9333 --case FINDING-004-STOW --output .artifacts/ui-audit/<commit>/FINDING-004-STOW
+bun run audit:ui -- --port 9333 --case FINDING-004-RESTORE --output .artifacts/ui-audit/<commit>/FINDING-004-RESTORE
+bun run audit:ui -- --port 9333 --case FINDING-004 --output .artifacts/ui-audit/<commit>/FINDING-004
+```
+
+The finding-specific cases insert audit-only feedback markup after the real production New Tab renders. Component tests cover the actual Stow and Restore action-to-message wiring; these runtime cases isolate the production CSS geometry. Confirm the no-message case leaves no empty row, the 1440px Stow and 768px Restore messages remain one line, and the 390px long error wraps while staying fully visible above Active and Saved content. Every case must report zero feedback/workspace overlap, zero feedback/Saved overlap, and zero feedback viewport overflow.
+
 - Load `apps/extension/.output/chrome-mv3` as an unpacked extension in Chrome.
 - Open a new tab and confirm the V2 desktop shell appears with the Quick Links rail, sticky top strip, Active Tabs region, and Saved for Later region.
 - At 1440px, 1180px, and 1024px widths, confirm all three regions remain visible, the page has no horizontal overflow, and Active/Saved scroll independently.

@@ -36,6 +36,25 @@ const manifestInput = {
   }],
 };
 
+const feedbackManifestInput = {
+  ...manifestInput,
+  cases: [{
+    ...manifestInput.cases[0],
+    id: 'FINDING-004',
+    description: 'Action feedback stays above the New Tab workspace',
+    viewport: { width: 390, height: 844 },
+    feedbackFixture: 'long-error',
+    screenshot: 'FINDING-004.png',
+    assertions: [
+      { metric: 'feedbackCount', operator: 'equals', value: 1 },
+      { metric: 'feedbackWorkspaceOverlapAreaPx2', operator: 'atMost', value: 0 },
+      { metric: 'feedbackSavedOverlapAreaPx2', operator: 'atMost', value: 0 },
+      { metric: 'feedbackViewportOverflowPx', operator: 'atMost', value: 0 },
+      { metric: 'feedbackLineCount', operator: 'atLeast', value: 2 },
+    ],
+  }],
+};
+
 describe('UI audit command', () => {
   it('parses a named case and deterministic output settings', () => {
     expect(parseUiAuditArguments([
@@ -97,18 +116,36 @@ describe('UI audit manifest', () => {
     expect(validateUiAuditManifest(manifestInput)).toEqual(manifestInput);
   });
 
+  it('accepts a feedback fixture with geometry assertions', () => {
+    expect(validateUiAuditManifest(feedbackManifestInput)).toEqual(feedbackManifestInput);
+  });
+
   it('keeps the checked-in case manifest valid', () => {
     const checkedInManifest = JSON.parse(readFileSync(
       new URL('../../scripts/ui-audit-cases.json', import.meta.url),
       'utf8',
     ));
-    expect(validateUiAuditManifest(checkedInManifest).cases).toHaveLength(1);
+    expect(validateUiAuditManifest(checkedInManifest).cases.map(({ id }) => id)).toEqual([
+      'BASELINE',
+      'FINDING-004-NONE',
+      'FINDING-004-STOW',
+      'FINDING-004-RESTORE',
+      'FINDING-004',
+    ]);
   });
 
   it('rejects a case name that is absent from the manifest', () => {
     const manifest = validateUiAuditManifest(manifestInput);
     expect(() => selectUiAuditCase(manifest, 'MISSING')).toThrow(
       'Unknown UI audit case: MISSING',
+    );
+  });
+
+  it('rejects an unknown feedback fixture', () => {
+    const invalidManifest = structuredClone(feedbackManifestInput);
+    invalidManifest.cases[0]!.feedbackFixture = 'custom-message';
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'feedbackFixture is unsupported',
     );
   });
 
@@ -138,6 +175,12 @@ describe('UI audit assertions', () => {
       viewportWidth: 1440,
       viewportHeight: 900,
       zoom: 1,
+      feedbackCount: 0,
+      feedbackWorkspaceOverlapAreaPx2: 0,
+      feedbackSavedOverlapAreaPx2: 0,
+      feedbackViewportOverflowPx: 0,
+      feedbackLineCount: 0,
+      topWorkspaceGapPx: 0,
     }, []);
 
     expect(result.passed).toBe(false);
@@ -161,6 +204,12 @@ describe('UI audit assertions', () => {
       viewportWidth: 1440,
       viewportHeight: 900,
       zoom: 1,
+      feedbackCount: 0,
+      feedbackWorkspaceOverlapAreaPx2: 0,
+      feedbackSavedOverlapAreaPx2: 0,
+      feedbackViewportOverflowPx: 0,
+      feedbackLineCount: 0,
+      topWorkspaceGapPx: 0,
     }, ['Unhandled exception']);
 
     expect(result.assertions.every((assertion) => assertion.passed)).toBe(true);
