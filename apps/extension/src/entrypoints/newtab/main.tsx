@@ -2,6 +2,7 @@ import React from 'react';
 import { createRoot } from 'react-dom/client';
 import { getThemePreferences, type ThemeMode } from '@/features/theme/theme-preferences';
 import { App } from './App';
+import '@/styles/tabstow-tokens.css';
 import './styles.css';
 
 async function mount() {

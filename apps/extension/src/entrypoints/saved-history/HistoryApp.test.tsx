@@ -72,7 +72,8 @@ describe('HistoryApp', () => {
 
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:list' });
     expect(getByRole('heading', 'History')).not.toBeNull();
-    expect(getByRole('link', 'Back to Tabstow').getAttribute('href')).toBe(
+    expect(getByText('Tabstow')).not.toBeNull();
+    expect(getByRole('link', 'Back to workspace').getAttribute('href')).toBe(
       'chrome-extension://tabstow-test/newtab.html',
     );
     expect(getByText('Opened from Saved for later')).not.toBeNull();

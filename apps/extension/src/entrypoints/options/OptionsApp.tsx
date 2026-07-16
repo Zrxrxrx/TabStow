@@ -11,6 +11,7 @@ import {
 import { useEffect, useRef, useState } from 'react';
 import type { ExtensionSettings } from '@tabstow/core';
 import { StatusMessage } from '@/components/StatusMessage';
+import { UtilityPageShell } from '@/components/UtilityPageShell';
 import type { AppResult } from '@/lib/errors';
 import {
   sendExtensionMessage,
@@ -191,13 +192,13 @@ export function OptionsApp() {
   const visibleBinding = confirmedBinding ?? connection.pendingBinding;
 
   return (
-    <main className="options-shell">
-      <header className="options-header">
-        <div>
-          <h1>Tabstow Settings</h1>
-          <p>Connect GitHub once, then let Tabstow synchronize automatically.</p>
-        </div>
-      </header>
+    <UtilityPageShell
+      backToWorkspaceLabel="Back to workspace"
+      pageLabel="Settings"
+    >
+      <p className="options-intro">
+        Connect GitHub once, then let Tabstow synchronize automatically.
+      </p>
 
       <StatusMessage message={status.message} tone={status.tone} />
 
@@ -479,6 +480,6 @@ export function OptionsApp() {
           <Save size={16} aria-hidden="true" /> Save settings
         </button>
       </footer>
-    </main>
+    </UtilityPageShell>
   );
 }

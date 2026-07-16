@@ -100,6 +100,28 @@ const responsiveManifestInput = {
   }],
 };
 
+const appearanceManifestInput = {
+  ...manifestInput,
+  cases: [{
+    ...manifestInput.cases[0],
+    id: 'FINDING-003-SETTINGS-DESKTOP',
+    description: 'Settings shares Tabstow identity, tokens, and workspace navigation',
+    page: 'options.html',
+    appearanceFixture: 'finding-003',
+    screenshot: 'FINDING-003-SETTINGS-DESKTOP.png',
+    assertions: [
+      { metric: 'appearanceStateCount', operator: 'equals', value: 3 },
+      { metric: 'appearanceRuntimeFailures', operator: 'equals', value: 0 },
+      { metric: 'sharedTokenSignatures', operator: 'equals', value: 'none:light|light:light|dark:dark' },
+      { metric: 'utilityShellFailures', operator: 'equals', value: 0 },
+      { metric: 'utilityBackRouteFailures', operator: 'equals', value: 0 },
+      { metric: 'backControlHeightPx', operator: 'atLeast', value: 44 },
+      { metric: 'backViewportOverflowPx', operator: 'atMost', value: 0 },
+      { metric: 'newtabComputedStyleSignatures', operator: 'equals', value: 'not-applicable' },
+    ],
+  }],
+};
+
 describe('UI audit command', () => {
   it('parses a named case and deterministic output settings', () => {
     expect(parseUiAuditArguments([
@@ -173,6 +195,10 @@ describe('UI audit manifest', () => {
     expect(validateUiAuditManifest(responsiveManifestInput)).toEqual(responsiveManifestInput);
   });
 
+  it('accepts the focused FINDING-003 shared appearance fixture', () => {
+    expect(validateUiAuditManifest(appearanceManifestInput)).toEqual(appearanceManifestInput);
+  });
+
   it('keeps the checked-in case manifest valid', () => {
     const checkedInManifest = JSON.parse(readFileSync(
       new URL('../../scripts/ui-audit-cases.json', import.meta.url),
@@ -191,6 +217,12 @@ describe('UI audit manifest', () => {
       'FINDING-001-768',
       'FINDING-001',
       'FINDING-001-ZOOM',
+      'FINDING-003-NEWTAB-DESKTOP',
+      'FINDING-003-NEWTAB-NARROW',
+      'FINDING-003-SETTINGS-DESKTOP',
+      'FINDING-003-SETTINGS-NARROW',
+      'FINDING-003-HISTORY-DESKTOP',
+      'FINDING-003-HISTORY-NARROW',
     ]);
   });
 
@@ -237,6 +269,14 @@ describe('UI audit manifest', () => {
     invalidManifest.cases[0]!.layoutFixture = 'custom-layout';
     expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
       'layoutFixture is unsupported',
+    );
+  });
+
+  it('rejects an unknown shared appearance fixture', () => {
+    const invalidManifest = structuredClone(appearanceManifestInput);
+    invalidManifest.cases[0]!.appearanceFixture = 'custom-appearance';
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'appearanceFixture is unsupported',
     );
   });
 
@@ -288,6 +328,14 @@ describe('UI audit assertions', () => {
       railViewportOverflowPx: 0,
       topStripViewportOverflowPx: 0,
       requiredControlVisibilityFailures: 0,
+      appearanceStateCount: 0,
+      appearanceRuntimeFailures: 0,
+      sharedTokenSignatures: 'not-applicable',
+      newtabComputedStyleSignatures: 'not-applicable',
+      utilityShellFailures: 0,
+      utilityBackRouteFailures: 0,
+      backControlHeightPx: 0,
+      backViewportOverflowPx: 0,
     }, []);
 
     expect(result.passed).toBe(false);
@@ -333,6 +381,14 @@ describe('UI audit assertions', () => {
       railViewportOverflowPx: 0,
       topStripViewportOverflowPx: 0,
       requiredControlVisibilityFailures: 0,
+      appearanceStateCount: 0,
+      appearanceRuntimeFailures: 0,
+      sharedTokenSignatures: 'not-applicable',
+      newtabComputedStyleSignatures: 'not-applicable',
+      utilityShellFailures: 0,
+      utilityBackRouteFailures: 0,
+      backControlHeightPx: 0,
+      backViewportOverflowPx: 0,
     }, ['Unhandled exception']);
 
     expect(result.assertions.every((assertion) => assertion.passed)).toBe(true);

@@ -91,6 +91,31 @@ type Finding001Scroll = {
 
 type Finding001Layout = Finding001Controls & Finding001Scroll;
 
+type Finding003Appearance = {
+  appearanceStateCount: number;
+  appearanceRuntimeFailures: number;
+  sharedTokenSignatures: string;
+  newtabComputedStyleSignatures: string;
+  utilityShellFailures: number;
+  utilityBackRouteFailures: number;
+  backControlHeightPx: number;
+  backViewportOverflowPx: number;
+  trace: Array<Record<string, unknown>>;
+};
+
+type Finding003ThemeMode = 'none' | 'light' | 'dark';
+
+type Finding003AppearanceState = {
+  mode: Finding003ThemeMode;
+  appearanceRuntimeFailures: number;
+  sharedTokenSignature: string;
+  newtabComputedStyleSignature: string | null;
+  utilityShellFailures: number;
+  backControlHeightPx: number;
+  backViewportOverflowPx: number;
+  trace: Array<Record<string, unknown>>;
+};
+
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const extensionRoot = resolve(scriptDirectory, '..');
 const repositoryRoot = resolve(extensionRoot, '../..');
@@ -310,20 +335,28 @@ async function waitForDomQuiet(cdp: CdpConnection, sessionId: string): Promise<v
   if (result.timedOut) throw new Error('Extension page did not reach a quiet DOM state');
 }
 
-async function applyRequestedEnvironment(
+async function applyRequestedZoom(
   cdp: CdpConnection,
   sessionId: string,
-  requested: { locale: 'en' | 'zh-CN'; theme: 'light' | 'dark'; zoom: number },
+  zoom: number,
 ): Promise<void> {
   await evaluate(cdp, sessionId, String.raw`(async () => {
     const tab = await chrome.tabs.getCurrent();
     if (tab?.id == null) throw new Error('UI audit could not resolve its extension tab');
-    const requestedZoom = ${JSON.stringify(requested.zoom)};
+    const requestedZoom = ${JSON.stringify(zoom)};
     if (Math.abs((await chrome.tabs.getZoom(tab.id)) - requestedZoom) > 0.001) {
       await chrome.tabs.setZoom(tab.id, requestedZoom);
     }
     return true;
   })()`);
+}
+
+async function applyRequestedEnvironment(
+  cdp: CdpConnection,
+  sessionId: string,
+  requested: { locale: 'en' | 'zh-CN'; theme: 'light' | 'dark'; zoom: number },
+): Promise<void> {
+  await applyRequestedZoom(cdp, sessionId, requested.zoom);
 
   const deadline = Date.now() + 5_000;
   while (Date.now() < deadline) {
@@ -961,6 +994,324 @@ async function runFinding001Layout(
   };
 }
 
+async function auditFinding003AppearanceState(
+  cdp: CdpConnection,
+  sessionId: string,
+  page: string,
+  mode: Finding003ThemeMode,
+): Promise<Finding003AppearanceState> {
+  return evaluate<Finding003AppearanceState>(cdp, sessionId, String.raw`(async () => {
+    const page = ${JSON.stringify(page)};
+    const mode = ${JSON.stringify(mode)};
+    const settle = () => new Promise((resolvePromise) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => setTimeout(resolvePromise, 180)));
+    });
+    const sha256 = async (value) => {
+      const digest = await crypto.subtle.digest(
+        'SHA-256',
+        new TextEncoder().encode(JSON.stringify(value)),
+      );
+      return [...new Uint8Array(digest)]
+        .map((byte) => byte.toString(16).padStart(2, '0'))
+        .join('');
+    };
+    const tokenNames = [
+      '--ts-font-body',
+      '--ts-font-display',
+      '--ts-bg',
+      '--ts-surface',
+      '--ts-surface-muted',
+      '--ts-text',
+      '--ts-text-secondary',
+      '--ts-text-muted',
+      '--ts-meta',
+      '--ts-border',
+      '--ts-border-soft',
+      '--ts-accent',
+      '--ts-on-accent',
+      '--ts-success',
+      '--ts-warning',
+      '--ts-danger',
+      '--ts-focus-ring',
+      '--ts-status-info-bg',
+      '--ts-status-info-text',
+      '--ts-status-success-bg',
+      '--ts-status-success-text',
+      '--ts-status-warning-bg',
+      '--ts-status-warning-text',
+      '--ts-status-error-bg',
+      '--ts-status-error-text',
+    ];
+    const styleProperties = [
+      'color',
+      'backgroundColor',
+      'backgroundImage',
+      'borderTopColor',
+      'borderRightColor',
+      'borderBottomColor',
+      'borderLeftColor',
+      'boxShadow',
+      'fontFamily',
+      'fontSize',
+      'lineHeight',
+      'outlineColor',
+      'outlineStyle',
+      'outlineWidth',
+      'visibility',
+    ];
+    const styleForElement = (element) => {
+      if (!(element instanceof HTMLElement)) return null;
+      const style = getComputedStyle(element);
+      return Object.fromEntries(
+        styleProperties.map((property) => [property, style[property]]),
+      );
+    };
+    const styleFor = (selector) => styleForElement(document.querySelector(selector));
+    const captureNewtabStyle = () => {
+      const resolveCustomProperty = (property, targetProperty) => {
+        const probe = document.createElement('span');
+        probe.style.setProperty(targetProperty, 'var(' + property + ')');
+        document.body.append(probe);
+        const value = getComputedStyle(probe).getPropertyValue(targetProperty).trim();
+        probe.remove();
+        return value;
+      };
+      const customPropertyTargets = [
+        ['--bg', 'background-color'],
+        ['--surface', 'background-color'],
+        ['--surface-warm', 'background-color'],
+        ['--fg', 'color'],
+        ['--fg-2', 'color'],
+        ['--muted', 'color'],
+        ['--meta', 'color'],
+        ['--border', 'border-top-color'],
+        ['--border-soft', 'border-top-color'],
+        ['--accent', 'color'],
+        ['--accent-on', 'color'],
+        ['--success', 'color'],
+        ['--warn', 'color'],
+        ['--danger', 'color'],
+        ['--rail', 'background-color'],
+        ['--grid', 'background-color'],
+        ['--focus-ring', 'box-shadow'],
+        ['--radius-sm', 'border-radius'],
+        ['--radius-md', 'border-radius'],
+        ['--radius-lg', 'border-radius'],
+        ['--radius-pill', 'border-radius'],
+      ];
+      const statusHost = document.createElement('div');
+      statusHost.innerHTML = [
+        '<p class="status-message status-message--info">Info</p>',
+        '<p class="status-message status-message--success">Success</p>',
+        '<p class="status-message status-message--error">Error</p>',
+      ].join('');
+      document.body.append(statusHost);
+      const result = {
+        customProperties: Object.fromEntries(customPropertyTargets.map(([property, targetProperty]) => [
+          property,
+          resolveCustomProperty(property, targetProperty),
+        ])),
+        root: styleFor('html'),
+        body: styleFor('body'),
+        rail: styleFor('.quick-links-rail'),
+        topStrip: styleFor('.top-strip'),
+        search: styleFor('.dashboard-search input'),
+        primaryAction: styleFor('.stow-current-button'),
+        activeRegion: styleFor('.active-region'),
+        savedRegion: styleFor('.saved-region'),
+        infoStatus: styleForElement(statusHost.querySelector('.status-message--info')),
+        successStatus: styleForElement(statusHost.querySelector('.status-message--success')),
+        errorStatus: styleForElement(statusHost.querySelector('.status-message--error')),
+      };
+      statusHost.remove();
+      return result;
+    };
+
+    if (mode === 'none') delete document.documentElement.dataset.themeMode;
+    else document.documentElement.dataset.themeMode = mode;
+    await settle();
+
+    const rootStyle = getComputedStyle(document.documentElement);
+    const tokens = Object.fromEntries(
+      tokenNames.map((token) => [token, rootStyle.getPropertyValue(token).trim()]),
+    );
+    const sharedTokenSignature = await sha256(tokens);
+    const newtabComputedStyleSignature = page === 'newtab.html'
+      ? await sha256(captureNewtabStyle())
+      : null;
+
+    const expectedColorScheme = mode === 'dark' ? 'dark' : 'light';
+    const runtimeChecks = [
+      {
+        name: 'visible-page',
+        passed: getComputedStyle(document.body).visibility === 'visible',
+      },
+      {
+        name: 'expected-color-scheme',
+        passed: getComputedStyle(document.documentElement).colorScheme === expectedColorScheme,
+      },
+      {
+        name: 'no-horizontal-overflow',
+        passed: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+      },
+    ];
+    const appearanceRuntimeFailures = runtimeChecks.filter((check) => !check.passed).length;
+
+    const shell = document.querySelectorAll('.utility-page-shell');
+    const wordmark = document.querySelector('.utility-page-wordmark');
+    const heading = document.querySelector('.utility-page-shell h1');
+    const back = document.querySelector('.utility-page-back');
+    const expectedPageLabel = page === 'options.html'
+      ? 'Settings'
+      : page === 'saved-history.html'
+        ? 'History'
+        : null;
+    const shellChecks = [];
+    if (expectedPageLabel !== null) {
+      shellChecks.push(
+        { name: 'one-shell', passed: shell.length === 1 },
+        { name: 'wordmark', passed: wordmark?.textContent?.trim() === 'Tabstow' },
+        { name: 'page-label', passed: heading?.textContent?.trim() === expectedPageLabel },
+        {
+          name: 'back-label',
+          passed: back?.textContent?.replace(/\s+/g, ' ').trim() === 'Back to workspace',
+        },
+        {
+          name: 'back-target',
+          passed: back instanceof HTMLAnchorElement
+            && new URL(back.href).origin === location.origin
+            && new URL(back.href).pathname === '/newtab.html',
+        },
+      );
+    }
+    const utilityShellFailures = shellChecks.filter((check) => !check.passed).length;
+    const backRect = back instanceof HTMLElement ? back.getBoundingClientRect() : null;
+    const backControlHeightPx = backRect
+      ? Math.round(backRect.height * 100) / 100
+      : 0;
+    const backViewportOverflowPx = backRect
+      ? Math.ceil(
+          Math.max(0, -backRect.left)
+          + Math.max(0, backRect.right - innerWidth)
+          + Math.max(0, -backRect.top)
+          + Math.max(0, backRect.bottom - innerHeight)
+        )
+      : 0;
+
+    return {
+      mode,
+      appearanceRuntimeFailures,
+      sharedTokenSignature,
+      newtabComputedStyleSignature,
+      utilityShellFailures,
+      backControlHeightPx,
+      backViewportOverflowPx,
+      trace: [
+        { step: 'appearance-state', mode, tokens, sharedTokenSignature, newtabComputedStyleSignature },
+        { step: 'appearance-runtime', mode, checks: runtimeChecks },
+        { step: 'utility-shell', checks: shellChecks, backControlHeightPx, backViewportOverflowPx },
+      ],
+    };
+  })()`);
+}
+
+async function runFinding003AppearanceMatrix(
+  cdp: CdpConnection,
+  sessionId: string,
+  page: string,
+  finalTheme: 'light' | 'dark',
+  outputDirectory: string,
+  screenshotName: string,
+): Promise<Finding003Appearance> {
+  const modes: Finding003ThemeMode[] = finalTheme === 'light'
+    ? ['none', 'dark', 'light']
+    : ['none', 'light', 'dark'];
+  const states: Finding003AppearanceState[] = [];
+  const screenshots: string[] = [];
+  const screenshotStem = screenshotName.endsWith('.png')
+    ? screenshotName.slice(0, -'.png'.length)
+    : screenshotName;
+
+  for (const mode of modes) {
+    const state = await auditFinding003AppearanceState(cdp, sessionId, page, mode);
+    states.push(state);
+
+    const screenshot = await cdp.call<{ data: string }>('Page.captureScreenshot', {
+      format: 'png',
+      fromSurface: true,
+    }, sessionId);
+    const stateScreenshotName = `${screenshotStem}-${mode}.png`;
+    const stateScreenshotPath = resolve(outputDirectory, stateScreenshotName);
+    await writeFile(stateScreenshotPath, Buffer.from(screenshot.data, 'base64'));
+    if ((await stat(stateScreenshotPath)).size < 1024) {
+      throw new Error(`Captured ${mode} appearance screenshot is unexpectedly small`);
+    }
+    screenshots.push(stateScreenshotName);
+  }
+
+  const orderedStates = (['none', 'light', 'dark'] as const).map((mode) =>
+    states.find((state) => state.mode === mode)!,
+  );
+
+  return {
+    appearanceStateCount: states.length,
+    appearanceRuntimeFailures: states.reduce(
+      (total, state) => total + state.appearanceRuntimeFailures,
+      0,
+    ),
+    sharedTokenSignatures: orderedStates
+      .map((state) => `${state.mode}:${state.sharedTokenSignature}`)
+      .join('|'),
+    newtabComputedStyleSignatures: page === 'newtab.html'
+      ? orderedStates
+          .map((state) => `${state.mode}:${state.newtabComputedStyleSignature}`)
+          .join('|')
+      : 'not-applicable',
+    utilityShellFailures: states.reduce(
+      (total, state) => total + state.utilityShellFailures,
+      0,
+    ),
+    utilityBackRouteFailures: 0,
+    backControlHeightPx: Math.min(...states.map((state) => state.backControlHeightPx)),
+    backViewportOverflowPx: Math.max(
+      ...states.map((state) => state.backViewportOverflowPx),
+    ),
+    trace: [{
+      step: 'appearance-matrix',
+      modes,
+      screenshots,
+      states: states.map((state) => ({ mode: state.mode, trace: state.trace })),
+    }],
+  };
+}
+
+async function probeFinding003BackRoute(
+  cdp: CdpConnection,
+  sessionId: string,
+  page: string,
+): Promise<number> {
+  if (page === 'newtab.html') return 0;
+  const clicked = await evaluate<boolean>(cdp, sessionId, String.raw`(() => {
+    const back = document.querySelector('.utility-page-back');
+    if (!(back instanceof HTMLAnchorElement)) return false;
+    back.click();
+    return true;
+  })()`);
+  if (!clicked) return 1;
+
+  const deadline = Date.now() + 5_000;
+  while (Date.now() < deadline) {
+    try {
+      const pathname = await evaluate<string>(cdp, sessionId, 'location.pathname');
+      if (pathname === '/newtab.html') return 0;
+    } catch {
+      // The old execution context is expected to disappear during navigation.
+    }
+    await new Promise((resolvePromise) => setTimeout(resolvePromise, 100));
+  }
+  return 1;
+}
+
 async function collectBuildEntries(
   root: string,
   directory = root,
@@ -1144,11 +1495,16 @@ async function runUiAudit(): Promise<number> {
     if (navigation.errorText) throw new Error(`Could not navigate to built extension: ${navigation.errorText}`);
     await waitForPage(cdp, sessionId);
     await waitForDomQuiet(cdp, sessionId);
-    await applyRequestedEnvironment(cdp, sessionId, {
-      locale: auditCase.locale,
-      theme: auditCase.theme,
-      zoom: auditCase.zoom,
-    });
+    const appearanceFixtureId = auditCase.appearanceFixture ?? 'none';
+    if (appearanceFixtureId === 'finding-003') {
+      await applyRequestedZoom(cdp, sessionId, auditCase.zoom);
+    } else {
+      await applyRequestedEnvironment(cdp, sessionId, {
+        locale: auditCase.locale,
+        theme: auditCase.theme,
+        zoom: auditCase.zoom,
+      });
+    }
 
     const feedbackFixtureId = auditCase.feedbackFixture ?? 'none';
     const feedbackFixture = feedbackFixtureId === 'none'
@@ -1207,10 +1563,32 @@ async function runUiAudit(): Promise<number> {
         }
       : await runFinding001Layout(cdp, sessionId, layoutFixtureId);
 
+    const appearance: Finding003Appearance = appearanceFixtureId === 'finding-003'
+      ? await runFinding003AppearanceMatrix(
+          cdp,
+          sessionId,
+          auditCase.page,
+          auditCase.theme,
+          outputDirectory,
+          auditCase.screenshot,
+        )
+      : {
+          appearanceStateCount: 0,
+          appearanceRuntimeFailures: 0,
+          sharedTokenSignatures: 'not-applicable',
+          newtabComputedStyleSignatures: 'not-applicable',
+          utilityShellFailures: 0,
+          utilityBackRouteFailures: 0,
+          backControlHeightPx: 0,
+          backViewportOverflowPx: 0,
+          trace: [],
+        };
+
     const observation = await evaluate<RuntimeObservation>(cdp, sessionId, String.raw`(async () => {
       const auditPage = ${JSON.stringify(auditCase.page)};
       const interaction = ${JSON.stringify(interaction)};
       const layout = ${JSON.stringify(layout)};
+      const appearance = ${JSON.stringify(appearance)};
       const sha256 = async (path) => {
         const response = await fetch(chrome.runtime.getURL(path), { cache: 'no-store' });
         if (!response.ok) throw new Error('Could not read runtime resource: ' + path);
@@ -1299,8 +1677,16 @@ async function runUiAudit(): Promise<number> {
           railViewportOverflowPx: layout.railViewportOverflowPx,
           topStripViewportOverflowPx: layout.topStripViewportOverflowPx,
           requiredControlVisibilityFailures: layout.requiredControlVisibilityFailures,
+          appearanceStateCount: appearance.appearanceStateCount,
+          appearanceRuntimeFailures: appearance.appearanceRuntimeFailures,
+          sharedTokenSignatures: appearance.sharedTokenSignatures,
+          newtabComputedStyleSignatures: appearance.newtabComputedStyleSignatures,
+          utilityShellFailures: appearance.utilityShellFailures,
+          utilityBackRouteFailures: appearance.utilityBackRouteFailures,
+          backControlHeightPx: appearance.backControlHeightPx,
+          backViewportOverflowPx: appearance.backViewportOverflowPx,
         },
-        interactionTrace: [...interaction.trace, ...layout.trace],
+        interactionTrace: [...interaction.trace, ...layout.trace, ...appearance.trace],
         runtimeId: chrome.runtime.id,
         manifest: chrome.runtime.getManifest(),
         resourceHashes: {
@@ -1332,6 +1718,14 @@ async function runUiAudit(): Promise<number> {
     }
     await new Promise((resolvePromise) => setTimeout(resolvePromise, 500));
     await evaluate(cdp, sessionId, 'true');
+
+    if (appearanceFixtureId === 'finding-003') {
+      observation.metrics.utilityBackRouteFailures = await probeFinding003BackRoute(
+        cdp,
+        sessionId,
+        auditCase.page,
+      );
+    }
 
     const runtimeErrors = [...cdp.runtimeErrors, ...identityErrors];
     const result = evaluateUiAuditCase(auditCase, observation.metrics, runtimeErrors);
@@ -1370,6 +1764,7 @@ async function runUiAudit(): Promise<number> {
           feedbackFixture: feedbackFixtureId,
           interactionFixture: interactionFixtureId,
           layoutFixture: layoutFixtureId,
+          appearanceFixture: appearanceFixtureId,
         },
         setup: auditCase.setup,
         cleanup: auditCase.cleanup,

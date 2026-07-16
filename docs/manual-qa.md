@@ -137,6 +137,21 @@ Repeat empty, representative, and long collections in light/dark and English/Sim
 - Disconnect and confirm local Saved for Later, Quick Links, and History remain, the remote Gist is unchanged, and Settings links to GitHub for full OAuth revocation.
 - Upgrade a valid version-one file and confirm only version two is written afterward.
 
+### FINDING-003 shared utility page shell
+
+Run the shared appearance matrix against one clean production build:
+
+```bash
+bun run audit:ui -- --port 9333 --case FINDING-003-NEWTAB-DESKTOP --output .artifacts/ui-audit/<commit>/FINDING-003-NEWTAB-DESKTOP
+bun run audit:ui -- --port 9333 --case FINDING-003-NEWTAB-NARROW --output .artifacts/ui-audit/<commit>/FINDING-003-NEWTAB-NARROW
+bun run audit:ui -- --port 9333 --case FINDING-003-SETTINGS-DESKTOP --output .artifacts/ui-audit/<commit>/FINDING-003-SETTINGS-DESKTOP
+bun run audit:ui -- --port 9333 --case FINDING-003-SETTINGS-NARROW --output .artifacts/ui-audit/<commit>/FINDING-003-SETTINGS-NARROW
+bun run audit:ui -- --port 9333 --case FINDING-003-HISTORY-DESKTOP --output .artifacts/ui-audit/<commit>/FINDING-003-HISTORY-DESKTOP
+bun run audit:ui -- --port 9333 --case FINDING-003-HISTORY-NARROW --output .artifacts/ui-audit/<commit>/FINDING-003-HISTORY-NARROW
+```
+
+Each case cycles the rendered page through no theme attribute, explicit light, and explicit dark without reading or writing the saved theme preference. It asserts visibility, color scheme, overflow, identity, and control geometry in every state and writes `-none`, `-light`, and `-dark` screenshots before restoring the case theme. Require identical shared-token signatures across all three pages, viewport-specific New Tab resolved computed-style parity with the manifest's audited base signatures, zero horizontal overflow, and a 44px-or-taller **Back to workspace** control that actually returns to `newtab.html`. Inspect the 12 utility-page state screenshots and confirm Settings and History use the same Tabstow mark, wordmark, heading hierarchy, focus treatment, semantic colors, and single-column narrow header.
+
 ## Tab lifecycle
 
 - Open **Tab lifecycle** from Active Tabs. Confirm Automatic sleep defaults off, Saved for later suggestions default on, thresholds remain visible while disabled, and Cancel discards every draft change.

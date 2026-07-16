@@ -41,6 +41,14 @@ const UI_AUDIT_METRICS = [
   'railViewportOverflowPx',
   'topStripViewportOverflowPx',
   'requiredControlVisibilityFailures',
+  'appearanceStateCount',
+  'appearanceRuntimeFailures',
+  'sharedTokenSignatures',
+  'newtabComputedStyleSignatures',
+  'utilityShellFailures',
+  'utilityBackRouteFailures',
+  'backControlHeightPx',
+  'backViewportOverflowPx',
 ] as const;
 
 const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
@@ -69,6 +77,12 @@ const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
   'railViewportOverflowPx',
   'topStripViewportOverflowPx',
   'requiredControlVisibilityFailures',
+  'appearanceStateCount',
+  'appearanceRuntimeFailures',
+  'utilityShellFailures',
+  'utilityBackRouteFailures',
+  'backControlHeightPx',
+  'backViewportOverflowPx',
 ]);
 
 const UI_AUDIT_FEEDBACK_FIXTURES = [
@@ -86,11 +100,14 @@ const UI_AUDIT_LAYOUT_FIXTURES = [
   'finding-001-long',
 ] as const;
 
+const UI_AUDIT_APPEARANCE_FIXTURES = ['finding-003'] as const;
+
 export type UiAuditMetric = typeof UI_AUDIT_METRICS[number];
 export type UiAuditOperator = 'atMost' | 'atLeast' | 'equals';
 export type UiAuditFeedbackFixture = typeof UI_AUDIT_FEEDBACK_FIXTURES[number];
 export type UiAuditInteractionFixture = typeof UI_AUDIT_INTERACTION_FIXTURES[number];
 export type UiAuditLayoutFixture = typeof UI_AUDIT_LAYOUT_FIXTURES[number];
+export type UiAuditAppearanceFixture = typeof UI_AUDIT_APPEARANCE_FIXTURES[number];
 
 export type UiAuditAssertion = {
   metric: UiAuditMetric;
@@ -109,6 +126,7 @@ export type UiAuditCase = {
   feedbackFixture?: UiAuditFeedbackFixture;
   interactionFixture?: UiAuditInteractionFixture;
   layoutFixture?: UiAuditLayoutFixture;
+  appearanceFixture?: UiAuditAppearanceFixture;
   setup: string[];
   cleanup: string[];
   screenshot: string;
@@ -243,6 +261,12 @@ export function validateUiAuditManifest(input: unknown): UiAuditManifest {
     if (candidate.layoutFixture !== undefined
       && !UI_AUDIT_LAYOUT_FIXTURES.includes(candidate.layoutFixture as UiAuditLayoutFixture)) {
       throw new Error(`${field}.layoutFixture is unsupported`);
+    }
+    if (candidate.appearanceFixture !== undefined
+      && !UI_AUDIT_APPEARANCE_FIXTURES.includes(
+        candidate.appearanceFixture as UiAuditAppearanceFixture,
+      )) {
+      throw new Error(`${field}.appearanceFixture is unsupported`);
     }
     validateInstructions(candidate.setup, `${field}.setup`);
     validateInstructions(candidate.cleanup, `${field}.cleanup`);
