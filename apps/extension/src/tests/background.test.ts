@@ -11,9 +11,9 @@ const browserMocks = vi.hoisted(() => ({
     onClicked: {
       addListener: vi.fn(),
     },
-    setBadgeBackgroundColor: vi.fn(),
-    setBadgeText: vi.fn(),
-    setTitle: vi.fn(),
+  },
+  sidePanel: {
+    setPanelBehavior: vi.fn(),
   },
   runtime: {
     sendMessage: vi.fn(),
@@ -113,10 +113,6 @@ const coordinatorMocks = vi.hoisted(() => ({
   scheduleOAuthAlarm: vi.fn(),
 }));
 
-const actionFeedbackMocks = vi.hoisted(() => ({
-  showActionFeedback: vi.fn(),
-}));
-
 const sessionServiceMocks = vi.hoisted(() => ({
   getCurrentWindowStowPreview: vi.fn(),
   openHistoryTab: vi.fn(),
@@ -154,7 +150,6 @@ vi.mock('@/lib/browser', () => ({
   browser: browserMocks,
 }));
 
-vi.mock('@/features/action-feedback/action-feedback', () => actionFeedbackMocks);
 vi.mock('@/features/context-menu/context-menu', () => contextMenuMocks);
 vi.mock('@/db/db', () => dbMocks);
 vi.mock('@/features/settings/settings-storage', () => settingsMocks);
@@ -283,10 +278,13 @@ describe('background message routing', () => {
     expect(closed.response).toEqual({ ok: true, data: { closedTabCount: 2 } });
   });
 
-  it('registers toolbar action click handling', async () => {
+  it('configures the toolbar action to open the Side Panel', async () => {
     await import('../entrypoints/background');
 
-    expect(browserMocks.action.onClicked.addListener).toHaveBeenCalledTimes(1);
+    expect(browserMocks.sidePanel.setPanelBehavior).toHaveBeenCalledWith({
+      openPanelOnActionClick: true,
+    });
+    expect(browserMocks.action.onClicked.addListener).not.toHaveBeenCalled();
   });
 
   it('routes named OAuth and sync alarms to the coordinator', async () => {
@@ -367,41 +365,15 @@ describe('background message routing', () => {
     expect(response).toEqual({ ok: true, data: view });
   });
 
-  it('stows the clicked tab window from the toolbar action', async () => {
-    const result = {
-      ok: true,
-      data: { session: null, savedTabCount: 3, closedTabCount: 3 },
-    };
-    sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValue(result);
-
+  it('keeps background startup available when Side Panel behavior setup fails', async () => {
+    browserMocks.sidePanel.setPanelBehavior.mockRejectedValueOnce(
+      new Error('Side Panel unavailable'),
+    );
     await import('../entrypoints/background');
+    await Promise.resolve();
 
-    const listener = browserMocks.action.onClicked.addListener.mock.calls[0]?.[0];
-    await listener?.({ windowId: 41 } as chrome.tabs.Tab);
-
-    expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(41);
-    expect(actionFeedbackMocks.showActionFeedback).toHaveBeenCalledWith(result);
-    expect(browserMocks.runtime.sendMessage).toHaveBeenCalledWith({
-      type: 'saved-data:changed',
-    });
-  });
-
-  it('falls back to the last focused window when toolbar tab has no window id', async () => {
-    sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValue({
-      ok: false,
-      error: {
-        code: 'no-eligible-tabs',
-        message: 'No eligible tabs were found in the current window.',
-      },
-    });
-
-    await import('../entrypoints/background');
-
-    const listener = browserMocks.action.onClicked.addListener.mock.calls[0]?.[0];
-    await listener?.({} as chrome.tabs.Tab);
-
-    expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(undefined);
-    expect(browserMocks.runtime.sendMessage).not.toHaveBeenCalled();
+    expect(browserMocks.runtime.onMessage.addListener).toHaveBeenCalledTimes(1);
+    expect(browserMocks.alarms.onAlarm.addListener).toHaveBeenCalledTimes(1);
   });
 
   it('routes active tab close messages', async () => {
