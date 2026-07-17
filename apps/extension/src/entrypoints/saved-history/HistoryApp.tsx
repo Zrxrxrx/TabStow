@@ -9,6 +9,10 @@ import {
   t,
   type LanguagePreference,
 } from '@/features/i18n/i18n';
+import {
+  formatLocalizedDateTime,
+  presentSessionTitle,
+} from '@/features/tabs/session-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 
@@ -34,6 +38,13 @@ export function HistoryApp({
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
   const [language, setLanguage] = useState<LanguagePreference>('auto');
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
+  const presentedEntries = useMemo(
+    () => entries.map((entry) => ({
+      entry,
+      sourceTitle: presentSessionTitle(locale, entry.sourceTitle, entry.tabs.length),
+    })),
+    [entries, locale],
+  );
 
   async function loadEntries() {
     const response = await sendExtensionMessage<AppResult<HistoryEntry[]>>({
@@ -124,15 +135,12 @@ export function HistoryApp({
         </div>
       ) : null}
       <div className="history-list">
-        {entries.map((entry) => (
+        {presentedEntries.map(({ entry, sourceTitle }) => (
           <article className="history-entry" key={entry.id}>
             <header>
-              <p>{t(locale, reasonMessageKey(entry.reason), { sourceTitle: entry.sourceTitle })}</p>
+              <p>{t(locale, reasonMessageKey(entry.reason), { sourceTitle })}</p>
               <time dateTime={entry.movedAt}>
-                {new Intl.DateTimeFormat(locale, {
-                  dateStyle: 'medium',
-                  timeStyle: 'short',
-                }).format(new Date(entry.movedAt))}
+                {formatLocalizedDateTime(locale, entry.movedAt)}
               </time>
             </header>
             <ul>

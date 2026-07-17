@@ -416,6 +416,10 @@ h3 {
   cursor: pointer;
 }
 
+.saved-count-summary {
+  white-space: nowrap;
+}
+
 .group-filter[aria-pressed="true"] {
   color: var(--accent-on);
   background: var(--accent);

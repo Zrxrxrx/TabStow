@@ -100,6 +100,25 @@ describe('HistoryApp', () => {
     expect(getByText('Removed from Archive')).not.toBeNull();
   });
 
+  it('localizes exact generated source titles and preserves mismatches', async () => {
+    storageGetItem.mockResolvedValueOnce('zh-CN');
+    sendExtensionMessage.mockResolvedValueOnce({
+      ok: true,
+      data: [
+        { ...ENTRY, id: 'history-generated', sourceTitle: '1 tabs stowed' },
+        { ...ENTRY, id: 'history-mismatch', reason: 'restored', sourceTitle: '2 tabs stowed' },
+        { ...ENTRY, id: 'history-custom', reason: 'deleted', sourceTitle: '阅读清单' },
+      ],
+    });
+
+    await renderHistory();
+
+    expect(getByText('从已收起 1 个标签页打开')).not.toBeNull();
+    expect(getByText('从2 tabs stowed恢复')).not.toBeNull();
+    expect(getByText('从阅读清单移除')).not.toBeNull();
+    expect(Array.from(container.querySelectorAll('time')).every((time) => /年|月|日/.test(time.textContent ?? ''))).toBe(true);
+  });
+
   it('shows a loading state while History is being fetched', async () => {
     sendExtensionMessage.mockReturnValueOnce(new Promise(() => {}));
 
