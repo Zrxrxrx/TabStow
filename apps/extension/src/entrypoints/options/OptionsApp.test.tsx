@@ -351,7 +351,7 @@ describe('OptionsApp', () => {
 
     expect(saveButton.disabled).toBe(true);
 
-    await act(async () => includePinnedTabs.click());
+    await act(async () => includePinnedTabs.closest('label')!.click());
     expect(saveButton.disabled).toBe(false);
 
     await act(async () => includePinnedTabs.click());
@@ -490,6 +490,9 @@ describe('OptionsApp', () => {
     expect(screen().getByText('Advanced / diagnostics')).not.toBeNull();
     expect(screen().getByText('Device ID')).not.toBeNull();
     const copyButton = screen().getByRole('button', { name: 'Copy Device ID' });
+    const deviceDescriptionId = copyButton.getAttribute('aria-describedby');
+    expect(deviceDescriptionId).toBe('device-id-description');
+    expect(document.getElementById(deviceDescriptionId!)?.textContent).toBe('replica-123');
 
     await act(async () => copyButton.click());
     expect(clipboardWriteText).toHaveBeenCalledWith('replica-123');
@@ -569,6 +572,12 @@ describe('OptionsApp', () => {
     await act(async () => includePinnedTabs.click());
     expect(closePinnedTabs.disabled).toBe(true);
     expect(closePinnedTabs.checked).toBe(true);
+    expect(closePinnedTabs.getAttribute('aria-describedby')).toBe(
+      'include-pinned-description settings-save-state',
+    );
+    expect(document.getElementById('include-pinned-description')?.textContent).toBe(
+      'Save pinned tabs when stowing',
+    );
 
     await act(async () => includePinnedTabs.click());
     expect(closePinnedTabs.disabled).toBe(false);

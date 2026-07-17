@@ -161,7 +161,30 @@ bun run audit:ui -- --port 9333 --case FINDING-003-HISTORY-DESKTOP --output .art
 bun run audit:ui -- --port 9333 --case FINDING-003-HISTORY-NARROW --output .artifacts/ui-audit/<commit>/FINDING-003-HISTORY-NARROW
 ```
 
-Each case cycles the rendered page through no theme attribute, explicit light, and explicit dark without reading or writing the saved theme preference. It asserts visibility, color scheme, overflow, identity, and control geometry in every state and writes `-none`, `-light`, and `-dark` screenshots before restoring the case theme. Require identical shared-token signatures across all three pages, viewport-specific New Tab resolved computed-style parity with the manifest's audited base signatures, zero horizontal overflow, and a 44px-or-taller **Back to workspace** control that actually returns to `newtab.html`. Inspect the 12 utility-page state screenshots and confirm Settings and History use the same Tabstow mark, wordmark, heading hierarchy, focus treatment, semantic colors, and single-column narrow header.
+Each case cycles the rendered page through no theme attribute, explicit light, and explicit dark without reading or writing the saved theme preference. It asserts visibility, color scheme, overflow, identity, and control geometry in every state and writes `-none`, `-light`, and `-dark` screenshots before restoring the case theme. Require identical reviewed shared-token signatures across all three pages, zero horizontal overflow, and a 44px-or-taller **Back to workspace** control that actually returns to `newtab.html`. New Tab resolved computed-style signatures remain in the assertion trace for visual review because FINDING-005 intentionally supersedes the earlier exact type, color, and control-size hashes. Inspect the 12 utility-page state screenshots and confirm Settings and History use the same Tabstow mark, wordmark, heading hierarchy, focus treatment, semantic colors, and single-column narrow header.
+
+### FINDING-005 readability and effective targets
+
+Run the final accessibility matrix against one clean production build in a disposable browser profile:
+
+```bash
+bun run audit:ui -- --port 9333 --case FINDING-005-NEWTAB-1440 --output .artifacts/ui-audit/<commit>/FINDING-005-NEWTAB-1440
+bun run audit:ui -- --port 9333 --case FINDING-005-NEWTAB-768 --output .artifacts/ui-audit/<commit>/FINDING-005-NEWTAB-768
+bun run audit:ui -- --port 9333 --case FINDING-005-NEWTAB-390 --output .artifacts/ui-audit/<commit>/FINDING-005-NEWTAB-390
+bun run audit:ui -- --port 9333 --case FINDING-005-NEWTAB-ZOOM --output .artifacts/ui-audit/<commit>/FINDING-005-NEWTAB-ZOOM
+bun run audit:ui -- --port 9333 --case FINDING-005-SETTINGS-1440 --output .artifacts/ui-audit/<commit>/FINDING-005-SETTINGS-1440
+bun run audit:ui -- --port 9333 --case FINDING-005-SETTINGS-768 --output .artifacts/ui-audit/<commit>/FINDING-005-SETTINGS-768
+bun run audit:ui -- --port 9333 --case FINDING-005-SETTINGS-390 --output .artifacts/ui-audit/<commit>/FINDING-005-SETTINGS-390
+bun run audit:ui -- --port 9333 --case FINDING-005-SETTINGS-ZOOM --output .artifacts/ui-audit/<commit>/FINDING-005-SETTINGS-ZOOM
+bun run audit:ui -- --port 9333 --case FINDING-005-HISTORY-1440 --output .artifacts/ui-audit/<commit>/FINDING-005-HISTORY-1440
+bun run audit:ui -- --port 9333 --case FINDING-005-HISTORY-768 --output .artifacts/ui-audit/<commit>/FINDING-005-HISTORY-768
+bun run audit:ui -- --port 9333 --case FINDING-005-HISTORY-390 --output .artifacts/ui-audit/<commit>/FINDING-005-HISTORY-390
+bun run audit:ui -- --port 9333 --case FINDING-005-HISTORY-ZOOM --output .artifacts/ui-audit/<commit>/FINDING-005-HISTORY-ZOOM
+```
+
+Each case audits both light and dark computed states. The runner requires the final 28/18/14/12px type scale, 4.5:1 text contrast, 44px effective standalone targets, non-overlapping sibling targets, visible keyboard focus, and nonempty descriptions for unavailable controls. Checkbox measurements use their full label rows; inline prose links are exempt only from target size. The zoom cases use 200% tab zoom.
+
+Repeat the matrix with representative populated state: Active and Saved rows, Unified Search results, Quick Link edit and chooser states, Settings connection phases, and populated History. Inspect the assertion trace for every failed selector or accessibility name. Store screenshots and assertion JSON under `.artifacts/`; do not commit them.
 
 ## Tab lifecycle
 

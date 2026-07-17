@@ -101,38 +101,41 @@ function SavedTabRow({
       </span>
     </>
   );
+  const safeUrl = isSafeSavedTabUrl(tab.url);
+  const openControl = safeUrl ? (
+    <button
+      aria-label={t(locale, 'openSavedTab', { label })}
+      className="saved-tab-open"
+      disabled={busy}
+      onAuxClick={(event) => {
+        if (event.button !== 1) return;
+        event.preventDefault();
+        onOpen(false);
+      }}
+      onClick={(event) => {
+        if (suppressClickRef.current || event.button !== 0 || isModifiedClick(event)) return;
+        event.preventDefault();
+        onOpen(true);
+      }}
+      type="button"
+    >
+      {content}
+    </button>
+  ) : (
+    <div className="saved-tab-open">{content}</div>
+  );
 
   return (
     <div
       aria-disabled={dragDisabled}
       className="saved-tab-row"
       draggable={!dragDisabled}
-      onAuxClick={(event) => {
-        if (event.button !== 1 || !isSafeSavedTabUrl(tab.url)) return;
-        event.preventDefault();
-        onOpen(false);
-      }}
-      onClick={(event) => {
-        if (suppressClickRef.current || busy || !isSafeSavedTabUrl(tab.url)) return;
-        if (event.button !== 0 || isModifiedClick(event)) return;
-        event.preventDefault();
-        onOpen(true);
-      }}
       onDragEnd={(event) => {
         onDragEnd(event);
         suppressClickRef.current = true;
         window.setTimeout(() => { suppressClickRef.current = false; }, 0);
       }}
       onDragStart={(event) => onDragStart(event, { kind: 'tab', sessionId, tabId: tab.id })}
-      onKeyDown={(event) => {
-        if (event.target !== event.currentTarget) return;
-        if ((event.key === 'Enter' || event.key === ' ') && !busy && isSafeSavedTabUrl(tab.url)) {
-          event.preventDefault();
-          onOpen(true);
-        }
-      }}
-      role={isSafeSavedTabUrl(tab.url) ? 'button' : undefined}
-      tabIndex={isSafeSavedTabUrl(tab.url) ? 0 : undefined}
     >
       <span
         aria-disabled={dragDisabled}
@@ -140,10 +143,7 @@ function SavedTabRow({
         draggable={!dragDisabled}
         className="drag-surface-label"
       />
-      <div
-        aria-label={isSafeSavedTabUrl(tab.url) ? t(locale, 'openSavedTab', { label }) : undefined}
-        className="saved-tab-open"
-      >{content}</div>
+      {openControl}
 
       <button
         type="button"
@@ -200,7 +200,10 @@ export function StowedSessions({
 
   function startDrag(event: DragEvent, source: SavedTabsDragSource) {
     event.stopPropagation();
-    if (event.target instanceof HTMLElement && event.target.closest('button, input, a')) {
+    const control = event.target instanceof HTMLElement
+      ? event.target.closest('button, input, a')
+      : null;
+    if (control && !control.classList.contains('saved-tab-open')) {
       event.preventDefault();
       return;
     }

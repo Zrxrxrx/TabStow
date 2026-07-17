@@ -15,6 +15,7 @@ export type FormDialogProps = {
   onCancel: () => void;
   onSubmit: () => void | Promise<void>;
   submitLabel: string;
+  submitAriaDescribedBy?: string;
   submitDisabled?: boolean;
   submitting?: boolean;
   title: string;
@@ -28,6 +29,7 @@ export function FormDialog({
   initialFocusRef,
   onCancel,
   onSubmit,
+  submitAriaDescribedBy,
   submitLabel,
   submitDisabled = false,
   submitting = false,
@@ -50,6 +52,7 @@ export function FormDialog({
             {cancelLabel}
           </button>
           <button
+            aria-describedby={submitAriaDescribedBy}
             className="primary-button"
             disabled={submitting || submitDisabled}
             form={formId}

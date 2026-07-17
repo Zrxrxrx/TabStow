@@ -375,11 +375,11 @@ export function OptionsApp({
               <p className="help-text">No unambiguous <code>tabstow.sync.json</code> Gist was found.</p>
             )}
             <div className="target-grid">
-              <label>
+              <label id="existing-gist-id-label">
                 Existing Gist ID
                 <input value={gistId} onChange={(event) => setGistId(event.target.value)} />
               </label>
-              <label>
+              <label id="sync-filename-label">
                 Sync filename
                 <input value={fileName} onChange={(event) => setFileName(event.target.value)} />
               </label>
@@ -388,6 +388,7 @@ export function OptionsApp({
               <button
                 type="button"
                 className="primary-button"
+                aria-describedby="existing-gist-id-label sync-filename-label"
                 disabled={disabled || !gistId.trim() || !fileName.trim()}
                 onClick={() =>
                   void runConnectionAction('select-manual', {
@@ -564,15 +565,21 @@ export function OptionsApp({
         </p>
         <label className="checkbox-row">
           <input
+            aria-describedby="settings-save-state"
             type="checkbox"
             checked={settingsDraft.includePinnedTabs}
             onChange={(event) => updateField('includePinnedTabs', event.target.checked)}
             disabled={!settingsForm || busyAction === 'save'}
           />
-          Save pinned tabs when stowing
+          <span id="include-pinned-description">Save pinned tabs when stowing</span>
         </label>
         <label className="checkbox-row">
           <input
+            aria-describedby={
+              settingsDraft.includePinnedTabs
+                ? 'settings-save-state'
+                : 'include-pinned-description settings-save-state'
+            }
             type="checkbox"
             checked={settingsDraft.closePinnedTabs}
             onChange={(event) => updateField('closePinnedTabs', event.target.checked)}
@@ -603,11 +610,14 @@ export function OptionsApp({
           <div className="diagnostics-content">
             <div>
               <strong>Device ID</strong>
-              <p className="device-id">{settingsDraft.deviceId || 'Device ID will be created automatically.'}</p>
+              <p className="device-id" id="device-id-description">
+                {settingsDraft.deviceId || 'Device ID will be created automatically.'}
+              </p>
             </div>
             <button
               type="button"
               className="secondary-button"
+              aria-describedby="device-id-description"
               disabled={!settingsDraft.deviceId}
               onClick={() => void copyDeviceId()}
             >

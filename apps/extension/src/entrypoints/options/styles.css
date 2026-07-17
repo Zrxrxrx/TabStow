@@ -14,6 +14,8 @@ body {
   margin: 0;
   background: var(--ts-bg);
   color: var(--ts-text);
+  font-size: var(--ts-type-body);
+  line-height: 1.5;
 }
 
 .utility-page-shell {
@@ -46,7 +48,8 @@ select {
 }
 
 button {
-  min-height: 38px;
+  min-width: var(--ts-target-size);
+  min-height: var(--ts-target-size);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -61,12 +64,15 @@ button {
 
 button:disabled {
   cursor: not-allowed;
-  opacity: 0.6;
+  color: var(--ts-text-muted);
+  opacity: 1;
 }
 
 button:focus-visible,
 input:focus-visible,
-select:focus-visible {
+select:focus-visible,
+summary:focus-visible,
+a:focus-visible {
   outline: 0;
   box-shadow: var(--ts-focus-ring);
 }
@@ -74,7 +80,7 @@ select:focus-visible {
 input,
 select {
   width: 100%;
-  min-height: 38px;
+  min-height: var(--ts-target-size);
   margin-top: 6px;
   padding: 0 10px;
   color: var(--ts-text);
@@ -92,6 +98,7 @@ select {
 .options-intro-detail {
   margin: 8px 0 0;
   color: var(--ts-text-muted);
+  font-size: var(--ts-type-meta);
 }
 
 .settings-section {
@@ -104,7 +111,7 @@ select {
 .settings-section h2 {
   margin: 0;
   font-family: var(--ts-font-display);
-  font-size: 17px;
+  font-size: var(--ts-type-section);
   font-weight: 900;
   letter-spacing: 0.025em;
   text-transform: uppercase;
@@ -119,6 +126,8 @@ select {
   display: flex !important;
   align-items: center;
   gap: 10px;
+  min-height: var(--ts-target-size);
+  width: 100%;
 }
 
 .checkbox-row input {
@@ -131,6 +140,7 @@ select {
   margin: 6px 0 0;
   overflow-wrap: anywhere;
   color: var(--ts-text-muted);
+  font-size: var(--ts-type-meta);
 }
 
 .diagnostics-disclosure {
@@ -139,6 +149,9 @@ select {
 }
 
 .diagnostics-disclosure summary {
+  min-height: var(--ts-target-size);
+  display: flex;
+  align-items: center;
   padding: 12px 14px;
   color: var(--ts-text-secondary);
   cursor: pointer;
@@ -164,6 +177,7 @@ select {
 .diagnostics-note {
   margin: 0;
   padding: 0 14px 14px;
+  font-size: var(--ts-type-meta);
 }
 
 .connection-card {
@@ -184,6 +198,10 @@ select {
   color: var(--ts-status-warning-text);
   border-color: var(--ts-warning);
   background: var(--ts-status-warning-bg);
+}
+
+.warning-card .help-text {
+  color: inherit;
 }
 
 .device-code {
@@ -223,6 +241,7 @@ select {
 
 .candidate-button small {
   color: var(--ts-text-muted);
+  font-size: var(--ts-type-meta);
 }
 
 .connection-summary {
@@ -257,6 +276,7 @@ select {
 
 .help-text {
   color: var(--ts-text-muted);
+  font-size: var(--ts-type-meta);
 }
 
 .settings-section-copy {
@@ -275,6 +295,7 @@ select {
 .settings-save-state {
   margin: 0;
   color: var(--ts-text-muted);
+  font-size: var(--ts-type-meta);
 }
 
 .danger-text,
@@ -287,6 +308,7 @@ select {
 }
 
 .danger-button {
+  color: var(--ts-status-error-text);
   border-color: color-mix(in oklab, var(--ts-danger), var(--ts-border) 70%);
   background: var(--ts-status-error-bg);
 }

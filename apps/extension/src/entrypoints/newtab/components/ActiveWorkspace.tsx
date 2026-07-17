@@ -270,7 +270,10 @@ export function ActiveWorkspace({
 
   function startDrag(event: DragEvent, source: ActiveTabsDragSource) {
     event.stopPropagation();
-    if (event.target instanceof HTMLElement && event.target.closest('button, input, a')) {
+    const control = event.target instanceof HTMLElement
+      ? event.target.closest('button, input, a')
+      : null;
+    if (control && !control.classList.contains('tab-open-button')) {
       event.preventDefault();
       return;
     }
