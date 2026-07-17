@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Languages, Moon, Settings, SlidersHorizontal, Sun } from 'lucide-react';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
-import { SavedForLater } from '@/features/saved-for-later/SavedForLater';
-import { useSavedForLaterController } from '@/features/saved-for-later/useSavedForLaterController';
+import {
+  SavedForLater,
+  useSavedForLaterController,
+} from '@/features/saved-for-later';
 import {
   getLanguagePreference,
   resolveLocale,
