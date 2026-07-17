@@ -9,6 +9,7 @@ export default defineConfig({
   manifest: {
     name: 'Tabstow',
     description: 'Stow, organize, and restore your browser tabs.',
+    minimum_chrome_version: '114',
     permissions: [
       'tabs',
       'storage',

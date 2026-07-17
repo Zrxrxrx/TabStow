@@ -9,6 +9,7 @@ const manifest = config.manifest as
         default_title?: string;
         default_popup?: unknown;
       };
+      minimum_chrome_version?: string;
       permissions?: string[];
       host_permissions?: string[];
       content_scripts?: unknown[];
@@ -16,6 +17,10 @@ const manifest = config.manifest as
   | undefined;
 
 describe('extension manifest', () => {
+  it('requires a Chrome version with the Side Panel API', () => {
+    expect(manifest?.minimum_chrome_version).toBe('114');
+  });
+
   it('keeps the toolbar action available for the Side Panel', () => {
     expect(manifest?.action).toMatchObject({
       default_title: 'Tabstow',

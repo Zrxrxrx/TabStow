@@ -34,7 +34,15 @@ export function SidePanelApp({
   const controller = useSavedForLaterController({ onStatus: setStatus });
 
   useEffect(() => {
-    void getLanguagePreference().then(setLanguage);
+    let active = true;
+    void getLanguagePreference()
+      .then((savedLanguage) => {
+        if (active) setLanguage(savedLanguage);
+      })
+      .catch(() => undefined);
+    return () => {
+      active = false;
+    };
   }, []);
 
   useEffect(() => {

@@ -101,7 +101,7 @@ Repeat empty, representative, and long collections in light/dark and English/Sim
 - At 1440px, 1180px, and 1024px widths, confirm all three regions remain visible, the page has no horizontal overflow, and Active/Saved scroll independently.
 - Repeat the width matrix in light/dark mode and English/Simplified Chinese. Confirm the saved theme is applied before content appears and no light-mode flash occurs.
 - Verify empty, typical, and long Quick Link/Active/Saved collections. At desktop widths, rail branding and utility controls stay fixed while the Quick Link list scrolls. At tablet widths, the Quick Links rail stays sticky and auxiliary controls remain reachable at the end of the document. Below 768px, every region remains reachable in document flow.
-- Click the extension toolbar icon and confirm Chrome opens or toggles Tabstow's native Side Panel without closing or saving any open tab.
+- On Chrome 114 or later, click the extension toolbar icon and confirm Chrome opens or toggles Tabstow's native Side Panel without closing or saving any open tab.
 - Keep a New Tab and the Side Panel open together. Confirm both show the same Saved windows and tabs, then open, restore, remove, reorder, and move items from either surface and confirm the other refreshes without reopening.
 - In the Side Panel, confirm Saved-only search filters the shared list and disables drag-and-drop until cleared; open History and confirm **View full History** opens outside the Side Panel.
 - Open several ordinary web tabs and use **Stow window**.

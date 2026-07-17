@@ -2,6 +2,7 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
+import type { LanguagePreference } from '@/features/i18n/i18n';
 import { SidePanelApp } from './SidePanelApp';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean })
@@ -133,6 +134,34 @@ describe('SidePanelApp', () => {
     expect(document.documentElement.lang).toBe('zh-CN');
     expect(getByRole('searchbox', '搜索已保存的标签页')).not.toBeNull();
     expect(getByRole('alert').textContent).toBe('Theme unavailable');
+  });
+
+  it('keeps the browser locale when the language preference cannot be read', async () => {
+    storageGetItem.mockRejectedValueOnce(new Error('Storage unavailable'));
+    await renderSidePanel();
+
+    expect(document.documentElement.lang).toBe('en');
+    expect(getByRole('searchbox', 'Search saved tabs')).not.toBeNull();
+  });
+
+  it('ignores a language preference read that finishes after unmount', async () => {
+    let resolveLanguage: ((language: LanguagePreference) => void) | undefined;
+    storageGetItem.mockImplementationOnce(() => new Promise<LanguagePreference>((resolve) => {
+      resolveLanguage = resolve;
+    }));
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await act(async () => {
+      root.render(<SidePanelApp />);
+      await Promise.resolve();
+      root.render(null);
+    });
+    await act(async () => {
+      resolveLanguage?.('zh-CN');
+      await Promise.resolve();
+    });
+
+    expect(consoleError).not.toHaveBeenCalled();
   });
 
   it('opens full History outside the Side Panel', async () => {
