@@ -11,6 +11,10 @@ import type { TabSession } from '@tabstow/core';
 import { TabFavicon } from '@/components/TabFavicon';
 import { t, type Locale } from '@/features/i18n/i18n';
 import { filterSavedSessions } from '@/features/tab-search/tab-search';
+import {
+  formatLocalizedDateTime,
+  presentSessionTitle,
+} from '@/features/tabs/session-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import {
@@ -37,13 +41,6 @@ type Props = {
 };
 
 type SavedTab = TabSession['tabs'][number];
-
-function formatDate(value: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    dateStyle: 'medium',
-    timeStyle: 'short',
-  }).format(new Date(value));
-}
 
 function isSafeSavedTabUrl(url: string): boolean {
   try {
@@ -175,6 +172,13 @@ export function StowedSessions({
   const filteredSessions = useMemo(
     () => filterSavedSessions(sessions, query),
     [query, sessions],
+  );
+  const presentedSessions = useMemo(
+    () => filteredSessions.map((session) => ({
+      session,
+      sessionTitle: presentSessionTitle(locale, session.title, session.tabs.length),
+    })),
+    [filteredSessions, locale],
   );
   const totalTabs = useMemo(
     () => filteredSessions.reduce((count, session) => count + session.tabs.length, 0),
@@ -330,15 +334,13 @@ export function StowedSessions({
         <div className="header-actions saved-header-actions">
           {filteredSessions.length > 0 ? (
             <span
-              className="meta-row"
+              className="meta-pill saved-count-summary"
               id="saved-count"
-              aria-label={t(locale, 'savedCount', {
+            >
+              {t(locale, 'savedCount', {
                 sessions: sessionCount,
                 tabs: tabCount,
               })}
-            >
-              <span className="meta-pill">{sessionCount}</span>
-              <span className="meta-pill">{tabCount}</span>
             </span>
           ) : null}
           <button
@@ -372,11 +374,11 @@ export function StowedSessions({
           )
         ) : (
           <>
-            {filteredSessions.map((session) => (
+            {presentedSessions.map(({ session, sessionTitle }) => (
               <Fragment key={session.id}>
                 {renderDropTarget(
                   `session:before:${session.id}`,
-                  t(locale, 'dropSavedSessionBefore', { label: session.title }),
+                  t(locale, 'dropSavedSessionBefore', { label: sessionTitle }),
                   {
                     kind: 'session',
                     beforeSessionId: session.id,
@@ -386,7 +388,7 @@ export function StowedSessions({
                 <article className="session-card">
                   <header
                     aria-disabled={dragDisabled}
-                    aria-label={t(locale, 'dragSavedSession', { label: session.title })}
+                    aria-label={t(locale, 'dragSavedSession', { label: sessionTitle })}
                     draggable={!dragDisabled}
                     onDragEnd={endDrag}
                     onDragStart={(event) => startDrag(event, { kind: 'session', sessionId: session.id })}
@@ -394,10 +396,10 @@ export function StowedSessions({
                     <div className="session-heading">
                       <div className="tab-copy">
                         <span className="session-title">
-                          {session.title}
+                          {sessionTitle}
                         </span>
                         <span className="session-preview">
-                          {t(locale, session.tabs.length === 1 ? 'savedTabCount' : 'savedTabsCount', { count: session.tabs.length })} · {formatDate(session.createdAt)}
+                          {t(locale, session.tabs.length === 1 ? 'savedTabCount' : 'savedTabsCount', { count: session.tabs.length })} · {formatLocalizedDateTime(locale, session.createdAt)}
                         </span>
                       </div>
                     </div>
@@ -405,7 +407,7 @@ export function StowedSessions({
                       <button
                         type="button"
                         className="secondary-button"
-                        aria-label={t(locale, 'restoreSavedSession', { label: session.title })}
+                        aria-label={t(locale, 'restoreSavedSession', { label: sessionTitle })}
                         onClick={() =>
                           void onRunAction(
                             `restore-${session.id}`,
@@ -426,7 +428,7 @@ export function StowedSessions({
                       <button
                         type="button"
                         className="danger-button"
-                        aria-label={t(locale, 'removeSavedSession', { label: session.title })}
+                        aria-label={t(locale, 'removeSavedSession', { label: sessionTitle })}
                         onClick={() =>
                           void onRunAction(
                             `delete-${session.id}`,
@@ -500,7 +502,7 @@ export function StowedSessions({
                     ))}
                     {renderDropTarget(
                       `tab:${session.id}:end`,
-                      t(locale, 'dropSavedTabAtEnd', { label: session.title }),
+                      t(locale, 'dropSavedTabAtEnd', { label: sessionTitle }),
                       {
                         kind: 'tab',
                         destinationSessionId: session.id,

@@ -1,6 +1,7 @@
 import { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
+import type { HistoryEntry } from '@/features/history/types';
 import { RecoveryBinDialog } from './RecoveryBinDialog';
 
 const sendExtensionMessage = vi.hoisted(() => vi.fn());
@@ -50,6 +51,10 @@ describe('RecoveryBinDialog', () => {
     expect(document.body.querySelector<HTMLImageElement>('.recovery-entry img.saved-tab-favicon')?.src).toContain(
       '_favicon/?pageUrl=https%3A%2F%2Fexample.com%2F5',
     );
+    const newestMeta = document.body.querySelector('.recovery-entry .tab-url')?.textContent ?? '';
+    expect(newestMeta).toContain('1 tab · Removed ·');
+    expect(newestMeta).toContain('Jul');
+    expect(newestMeta).not.toContain('deleted');
     const restore = document.body.querySelector<HTMLButtonElement>('.recovery-entry button')!;
     await act(async () => restore.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:restore', historyId: 'history-5' });
@@ -60,7 +65,44 @@ describe('RecoveryBinDialog', () => {
   });
 
   it('uses the same History vocabulary in Simplified Chinese', async () => {
-    sendExtensionMessage.mockReset().mockResolvedValue({ ok: true, data: [] });
+    const entries: HistoryEntry[] = [
+      {
+        id: 'history-opened',
+        sourceSessionId: 'session-opened',
+        sourceTitle: '1 tabs stowed',
+        tabs: [{ id: 'tab-opened', title: '已打开', url: 'https://opened.example/', createdAt: '2026-07-01T00:00:00.000Z' }],
+        originalCreatedAt: '2026-07-01T00:00:00.000Z',
+        movedAt: '2026-07-03T12:00:00.000Z',
+        reason: 'opened',
+        deviceId: 'device-1',
+      },
+      {
+        id: 'history-restored',
+        sourceSessionId: 'session-restored',
+        sourceTitle: '2 tabs stowed',
+        tabs: [{ id: 'tab-restored', title: '已恢复', url: 'https://restored.example/', createdAt: '2026-07-01T00:00:00.000Z' }],
+        originalCreatedAt: '2026-07-01T00:00:00.000Z',
+        movedAt: '2026-07-02T12:00:00.000Z',
+        reason: 'restored',
+        deviceId: 'device-1',
+      },
+      {
+        id: 'history-deleted',
+        sourceSessionId: 'session-deleted',
+        sourceTitle: '3 tabs stowed',
+        tabs: Array.from({ length: 3 }, (_, index) => ({
+          id: `tab-deleted-${index}`,
+          title: `已移除 ${index}`,
+          url: `https://deleted.example/${index}`,
+          createdAt: '2026-07-01T00:00:00.000Z',
+        })),
+        originalCreatedAt: '2026-07-01T00:00:00.000Z',
+        movedAt: '2026-07-01T12:00:00.000Z',
+        reason: 'deleted',
+        deviceId: 'device-1',
+      },
+    ];
+    sendExtensionMessage.mockReset().mockResolvedValue({ ok: true, data: entries });
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
       value: { runtime: { getURL: (path: string) => `chrome-extension://test${path}` } },
@@ -83,6 +125,14 @@ describe('RecoveryBinDialog', () => {
     expect(document.getElementById(titleId)?.textContent).toBe('历史记录');
     expect(dialog.textContent).not.toContain('临时找回');
     expect(dialog.querySelector('.recovery-history-link')?.textContent).toContain('查看完整历史记录');
+    const titles = Array.from(dialog.querySelectorAll('.recovery-entry strong')).map((node) => node.textContent);
+    expect(titles).toEqual(['已收起 1 个标签页', '2 tabs stowed', '已收起 3 个标签页']);
+    const metadata = Array.from(dialog.querySelectorAll('.recovery-entry .tab-url')).map((node) => node.textContent ?? '');
+    expect(metadata[0]).toContain('1 个标签页 · 已打开 ·');
+    expect(metadata[1]).toContain('1 个标签页 · 已恢复 ·');
+    expect(metadata[2]).toContain('3 个标签页 · 已移除 ·');
+    expect(metadata.every((text) => /年|月|日/.test(text))).toBe(true);
+    expect(metadata.join(' ')).not.toMatch(/\b(opened|restored|deleted)\b/);
 
     await act(async () => root.unmount());
     container.remove();

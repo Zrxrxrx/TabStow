@@ -90,6 +90,14 @@ describe('i18n', () => {
     expect(t('en', 'savedTabsCount', { count: 3 })).toBe('3 tabs');
     expect(t('en', 'savedSessionCount', { count: 1 })).toBe('1 window');
     expect(t('en', 'savedTabCount', { count: 1 })).toBe('1 tab');
+    expect(t('en', 'generatedSessionTitleOne', { count: 1 })).toBe('1 tab stowed');
+    expect(t('en', 'generatedSessionTitleMany', { count: 3 })).toBe('3 tabs stowed');
+    expect(t('en', 'historyReasonOpened')).toBe('Opened');
+    expect(t('en', 'historyReasonRestored')).toBe('Restored');
+    expect(t('en', 'historyReasonDeleted')).toBe('Removed');
+    expect(t('en', 'recoveryEntryMeta', { tabs: '1 tab', reason: 'Removed', time: 'Jul 7' })).toBe(
+      '1 tab · Removed · Jul 7',
+    );
     expect(t('en', 'saveTabForLater', { label: 'Docs' })).toBe(
       'Save Docs to Saved windows',
     );
@@ -202,6 +210,14 @@ describe('i18n', () => {
     expect(t('zh-CN', 'savedTabsCount', { count: 3 })).toBe('3 个标签页');
     expect(t('zh-CN', 'savedSessionCount', { count: 1 })).toBe('1 个窗口');
     expect(t('zh-CN', 'savedTabCount', { count: 1 })).toBe('1 个标签页');
+    expect(t('zh-CN', 'generatedSessionTitleOne', { count: 1 })).toBe('已收起 1 个标签页');
+    expect(t('zh-CN', 'generatedSessionTitleMany', { count: 3 })).toBe('已收起 3 个标签页');
+    expect(t('zh-CN', 'historyReasonOpened')).toBe('已打开');
+    expect(t('zh-CN', 'historyReasonRestored')).toBe('已恢复');
+    expect(t('zh-CN', 'historyReasonDeleted')).toBe('已移除');
+    expect(t('zh-CN', 'recoveryEntryMeta', { tabs: '1 个标签页', reason: '已移除', time: '7月7日' })).toBe(
+      '1 个标签页 · 已移除 · 7月7日',
+    );
     expect(t('zh-CN', 'stowThisWindow')).toBe('收起窗口');
     expect(t('zh-CN', 'stowTabReady', { count: 1 })).toBe('1 个标签页待收起');
     expect(t('zh-CN', 'stowWaitForCurrentAction')).toBe('请等待当前操作完成。');

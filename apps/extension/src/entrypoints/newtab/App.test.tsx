@@ -692,9 +692,7 @@ describe('App', () => {
     expect(container.textContent).not.toContain('Saved mail');
     expect(container.textContent).not.toContain('Saved article');
     expect(screen().getByText('1 open')).not.toBeNull();
-    expect(screen().getByText('1 window')).not.toBeNull();
-    expect(screen().getByText('1 tab')).not.toBeNull();
-    expect(screen().getByLabelText('1 window, 1 tab')).not.toBeNull();
+    expect(screen().getByText('1 window, 1 tab')).not.toBeNull();
 
     const dragHandle = screen().getByLabelText('Drag GitHub active issue') as HTMLButtonElement;
     expect(dragHandle.getAttribute('aria-disabled')).toBe('true');
@@ -1513,11 +1511,9 @@ describe('App', () => {
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
     expect(screen().getByRole('button', { name: '添加快捷链接' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '已保存的窗口' })).not.toBeNull();
-    expect(screen().getByText('1 个窗口')).not.toBeNull();
-    expect(screen().getByText('1 个标签页')).not.toBeNull();
+    expect(screen().getByText('1 个窗口，1 个标签页')).not.toBeNull();
     expect(screen().getByText('已打开 1 个')).not.toBeNull();
     expect(screen().getByLabelText('已保存的窗口')).not.toBeNull();
-    expect(screen().getByLabelText('1 个窗口，1 个标签页')).not.toBeNull();
     expect(screen().getByLabelText('搜索打开的标签页、已保存标签页或网页')).not.toBeNull();
     expect(screen().getByLabelText('编辑快捷链接')).not.toBeNull();
     expect(screen().getByText('收起窗口')).not.toBeNull();
@@ -2606,7 +2602,7 @@ describe('App', () => {
 
     await renderApp();
 
-    expect(screen().getByText('2 tabs')).not.toBeNull();
+    expect(screen().getByText('1 window, 2 tabs')).not.toBeNull();
     expect(screen().getByText('Example Docs')).not.toBeNull();
     expect(screen().getByText('https://docs.example.com/path')).not.toBeNull();
     expect(screen().getByText('Example Blog')).not.toBeNull();
@@ -2633,6 +2629,40 @@ describe('App', () => {
 
     expect(savedTabButton.querySelector('img.saved-tab-favicon')).toBeNull();
     expect(savedTabButton.querySelector('.favicon-fallback')).not.toBeNull();
+  });
+
+  it('localizes generated saved-window metadata without changing custom data', async () => {
+    getLanguagePreference.mockResolvedValue('zh-CN');
+    const generatedSession: TabSession = {
+      id: 'generated-session',
+      title: '1 tabs stowed',
+      tabs: [{
+        id: 'generated-tab',
+        title: '示例',
+        url: 'https://example.com/',
+        createdAt: '2026-07-07T12:00:00.000Z',
+      }],
+      sourceWindowId: 4,
+      createdAt: '2026-07-07T12:00:00.000Z',
+      updatedAt: '2026-07-07T12:00:00.000Z',
+      deviceId: 'device-1',
+    };
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: [generatedSession] });
+
+    await renderApp();
+
+    expect(screen().getByText('已收起 1 个标签页')).not.toBeNull();
+    expect(screen().getByLabelText('恢复已收起 1 个标签页并将窗口移至历史记录')).not.toBeNull();
+    expect(screen().getByLabelText('将已收起 1 个标签页移至历史记录')).not.toBeNull();
+    expect(screen().getByLabelText('拖动已保存的窗口已收起 1 个标签页')).not.toBeNull();
+    expect(screen().getByLabelText('将已保存的窗口放在已收起 1 个标签页之前')).not.toBeNull();
+    expect(screen().getByLabelText('将已保存的标签页放在已收起 1 个标签页末尾')).not.toBeNull();
+    expect(container.querySelector('.session-preview')?.textContent).toMatch(/年|月|日/);
+    const savedCount = container.querySelector('#saved-count');
+    expect(savedCount?.textContent).toBe('1 个窗口，1 个标签页');
+    expect(savedCount?.children).toHaveLength(0);
+    expect(savedCount?.classList.contains('saved-count-summary')).toBe(true);
+    expect(container.textContent).not.toContain('1 tabs stowed');
   });
 
   it('renders imported non-http saved tabs as inert rows without hrefs', async () => {
