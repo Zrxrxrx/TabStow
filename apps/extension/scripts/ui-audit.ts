@@ -1587,6 +1587,10 @@ async function runUiAudit(): Promise<number> {
 
     const observation = await evaluate<RuntimeObservation>(cdp, sessionId, String.raw`(async () => {
       const auditPage = ${JSON.stringify(auditCase.page)};
+      const auditsFirstUse = ${JSON.stringify(auditCase.assertions.some(
+        ({ metric }) => metric === 'firstUseGuidanceFailures'
+          || metric === 'stowUnavailableFailures',
+      ))};
       const interaction = ${JSON.stringify(interaction)};
       const layout = ${JSON.stringify(layout)};
       const appearance = ${JSON.stringify(appearance)};
@@ -1631,6 +1635,51 @@ async function runUiAudit(): Promise<number> {
       );
       const currentTab = await chrome.tabs.getCurrent();
       const zoom = currentTab?.id == null ? Number.NaN : await chrome.tabs.getZoom(currentTab.id);
+      const firstUseGuidanceFailures = auditsFirstUse
+        ? [
+            !document.querySelector('[data-od-id="active-first-use-guidance"]'),
+            !document.querySelector('[data-od-id="saved-empty-guidance"]'),
+            document.querySelector('#active-count') !== null,
+            document.querySelector('#saved-count') !== null,
+            document.querySelector('.active-workspace .window-filter') !== null,
+            document.querySelector('[data-od-id="active-bulk-sleep"]') !== null,
+            !document.querySelector('[data-od-id="tab-lifecycle-action"]'),
+          ].filter(Boolean).length
+        : 0;
+      const stowUnavailableFailures = (() => {
+        if (!auditsFirstUse) return 0;
+        const stow = document.querySelector('[data-od-id="stow-current-action"]');
+        const lifecycle = document.querySelector('[data-od-id="tab-lifecycle-action"]');
+        const failures = [];
+        if (!(stow instanceof HTMLButtonElement)) {
+          failures.push('missing-stow');
+          return failures.length;
+        }
+
+        if (!stow.disabled) failures.push('stow-enabled');
+        if (!stow.classList.contains('secondary-button')) failures.push('missing-secondary-class');
+        if (stow.classList.contains('primary-button')) failures.push('retained-primary-class');
+        if (getComputedStyle(stow).opacity !== '1') failures.push('reduced-opacity');
+
+        const descriptionId = stow.getAttribute('aria-describedby');
+        const description = descriptionId ? document.getElementById(descriptionId) : null;
+        if (!description?.textContent?.trim()) failures.push('missing-description');
+
+        if (!(lifecycle instanceof HTMLButtonElement)) {
+          failures.push('missing-neutral-reference');
+        } else {
+          const stowStyle = getComputedStyle(stow);
+          const lifecycleStyle = getComputedStyle(lifecycle);
+          if (stowStyle.backgroundColor !== lifecycleStyle.backgroundColor) {
+            failures.push('accent-background');
+          }
+          if (stowStyle.borderColor !== lifecycleStyle.borderColor) {
+            failures.push('accent-border');
+          }
+        }
+
+        return failures.length;
+      })();
       return {
         metrics: {
           rootChildCount: root?.childElementCount ?? 0,
@@ -1678,6 +1727,8 @@ async function runUiAudit(): Promise<number> {
           railViewportOverflowPx: layout.railViewportOverflowPx,
           topStripViewportOverflowPx: layout.topStripViewportOverflowPx,
           requiredControlVisibilityFailures: layout.requiredControlVisibilityFailures,
+          firstUseGuidanceFailures,
+          stowUnavailableFailures,
           appearanceStateCount: appearance.appearanceStateCount,
           appearanceRuntimeFailures: appearance.appearanceRuntimeFailures,
           sharedTokenSignatures: appearance.sharedTokenSignatures,

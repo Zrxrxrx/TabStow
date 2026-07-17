@@ -206,6 +206,8 @@ describe('UI audit manifest', () => {
     ));
     expect(validateUiAuditManifest(checkedInManifest).cases.map(({ id }) => id)).toEqual([
       'BASELINE',
+      'FINDING-002-LIGHT',
+      'FINDING-002-DARK',
       'FINDING-004-NONE',
       'FINDING-004-STOW',
       'FINDING-004-RESTORE',
@@ -224,6 +226,26 @@ describe('UI audit manifest', () => {
       'FINDING-003-HISTORY-DESKTOP',
       'FINDING-003-HISTORY-NARROW',
     ]);
+  });
+
+  it('covers first-use guidance in both themes and locales', () => {
+    const checkedInManifest = validateUiAuditManifest(JSON.parse(readFileSync(
+      new URL('../../scripts/ui-audit-cases.json', import.meta.url),
+      'utf8',
+    )));
+    const findingCases = checkedInManifest.cases.filter(({ id }) =>
+      id === 'FINDING-002-LIGHT' || id === 'FINDING-002-DARK');
+
+    expect(findingCases.map(({ locale, theme }) => ({ locale, theme }))).toEqual([
+      { locale: 'en', theme: 'light' },
+      { locale: 'zh-CN', theme: 'dark' },
+    ]);
+    for (const auditCase of findingCases) {
+      expect(auditCase.assertions).toEqual(expect.arrayContaining([
+        { metric: 'firstUseGuidanceFailures', operator: 'equals', value: 0 },
+        { metric: 'stowUnavailableFailures', operator: 'equals', value: 0 },
+      ]));
+    }
   });
 
   it('checks long collection reachability at 390 pixels', () => {
@@ -328,6 +350,8 @@ describe('UI audit assertions', () => {
       railViewportOverflowPx: 0,
       topStripViewportOverflowPx: 0,
       requiredControlVisibilityFailures: 0,
+      firstUseGuidanceFailures: 0,
+      stowUnavailableFailures: 0,
       appearanceStateCount: 0,
       appearanceRuntimeFailures: 0,
       sharedTokenSignatures: 'not-applicable',
@@ -381,6 +405,8 @@ describe('UI audit assertions', () => {
       railViewportOverflowPx: 0,
       topStripViewportOverflowPx: 0,
       requiredControlVisibilityFailures: 0,
+      firstUseGuidanceFailures: 0,
+      stowUnavailableFailures: 0,
       appearanceStateCount: 0,
       appearanceRuntimeFailures: 0,
       sharedTokenSignatures: 'not-applicable',

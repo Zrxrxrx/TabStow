@@ -5,6 +5,7 @@ import { buildActiveTabWindows } from '@/features/active-tabs/active-tab-windows
 import { subscribeToActiveTabsChanges } from '@/features/active-tabs/active-tabs-events';
 import type {
   ActiveBrowserTab,
+  ActiveTabWindow,
   ActiveTabsDragSource,
   ActiveTabsMoveResult,
   ActiveTabsSleepResult,
@@ -40,6 +41,15 @@ type Props = {
 
 const EMPTY_SNAPSHOT: ActiveTabsSnapshot = { windows: [], tabs: [], chromeGroups: [] };
 
+type SnapshotState =
+  | { kind: 'loading' }
+  | { kind: 'ready'; snapshot: ActiveTabsSnapshot }
+  | { kind: 'error' };
+
+function countVisibleTabs(windows: ActiveTabWindow[]): number {
+  return windows.reduce((count, window) => count + window.visibleTabCount, 0);
+}
+
 export function ActiveWorkspace({
   busy,
   locale,
@@ -51,8 +61,7 @@ export function ActiveWorkspace({
   refreshKey,
   suggestionRefreshKey,
 }: Props) {
-  const [snapshot, setSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_SNAPSHOT);
-  const [snapshotReady, setSnapshotReady] = useState(false);
+  const [snapshotState, setSnapshotState] = useState<SnapshotState>({ kind: 'loading' });
   const [closePending, setClosePending] = useState(false);
   const [dragSource, setDragSource] = useState<ActiveTabsDragSource | null>(null);
   const [activeDropTargetKey, setActiveDropTargetKey] = useState<string | null>(null);
@@ -83,11 +92,11 @@ export function ActiveWorkspace({
       type: 'active-tabs:snapshot',
     });
     if (!activeRef.current || refreshToken !== refreshTokenRef.current) return;
-    setSnapshotReady(true);
     if (!response.ok) {
+      setSnapshotState({ kind: 'error' });
       onStatus('error', response.error.message);
     } else {
-      setSnapshot(response.data);
+      setSnapshotState({ kind: 'ready', snapshot: response.data });
       onSnapshot?.(response.data);
     }
 
@@ -132,11 +141,28 @@ export function ActiveWorkspace({
     };
   }, []);
 
+  const snapshot = snapshotState.kind === 'ready' ? snapshotState.snapshot : EMPTY_SNAPSHOT;
+  const snapshotReady = snapshotState.kind === 'ready';
+  const searchActive = query.trim() !== '';
+  const authoritativeWindows = useMemo(() => buildActiveTabWindows(snapshot), [snapshot]);
+  const authoritativeVisibleTabCount = useMemo(
+    () => countVisibleTabs(authoritativeWindows),
+    [authoritativeWindows],
+  );
+  const pinnedVisibleTabCount = useMemo(
+    () => authoritativeWindows.reduce((count, window) => count + window.pinnedTabs.length, 0),
+    [authoritativeWindows],
+  );
+  const ordinaryVisibleTabCount = authoritativeVisibleTabCount - pinnedVisibleTabCount;
   const filteredSnapshot = useMemo(
     () => filterActiveTabsSnapshot(snapshot, query),
     [query, snapshot],
   );
   const windows = useMemo(() => buildActiveTabWindows(filteredSnapshot), [filteredSnapshot]);
+  const filteredVisibleTabCount = useMemo(
+    () => countVisibleTabs(windows),
+    [windows],
+  );
   const visibleWindows = selectedWindowId === null
     ? windows
     : windows.filter((window) => window.windowId === selectedWindowId);
@@ -167,7 +193,7 @@ export function ActiveWorkspace({
     return eligibleTabIds;
   }, [snapshot]);
   const controlsDisabled = busy || closePending || movePending || sleepPending || !snapshotReady;
-  const dragDisabled = controlsDisabled || query.trim() !== '';
+  const dragDisabled = controlsDisabled || searchActive;
   const bulkSleepTabIds = useMemo(
     () =>
       snapshot.tabs.flatMap((tab) =>
@@ -179,8 +205,18 @@ export function ActiveWorkspace({
       ),
     [selectedWindowId, sleepEligibleTabIds, snapshot.tabs],
   );
-  const bulkSleepDisabled =
-    controlsDisabled || query.trim() !== '' || bulkSleepTabIds.length === 0;
+  const showBulkSleep = snapshotReady && !searchActive && bulkSleepTabIds.length > 0;
+  const showFirstUseGuidance =
+    snapshotReady &&
+    !searchActive &&
+    ordinaryVisibleTabCount === 0 &&
+    pinnedVisibleTabCount === 0;
+  const pinnedOnly =
+    snapshotReady &&
+    !searchActive &&
+    ordinaryVisibleTabCount === 0 &&
+    pinnedVisibleTabCount > 0;
+  const searchNoMatch = snapshotReady && searchActive && filteredVisibleTabCount === 0;
 
   async function closeTabs(tabIds: number[]) {
     if (
@@ -363,29 +399,32 @@ export function ActiveWorkspace({
           </h2>
           <p className="subtle">{t(locale, 'activeTabsSubtitle')}</p>
         </div>
-        <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
-          {t(locale, 'openCount', { count: filteredSnapshot.tabs.length })}
-        </span>
+        {snapshotReady && filteredVisibleTabCount > 0 ? (
+          <span className="meta-pill" id="active-count" data-od-id="active-tabs-count">
+            {t(locale, 'openCount', { count: filteredVisibleTabCount })}
+          </span>
+        ) : null}
       </div>
 
       <div className="active-tools">
+        {showBulkSleep ? (
+          <button
+            className="secondary-button"
+            data-od-id="active-bulk-sleep"
+            disabled={controlsDisabled}
+            onClick={() => void sleepTabs(bulkSleepTabIds)}
+            type="button"
+          >
+            <MoonStar aria-hidden="true" size={15} />
+            {t(locale, 'sleepEligibleTabs')}
+          </button>
+        ) : null}
         <button
           className="secondary-button"
-          disabled={bulkSleepDisabled}
-          onClick={() => void sleepTabs(bulkSleepTabIds)}
-          title={
-            query.trim() !== ''
-              ? t(locale, 'sleepSearchUnavailableReason')
-              : bulkSleepTabIds.length === 0
-                ? t(locale, 'noEligibleTabsToSleep')
-                : undefined
-          }
+          data-od-id="tab-lifecycle-action"
+          onClick={() => setPolicyOpen(true)}
           type="button"
         >
-          <MoonStar aria-hidden="true" size={15} />
-          {t(locale, 'sleepEligibleTabs')}
-        </button>
-        <button className="secondary-button" onClick={() => setPolicyOpen(true)} type="button">
           {t(locale, 'tabLifecycle')}
         </button>
       </div>
@@ -399,7 +438,14 @@ export function ActiveWorkspace({
         />
       ) : null}
 
-      <WindowFilter locale={locale} onChange={setSelectedWindowId} value={selectedWindowId} windows={windows} />
+      {snapshotReady && filteredVisibleTabCount > 0 ? (
+        <WindowFilter
+          locale={locale}
+          onChange={setSelectedWindowId}
+          value={selectedWindowId}
+          windows={windows}
+        />
+      ) : null}
 
       {duplicateGroups.length > 0 && (
         <button
@@ -417,29 +463,52 @@ export function ActiveWorkspace({
         </button>
       )}
 
+      {pinnedOnly ? (
+        <p className="active-state-note">{t(locale, 'activeTabsPinnedOnly')}</p>
+      ) : null}
+
       <div className="active-window-list">
-        {visibleWindows.map((window, displayIndex) => (
-          <ActiveWindowSection
-            activeDropTargetKey={activeDropTargetKey}
-            disabled={controlsDisabled}
-            displayIndex={displayIndex}
-            dragDisabled={dragDisabled}
-            dragSource={dragSource}
-            key={window.key}
-            locale={locale}
-            window={window}
-            onActivateDropTarget={setActiveDropTargetKey}
-            onCloseTabs={(tabIds) => void closeTabs(tabIds)}
-            onDragEnd={endDrag}
-            onDragStart={startDrag}
-            onDrop={(event, target) => void dropOnTarget(event, target)}
-            onFocusTab={(tab) => void focusTab(tab)}
-            onRegisterTarget={registerTarget}
-            onSleepTabs={(tabIds) => void sleepTabs(tabIds)}
-            onStowTab={(tab) => void onStowTab(tab)}
-            sleepEligibleTabIds={sleepEligibleTabIds}
-          />
-        ))}
+        {snapshotState.kind === 'loading' ? (
+          <div className="empty-state" role="status">{t(locale, 'activeTabsLoading')}</div>
+        ) : snapshotState.kind === 'error' ? (
+          <div className="empty-state" role="status">{t(locale, 'activeTabsUnavailable')}</div>
+        ) : searchNoMatch ? (
+          <div className="empty-state" role="status">{t(locale, 'noMatchingActiveTabs')}</div>
+        ) : showFirstUseGuidance ? (
+          <div
+            className="empty-state empty-state--guidance"
+            data-od-id="active-first-use-guidance"
+            role="status"
+          >
+            <div className="empty-state-copy">
+              <strong>{t(locale, 'activeTabsFirstUseTitle')}</strong>
+              <span>{t(locale, 'activeTabsFirstUseDescription')}</span>
+            </div>
+          </div>
+        ) : (
+          visibleWindows.map((window, displayIndex) => (
+            <ActiveWindowSection
+              activeDropTargetKey={activeDropTargetKey}
+              disabled={controlsDisabled}
+              displayIndex={displayIndex}
+              dragDisabled={dragDisabled}
+              dragSource={dragSource}
+              key={window.key}
+              locale={locale}
+              window={window}
+              onActivateDropTarget={setActiveDropTargetKey}
+              onCloseTabs={(tabIds) => void closeTabs(tabIds)}
+              onDragEnd={endDrag}
+              onDragStart={startDrag}
+              onDrop={(event, target) => void dropOnTarget(event, target)}
+              onFocusTab={(tab) => void focusTab(tab)}
+              onRegisterTarget={registerTarget}
+              onSleepTabs={(tabIds) => void sleepTabs(tabIds)}
+              onStowTab={(tab) => void onStowTab(tab)}
+              sleepEligibleTabIds={sleepEligibleTabIds}
+            />
+          ))
+        )}
       </div>
       {policyOpen ? (
         <TabLifecyclePolicyDialog

@@ -43,6 +43,17 @@ Use a disposable Chrome for Testing profile. Never connect the audit runner to a
 5. Attach `assertions.json` and `BASELINE.png` to the PR. The report records the current commit and dirty state, audited baseline, Chrome/CDP versions, production-build SHA-256, requested and observed case metadata, assertion results, sanitized runtime errors, and screenshot hash. A threshold failure or any runtime exception, console error/assert, or Log error exits non-zero.
 6. Close Chrome for Testing and delete `PROFILE_DIR`; discarding the entire profile is the cleanup boundary.
 
+### FINDING-002 first-use guidance
+
+Run the English light and Simplified Chinese dark cases against the same clean production build:
+
+```bash
+bun run audit:ui -- --port 9333 --case FINDING-002-LIGHT --output .artifacts/ui-audit/<commit>/FINDING-002-LIGHT
+bun run audit:ui -- --port 9333 --case FINDING-002-DARK --output .artifacts/ui-audit/<commit>/FINDING-002-DARK
+```
+
+Both cases require authoritative Active and Saved first-use guidance, no zero-only counters or filters, a reachable Tab lifecycle action, and a disabled Stow control that matches the neutral secondary surface in computed background and border colors. They also require Stow's current reason to be connected through `aria-describedby`.
+
 ### FINDING-004 feedback layout
 
 With the production extension and disposable Chrome profile from the preceding workflow running, execute the four-case feedback matrix:

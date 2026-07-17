@@ -1,5 +1,5 @@
 import { Archive } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowPreview } from '@/lib/messages';
@@ -16,7 +16,7 @@ type Props = {
 type PreviewState =
   | { kind: 'loading' }
   | { kind: 'ready'; count: number }
-  | { kind: 'error' };
+  | { kind: 'error'; reason: string };
 
 export function StowCurrentWindowButton({
   busy,
@@ -31,6 +31,7 @@ export function StowCurrentWindowButton({
   const [submitting, setSubmitting] = useState(false);
   const requestGenerationRef = useRef(0);
   const submittingRef = useRef(false);
+  const detailId = useId();
 
   useEffect(() => {
     const generation = ++requestGenerationRef.current;
@@ -44,14 +45,17 @@ export function StowCurrentWindowButton({
         if (response.ok) {
           setPreview({ kind: 'ready', count: response.data.eligibleTabCount });
         } else {
-          setPreview({ kind: 'error' });
+          setPreview({ kind: 'error', reason: response.error.message });
           onStatus('error', response.error.message);
         }
       })
       .catch((error: unknown) => {
         if (generation !== requestGenerationRef.current) return;
-        setPreview({ kind: 'error' });
-        onStatus('error', error instanceof Error ? error.message : 'Preview unavailable.');
+        const reason = error instanceof Error
+          ? error.message
+          : t(locale, 'stowPreviewUnavailable');
+        setPreview({ kind: 'error', reason });
+        onStatus('error', reason);
       });
 
     return () => {
@@ -84,18 +88,30 @@ export function StowCurrentWindowButton({
   const pending = busy || submitting;
   const detail = pending
     ? t(locale, 'stowWorkingSafely')
-    : preview.kind === 'loading'
-      ? t(locale, 'stowChecking')
-      : preview.kind === 'error'
-        ? t(locale, 'stowPreviewUnavailable')
-        : preview.count === 0
-          ? t(locale, 'stowNoTabsReady')
-          : t(locale, 'stowTabsReady', { count: preview.count });
+    : disabled
+      ? t(locale, 'stowWaitForCurrentAction')
+      : preview.kind === 'loading'
+        ? t(locale, 'stowChecking')
+        : preview.kind === 'error'
+          ? preview.reason
+          : preview.count === 0
+            ? t(locale, 'stowNoTabsReady')
+            : t(
+                locale,
+                preview.count === 1 ? 'stowTabReady' : 'stowTabsReady',
+                { count: preview.count },
+              );
+  const useNeutralHierarchy =
+    !submitting &&
+    (disabled || busy || preview.kind !== 'ready' || preview.count === 0);
+  const hierarchyClass = useNeutralHierarchy ? 'secondary-button' : 'primary-button';
 
   return (
     <button
+      aria-describedby={detailId}
       aria-label={t(locale, 'stowCurrentWindow')}
-      className="primary-button stow-current-button"
+      className={`${hierarchyClass} stow-current-button`}
+      data-od-id="stow-current-action"
       disabled={
         disabled ||
         pending ||
@@ -108,7 +124,7 @@ export function StowCurrentWindowButton({
       <Archive aria-hidden="true" size={16} />
       <span className="stow-current-copy">
         <strong>{pending ? t(locale, 'stowingWindow') : t(locale, 'stowCurrentWindow')}</strong>
-        <small>{detail}</small>
+        <small id={detailId}>{detail}</small>
       </span>
     </button>
   );

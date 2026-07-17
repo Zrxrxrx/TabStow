@@ -40,6 +40,20 @@ describe('i18n', () => {
     expect(t('en', 'savedForLater')).toBe('Saved windows');
     expect(t('en', 'savedSessions')).toBe('Saved windows');
     expect(t('en', 'noSavedSessions')).toBe('No saved windows yet.');
+    expect(t('en', 'savedSessionsEmptyGuidance')).toBe(
+      'Use Stow window to save tabs here, then restore the window when you need it.',
+    );
+    expect(t('en', 'noMatchingSavedSessions')).toBe(
+      'No saved windows match this search.',
+    );
+    expect(t('en', 'activeTabsFirstUseTitle')).toBe('Open a page to get started');
+    expect(t('en', 'activeTabsFirstUseDescription')).toBe(
+      'Open the pages you want to keep, then use Stow window to save them in Saved windows.',
+    );
+    expect(t('en', 'activeTabsLoading')).toBe('Loading active tabs…');
+    expect(t('en', 'activeTabsPinnedOnly')).toBe('Only pinned tabs are open.');
+    expect(t('en', 'activeTabsUnavailable')).toBe('Active tabs are unavailable.');
+    expect(t('en', 'noMatchingActiveTabs')).toBe('No active tabs match this search.');
     expect(t('en', 'savedSessionsSubtitle')).toBe(
       'Stowed windows stay here until you restore or remove them. Both actions move them to History.',
     );
@@ -91,7 +105,9 @@ describe('i18n', () => {
     expect(t('en', 'settings')).toBe('Settings');
     expect(t('en', 'closeExtra')).toBe('Close extra drawer');
     expect(t('en', 'tabstowSubtitle')).toBe('Tab operations');
+    expect(t('en', 'stowTabReady', { count: 1 })).toBe('1 tab ready');
     expect(t('en', 'stowTabsReady', { count: 3 })).toBe('3 tabs ready');
+    expect(t('en', 'stowWaitForCurrentAction')).toBe('Wait for the current action to finish.');
     expect(t('en', 'stowingWindow')).toBe('Stowing window…');
     expect(t('en', 'sleptTab')).toBe('Slept 1 tab.');
     expect(t('en', 'sleptTabs', { count: 3 })).toBe('Slept 3 tabs.');
@@ -136,6 +152,20 @@ describe('i18n', () => {
     expect(t('zh-CN', 'savedForLater')).toBe('已保存的窗口');
     expect(t('zh-CN', 'savedSessions')).toBe('已保存的窗口');
     expect(t('zh-CN', 'noSavedSessions')).toBe('还没有已保存的窗口。');
+    expect(t('zh-CN', 'savedSessionsEmptyGuidance')).toBe(
+      '使用“收起窗口”将标签页保存到这里，需要时可恢复整个窗口。',
+    );
+    expect(t('zh-CN', 'noMatchingSavedSessions')).toBe(
+      '没有与此搜索匹配的已保存窗口。',
+    );
+    expect(t('zh-CN', 'activeTabsFirstUseTitle')).toBe('打开网页即可开始');
+    expect(t('zh-CN', 'activeTabsFirstUseDescription')).toBe(
+      '打开要保留的网页，然后使用“收起窗口”将它们保存到“已保存的窗口”。',
+    );
+    expect(t('zh-CN', 'activeTabsLoading')).toBe('正在加载打开的标签页…');
+    expect(t('zh-CN', 'activeTabsPinnedOnly')).toBe('当前只打开了固定标签页。');
+    expect(t('zh-CN', 'activeTabsUnavailable')).toBe('暂时无法加载打开的标签页。');
+    expect(t('zh-CN', 'noMatchingActiveTabs')).toBe('没有与此搜索匹配的打开标签页。');
     expect(t('zh-CN', 'savedSessionsSubtitle')).toBe(
       '收起的窗口会保存在这里；恢复或移除后都会进入历史记录。',
     );
@@ -173,6 +203,8 @@ describe('i18n', () => {
     expect(t('zh-CN', 'savedSessionCount', { count: 1 })).toBe('1 个窗口');
     expect(t('zh-CN', 'savedTabCount', { count: 1 })).toBe('1 个标签页');
     expect(t('zh-CN', 'stowThisWindow')).toBe('收起窗口');
+    expect(t('zh-CN', 'stowTabReady', { count: 1 })).toBe('1 个标签页待收起');
+    expect(t('zh-CN', 'stowWaitForCurrentAction')).toBe('请等待当前操作完成。');
     expect(t('zh-CN', 'stowSuggestions')).toBe('“已保存的窗口”建议');
     expect(t('zh-CN', 'lifecycleConfirmStow', { count: '2 个标签页' })).toBe(
       '将 2 个标签页移至“已保存的窗口”并关闭原标签页',
