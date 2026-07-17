@@ -92,6 +92,7 @@ export type ExtensionMessage =
   | { type: 'sync:pull' };
 
 export type ExtensionEvent =
+  | { type: 'saved-data:changed' }
   | { type: 'sync:data-changed' }
   | { type: 'sync:status-changed'; status: SyncStatusView }
   | { type: 'connection:state-changed' };
