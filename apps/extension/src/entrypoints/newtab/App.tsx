@@ -84,7 +84,7 @@ export function App({
     onActionSucceeded: () => setActiveWorkspaceRefreshKey((value) => value + 1),
     onStatus: setStatus,
   });
-  const { busyAction, loadSessions, runAction, sessions } = savedForLater;
+  const { busyAction, runAction, runSavedDataMutation, sessions } = savedForLater;
 
   useEffect(() => {
     void observeSync('open');
@@ -233,8 +233,8 @@ export function App({
               disabled={busyAction !== null}
               locale={locale}
               onChange={setTabQuery}
-              onSavedOpened={loadSessions}
               onStatus={(tone, message) => setStatus({ tone, message })}
+              runSavedDataMutation={runSavedDataMutation}
               sessions={sessions}
               value={tabQuery}
             />
@@ -337,10 +337,10 @@ export function App({
                     );
                   }}
                   onSuggestedStow={async () => {
-                    await loadSessions();
                     setActiveWorkspaceRefreshKey((value) => value + 1);
                   }}
                   suggestionRefreshKey={suggestionRefreshKey}
+                  runSavedDataMutation={runSavedDataMutation}
                 />
               </div>
               <div className="saved-region">

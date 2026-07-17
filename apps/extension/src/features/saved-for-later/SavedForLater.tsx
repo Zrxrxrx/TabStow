@@ -27,7 +27,7 @@ export function SavedForLater({ controller, locale, query }: SavedForLaterProps)
         <RecoveryBinDialog
           locale={locale}
           onClose={() => setRecoveryOpen(false)}
-          onRestored={controller.loadSessions}
+          runSavedDataMutation={controller.runSavedDataMutation}
         />
       ) : null}
     </>

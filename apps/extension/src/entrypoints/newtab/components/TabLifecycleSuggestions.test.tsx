@@ -186,6 +186,7 @@ async function renderSuggestions(
         locale="en"
         onStowed={() => Promise.resolve()}
         refreshKey={0}
+        runSavedDataMutation={async (mutation) => mutation()}
         {...overrides}
       />,
     );

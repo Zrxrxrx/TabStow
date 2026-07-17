@@ -186,6 +186,30 @@ describe('useSavedForLaterController', () => {
     )).toHaveLength(2);
   });
 
+  it('coalesces events for mutations owned by embedding components', async () => {
+    const mutation = deferred<AppResult<{ restored: true }>>();
+    sendExtensionMessage.mockResolvedValue({ ok: true, data: [session('fresh')] });
+
+    await act(async () => root?.render(
+      <Harness onStatus={vi.fn<(status: SavedForLaterStatus) => void>()} />,
+    ));
+    let mutationPromise: Promise<AppResult<{ restored: true }>> | undefined;
+    await act(async () => {
+      mutationPromise = currentController?.runSavedDataMutation(() => mutation.promise);
+      await Promise.resolve();
+    });
+    runtimeMessages.emit({ type: 'saved-data:changed' });
+
+    await act(async () => {
+      mutation.resolve({ ok: true, data: { restored: true } });
+      await mutationPromise;
+    });
+
+    expect(sendExtensionMessage.mock.calls.filter(
+      ([message]) => message.type === 'sessions:list',
+    )).toHaveLength(2);
+  });
+
   it('does not publish action results or reload after unmount', async () => {
     const action = deferred<AppResult<{ saved: true }>>();
     const onActionSucceeded = vi.fn();

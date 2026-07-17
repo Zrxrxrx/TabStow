@@ -86,17 +86,22 @@ describe('UnifiedSearch', () => {
     await click(container.querySelector<HTMLButtonElement>('.unified-search-suggestion')!);
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'active-tabs:focus', tabId: 7, windowId: 4 });
 
-    const onSavedOpened = vi.fn();
+    const mutationCalls = vi.fn();
+    const runSavedDataMutation: ComponentProps<typeof UnifiedSearch>['runSavedDataMutation'] =
+      async (mutation) => {
+        mutationCalls();
+        return mutation();
+      };
     await renderSearch(
       { windows: [], tabs: [], chromeGroups: [] },
       [savedSession],
-      onSavedOpened,
+      runSavedDataMutation,
     );
     await change(container.querySelector<HTMLInputElement>('input')!, 'api');
     sendExtensionMessage.mockResolvedValue({ ok: true, data: { opened: true, consumed: true } });
     await click(container.querySelector<HTMLButtonElement>('.unified-search-suggestion')!);
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'sessions:open-tab', sessionId: 'session-1', tabId: 'tab-1', consume: true });
-    expect(onSavedOpened).toHaveBeenCalledTimes(1);
+    expect(mutationCalls).toHaveBeenCalledTimes(1);
   });
 
   it('renders represented local sources as labelled button groups plus an independent Web row', async () => {
@@ -173,7 +178,13 @@ describe('UnifiedSearch', () => {
   });
 
   it('disables local and Web actions while another mutation is busy', async () => {
-    await renderSearch(snapshot, [], vi.fn(), true, 'api');
+    await renderSearch(
+      snapshot,
+      [],
+      async (mutation) => mutation(),
+      true,
+      'api',
+    );
 
     const local = container.querySelector<HTMLButtonElement>(
       '.unified-search-suggestion:not(.unified-search-web)',
@@ -200,13 +211,14 @@ function groupLabels() {
 async function renderSearch(
   activeSnapshot: ActiveTabsSnapshot,
   sessions: ComponentProps<typeof UnifiedSearch>['sessions'],
-  onSavedOpened = vi.fn(),
+  runSavedDataMutation: ComponentProps<typeof UnifiedSearch>['runSavedDataMutation'] =
+    async (mutation) => mutation(),
   disabled = false,
   initialValue = '',
 ) {
   function Harness() {
     const [value, setValue] = useState(initialValue);
-    return <UnifiedSearch activeSnapshot={activeSnapshot} disabled={disabled} locale="en" onChange={setValue} onSavedOpened={onSavedOpened} onStatus={() => undefined} sessions={sessions} value={value} />;
+    return <UnifiedSearch activeSnapshot={activeSnapshot} disabled={disabled} locale="en" onChange={setValue} onStatus={() => undefined} runSavedDataMutation={runSavedDataMutation} sessions={sessions} value={value} />;
   }
   await act(async () => root.render(<Harness />));
 }

@@ -16,10 +16,16 @@ export type RunSavedForLaterAction = <T>(
   options?: { reloadOnFailure?: boolean },
 ) => Promise<void>;
 
+export type RunSavedDataMutation = <T>(
+  mutation: () => Promise<AppResult<T>>,
+  didChangeData?: (response: AppResult<T>) => boolean,
+) => Promise<AppResult<T>>;
+
 export type SavedForLaterController = {
   busyAction: string | null;
   loadSessions: () => Promise<void>;
   runAction: RunSavedForLaterAction;
+  runSavedDataMutation: RunSavedDataMutation;
   sessions: TabSession[];
 };
 
@@ -109,5 +115,20 @@ export function useSavedForLaterController({
     }
   }, [beginMutation, finishMutation]);
 
-  return { busyAction, loadSessions, runAction, sessions };
+  const runSavedDataMutation = useCallback(async function runSavedDataMutation<T>(
+    mutation: () => Promise<AppResult<T>>,
+    didChangeData: (response: AppResult<T>) => boolean = (response) => response.ok,
+  ): Promise<AppResult<T>> {
+    beginMutation();
+    let reloadSessions = false;
+    try {
+      const response = await mutation();
+      reloadSessions = didChangeData(response);
+      return response;
+    } finally {
+      if (mountedRef.current) await finishMutation(reloadSessions);
+    }
+  }, [beginMutation, finishMutation]);
+
+  return { busyAction, loadSessions, runAction, runSavedDataMutation, sessions };
 }

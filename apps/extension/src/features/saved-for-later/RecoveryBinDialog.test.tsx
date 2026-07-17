@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot } from 'react-dom/client';
 import { describe, expect, it, vi } from 'vitest';
 import type { HistoryEntry } from '@/features/history/types';
@@ -59,13 +59,18 @@ describe('RecoveryBinDialog', () => {
       }
       throw new Error(`Unexpected message: ${message.type}`);
     });
-    const onRestored = vi.fn();
+    const mutationCalls = vi.fn();
+    const runSavedDataMutation: ComponentProps<typeof RecoveryBinDialog>['runSavedDataMutation'] =
+      async (mutation) => {
+        mutationCalls();
+        return mutation();
+      };
     const container = document.createElement('div');
     container.id = 'root';
     document.body.appendChild(container);
     const root = createRoot(container);
 
-    await act(async () => root.render(<RecoveryBinDialog locale="en" onClose={() => undefined} onRestored={onRestored} />));
+    await act(async () => root.render(<RecoveryBinDialog locale="en" onClose={() => undefined} runSavedDataMutation={runSavedDataMutation} />));
 
     const dialog = document.body.querySelector<HTMLElement>('[role="dialog"]')!;
     const titleId = dialog.getAttribute('aria-labelledby')!;
@@ -86,7 +91,7 @@ describe('RecoveryBinDialog', () => {
     const restore = document.body.querySelector<HTMLButtonElement>('.recovery-entry button')!;
     await act(async () => restore.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:restore', historyId: 'history-5' });
-    expect(onRestored).toHaveBeenCalledTimes(1);
+    expect(mutationCalls).toHaveBeenCalledTimes(1);
     expect(sendExtensionMessage.mock.calls.filter(
       ([message]) => message.type === 'history:list',
     )).toHaveLength(2);
@@ -147,7 +152,7 @@ describe('RecoveryBinDialog', () => {
       <RecoveryBinDialog
         locale="zh-CN"
         onClose={() => undefined}
-        onRestored={() => undefined}
+        runSavedDataMutation={async (mutation) => mutation()}
       />,
     ));
 
@@ -208,7 +213,7 @@ describe('RecoveryBinDialog', () => {
     const root = createRoot(container);
 
     await act(async () => root.render(
-      <RecoveryBinDialog locale="en" onClose={() => undefined} onRestored={() => undefined} />,
+      <RecoveryBinDialog locale="en" onClose={() => undefined} runSavedDataMutation={async (mutation) => mutation()} />,
     ));
     expect(runtimeMessages.emit({ type: 'sync:data-changed' })).toEqual([undefined]);
     expect(sendExtensionMessage).toHaveBeenCalledTimes(1);

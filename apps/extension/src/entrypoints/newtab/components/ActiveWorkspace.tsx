@@ -16,6 +16,7 @@ import { filterActiveTabsSnapshot } from '@/features/tab-search/tab-search';
 import { isBlockedTabUrl } from '@/features/tabs/tab-filter';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import type { RunSavedDataMutation } from '@/features/saved-for-later';
 import {
   readActiveTabsDragSource,
   writeActiveTabsDragSource,
@@ -36,6 +37,7 @@ type Props = {
   onSuggestedStow: () => void | Promise<void>;
   query: string;
   refreshKey: number;
+  runSavedDataMutation: RunSavedDataMutation;
   suggestionRefreshKey: number;
 };
 
@@ -59,6 +61,7 @@ export function ActiveWorkspace({
   onSuggestedStow,
   query,
   refreshKey,
+  runSavedDataMutation,
   suggestionRefreshKey,
 }: Props) {
   const [snapshotState, setSnapshotState] = useState<SnapshotState>({ kind: 'loading' });
@@ -438,6 +441,7 @@ export function ActiveWorkspace({
           locale={locale}
           onStowed={onSuggestedStow}
           refreshKey={suggestionRefreshKey + localSuggestionRefreshKey}
+          runSavedDataMutation={runSavedDataMutation}
         />
       ) : null}
 

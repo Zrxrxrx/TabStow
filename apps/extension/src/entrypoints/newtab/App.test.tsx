@@ -1329,6 +1329,7 @@ describe('App', () => {
           onSuggestedStow={async () => {}}
           query=""
           refreshKey={0}
+          runSavedDataMutation={async (mutation) => mutation()}
           suggestionRefreshKey={0}
         />,
       );
@@ -3534,6 +3535,7 @@ async function renderActiveWorkspace(
         onSuggestedStow={async () => {}}
         query=""
         refreshKey={0}
+        runSavedDataMutation={async (mutation) => mutation()}
         suggestionRefreshKey={0}
         {...overrides}
       />,
