@@ -25,6 +25,7 @@ import {
   type SavedTabsDragSource,
   type SavedTabsDropTarget,
 } from '@/features/saved-for-later/saved-tabs-dnd';
+import type { RunSavedForLaterAction } from './useSavedForLaterController';
 import './styles.css';
 
 export type SavedForLaterViewProps = {
@@ -32,12 +33,7 @@ export type SavedForLaterViewProps = {
   locale: Locale;
   query: string;
   sessions: TabSession[];
-  onRunAction: <T>(
-    actionId: string,
-    action: () => Promise<AppResult<T>>,
-    success: (data: T) => string,
-    options?: { reloadOnFailure?: boolean },
-  ) => Promise<void>;
+  onRunAction: RunSavedForLaterAction;
   onOpenRecovery: () => void;
 };
 
