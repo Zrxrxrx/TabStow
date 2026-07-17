@@ -1,8 +1,7 @@
 import { ImageUp, Pencil, PencilLine, Plus, Trash2 } from 'lucide-react';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
-import { getTabLabel } from '@/features/active-tabs/tab-labels';
-import type { ActiveBrowserTab } from '@/features/active-tabs/types';
+import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
 import {
   deleteQuickLinkIcon,
@@ -16,6 +15,11 @@ import {
   type QuickLinkIcon,
 } from '@/features/quick-links/quick-links';
 import { getQuickLinks } from '@/features/quick-links/quick-links-storage';
+import {
+  buildOpenTabChoices,
+  type OpenTabChoice,
+} from '@/features/tab-search/tab-search';
+import { presentActiveTabContext } from '@/features/tab-search/tab-search-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type ExtensionMessage } from '@/lib/messages';
 import { FormDialog } from './FormDialog';
@@ -41,11 +45,6 @@ function iconFromValue(value: string): QuickLinkIcon {
   return value.trim() ? { kind: 'emoji', value: value.trim() } : { kind: 'site', value: null };
 }
 
-type OpenTabChoice = {
-  key: string;
-  tab: ActiveBrowserTab;
-};
-
 type QuickLinkDialogState =
   | {
       kind: 'add-url';
@@ -59,21 +58,13 @@ type QuickLinkDialogState =
   | { kind: 'edit'; linkId: string; label: string; iconValue: string; error: string | null; submitting: boolean }
   | {
       kind: 'open-tabs';
-      choices: OpenTabChoice[];
+      snapshot: ActiveTabsSnapshot;
+      query: string;
       error: string | null;
       selectedKey: string;
       submittingKey: string | null;
     }
   | null;
-
-function canCreateQuickLink(url: string): boolean {
-  try {
-    createQuickLink({ url });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 function getImageIconToken(icon: QuickLinkIcon | null | undefined): string | null {
   return icon?.kind === 'image' ? icon.value : null;
@@ -146,6 +137,7 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
   const [dialog, setDialog] = useState<QuickLinkDialogState>(null);
   const [editing, setEditing] = useState(false);
   const disabledRef = useRef(disabled);
+  const openTabFilterRef = useRef<HTMLInputElement>(null);
   const uploadInputRefs = useRef(new Map<string, HTMLInputElement>());
   const dragSourceRef = useRef<QuickLinksDragSource | null>(null);
   const dropPendingRef = useRef(false);
@@ -243,25 +235,29 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
   async function openOpenTabsDialog() {
     if (disabledRef.current) return;
     setErrorMessage(null);
-    const response = await sendExtensionMessage<AppResult<ActiveBrowserTab[]>>({ type: 'active-tabs:list' });
+    const response = await sendExtensionMessage<AppResult<ActiveTabsSnapshot>>({
+      type: 'active-tabs:snapshot',
+    });
     if (!response.ok) {
       setErrorMessage(response.error.message);
       return;
     }
 
-    const choices = response.data
-      .filter((tab) => typeof tab.url === 'string' && tab.url.length > 0 && canCreateQuickLink(tab.url))
-      .map((tab) => ({
-        key: String(tab.id ?? tab.url ?? getTabLabel(tab)),
-        tab,
-      }));
+    const { choices } = buildOpenTabChoices(response.data, '');
 
     if (choices.length === 0) {
       setErrorMessage(t(locale, 'noOpenTabsForQuickLink'));
       return;
     }
 
-    setDialog({ kind: 'open-tabs', choices, error: null, selectedKey: choices[0].key, submittingKey: null });
+    setDialog({
+      kind: 'open-tabs',
+      snapshot: response.data,
+      query: '',
+      error: null,
+      selectedKey: choices[0].key,
+      submittingKey: null,
+    });
   }
 
   async function submitOpenTabChoice(choice: OpenTabChoice) {
@@ -269,14 +265,14 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
     const url = choice.tab.url;
     setDialog((current) =>
       current?.kind === 'open-tabs'
-        ? { ...current, error: null, selectedKey: choice.key, submittingKey: choice.key }
+        ? { ...current, error: null, submittingKey: choice.key }
         : current,
     );
 
     try {
       const saved = await persistLinks({
         type: 'quick-links:add',
-        link: createQuickLink({ url, label: getTabLabel(choice.tab) }),
+        link: createQuickLink({ url, label: choice.label }),
       });
       if (!saved) {
         setDialog((current) =>
@@ -300,9 +296,28 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
 
   async function submitSelectedOpenTab() {
     if (!dialog || dialog.kind !== 'open-tabs' || disabledRef.current) return;
-    const choice = dialog.choices.find((item) => item.key === dialog.selectedKey);
+    const choice = buildOpenTabChoices(dialog.snapshot, dialog.query).choices.find(
+      (item) => item.key === dialog.selectedKey,
+    );
     if (!choice) return;
     await submitOpenTabChoice(choice);
+  }
+
+  function updateOpenTabQuery(query: string) {
+    setDialog((current) => {
+      if (current?.kind !== 'open-tabs') return current;
+      const { choices } = buildOpenTabChoices(current.snapshot, query);
+      const selectedKey = choices.some((choice) => choice.key === current.selectedKey)
+        ? current.selectedKey
+        : choices[0]?.key ?? '';
+      return { ...current, query, selectedKey };
+    });
+  }
+
+  function selectOpenTabChoice(selectedKey: string) {
+    setDialog((current) =>
+      current?.kind === 'open-tabs' ? { ...current, selectedKey } : current,
+    );
   }
 
   async function remove(id: string) {
@@ -424,6 +439,11 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
       dropPendingRef.current = false;
     }
   }
+
+  const openTabChoices =
+    dialog?.kind === 'open-tabs'
+      ? buildOpenTabChoices(dialog.snapshot, dialog.query)
+      : { choices: [], overflow: false };
 
   return (
     <section className="panel quick-links-panel" aria-labelledby="quick-links-title" data-od-id="quick-links-section">
@@ -723,42 +743,59 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
         <FormDialog
           cancelLabel={t(locale, 'cancel')}
           errorMessage={dialog.error}
+          initialFocusRef={openTabFilterRef}
           onCancel={() => setDialog(null)}
           onSubmit={submitSelectedOpenTab}
           submitLabel={t(locale, 'add')}
-          submitDisabled={disabled}
+          submitDisabled={disabled || openTabChoices.choices.length === 0}
           submitting={dialog.submittingKey !== null}
           title={t(locale, 'chooseOpenTab')}
         >
+          <label className="field-label">
+            {t(locale, 'filterOpenTabs')}
+            <input
+              aria-label={t(locale, 'filterOpenTabs')}
+              className="dialog-input"
+              onChange={(event) => updateOpenTabQuery(event.currentTarget.value)}
+              ref={openTabFilterRef}
+              type="search"
+              value={dialog.query}
+            />
+          </label>
           <div className="open-tab-chooser">
-            {dialog.choices.map((choice) => {
-              const tabLabel = getTabLabel(choice.tab);
+            {openTabChoices.choices.map((choice) => {
+              const context = presentActiveTabContext(locale, choice.context);
               return (
                 <button
                   type="button"
-                  aria-label={tabLabel}
+                  aria-label={`${choice.label}, ${context}`}
                   aria-pressed={dialog.selectedKey === choice.key}
                   className="open-tab-choice"
                   disabled={disabled || dialog.submittingKey !== null}
                   key={choice.key}
-                  onClick={() => {
-                    void submitOpenTabChoice(choice);
-                  }}
+                  onClick={() => selectOpenTabChoice(choice.key)}
                 >
                   <TabFavicon
                     className="favicon"
                     favIconUrl={choice.tab.favIconUrl}
                     pageUrl={choice.tab.url ?? ''}
-                    title={tabLabel}
+                    title={choice.label}
                   />
                   <span className="tab-copy">
-                    <span className="tab-title">{tabLabel}</span>
+                    <span className="tab-title">{choice.label}</span>
                     <span className="tab-url">{choice.tab.url ?? ''}</span>
+                    <span className="suggestion-context">{context}</span>
                   </span>
                 </button>
               );
             })}
+            {openTabChoices.choices.length === 0 ? (
+              <p className="empty-copy">{t(locale, 'noMatchingOpenTabsForQuickLink')}</p>
+            ) : null}
           </div>
+          {openTabChoices.overflow ? (
+            <p className="chooser-limit-hint">{t(locale, 'openTabChooserLimitHint')}</p>
+          ) : null}
         </FormDialog>
       ) : null}
     </section>
