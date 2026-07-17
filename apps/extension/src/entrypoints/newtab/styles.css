@@ -868,6 +868,11 @@ h3 {
   box-shadow: var(--elev-raised);
 }
 
+.form-dialog.modal-dialog {
+  width: min(100%, 520px);
+  max-height: min(760px, calc(100dvh - 60px));
+}
+
 .field-stack {
   display: grid;
   gap: 12px;
