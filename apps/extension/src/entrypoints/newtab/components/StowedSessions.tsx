@@ -24,7 +24,7 @@ import {
   writeSavedTabsDragSource,
   type SavedTabsDragSource,
   type SavedTabsDropTarget,
-} from './saved-tabs-dnd';
+} from '@/features/saved-for-later/saved-tabs-dnd';
 
 type Props = {
   busyAction: string | null;
