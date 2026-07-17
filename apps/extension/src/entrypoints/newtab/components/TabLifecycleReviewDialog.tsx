@@ -299,7 +299,7 @@ export function TabLifecycleReviewDialog({
                           type="checkbox"
                         />
                         <TabFavicon
-                          className="saved-tab-favicon"
+                          className="lifecycle-tab-favicon"
                           favIconUrl={candidate.favIconUrl}
                           pageUrl={candidate.url}
                           title={candidate.title}

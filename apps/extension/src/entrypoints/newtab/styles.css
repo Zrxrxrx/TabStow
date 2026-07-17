@@ -335,6 +335,12 @@ h3 {
   flex: 0 0 auto;
 }
 
+.lifecycle-tab-favicon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
 .active-tab-favicon {
   width: 30px;
   height: 30px;

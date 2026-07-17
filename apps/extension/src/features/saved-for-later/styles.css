@@ -104,6 +104,17 @@
   gap: 0;
 }
 
+.saved-for-later .drop-insertion {
+  position: relative;
+  z-index: 2;
+  height: 8px;
+  margin-block: -4px;
+}
+
+.saved-for-later .drop-insertion.is-active-drop-target {
+  min-height: 8px;
+}
+
 .saved-for-later .saved-tab-row {
   position: relative;
   min-width: 0;
@@ -165,7 +176,8 @@
   transform: none;
 }
 
-.saved-tab-favicon {
+.saved-for-later .saved-tab-favicon,
+.recovery-entry .saved-tab-favicon {
   width: 22px;
   height: 22px;
   border-radius: 6px;
