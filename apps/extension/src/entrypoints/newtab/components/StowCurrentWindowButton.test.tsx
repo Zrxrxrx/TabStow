@@ -26,12 +26,23 @@ afterEach(async () => {
 });
 
 describe('StowCurrentWindowButton', () => {
+  it('describes its neutral loading state', async () => {
+    sendExtensionMessage.mockReturnValue(new Promise(() => undefined));
+
+    await renderButton();
+
+    expect(getButton().disabled).toBe(true);
+    expect(getButton().classList.contains('secondary-button')).toBe(true);
+    expect(getDescription().textContent).toBe('Checking current window…');
+  });
+
   it('uses the canonical Stow window label', async () => {
     sendExtensionMessage.mockResolvedValue({ ok: true, data: { eligibleTabCount: 1 } });
 
     await renderButton();
 
     expect(getButton().textContent).toContain('Stow window');
+    expect(getDescription().textContent).toBe('1 tab ready');
   });
 
   it('shows the authoritative count and disables itself when no tabs are eligible', async () => {
@@ -40,12 +51,17 @@ describe('StowCurrentWindowButton', () => {
 
     expect(getButton().textContent).toContain('3 tabs ready');
     expect(getButton().disabled).toBe(false);
+    expect(getButton().classList.contains('primary-button')).toBe(true);
+    expect(getDescription().textContent).toBe('3 tabs ready');
 
     sendExtensionMessage.mockResolvedValue({ ok: true, data: { eligibleTabCount: 0 } });
     await renderButton({ refreshKey: 1 });
 
     expect(getButton().textContent).toContain('No tabs ready');
     expect(getButton().disabled).toBe(true);
+    expect(getButton().classList.contains('primary-button')).toBe(false);
+    expect(getButton().classList.contains('secondary-button')).toBe(true);
+    expect(getDescription().textContent).toBe('No tabs ready');
   });
 
   it('blocks duplicate submissions and uses indeterminate busy copy', async () => {
@@ -79,8 +95,28 @@ describe('StowCurrentWindowButton', () => {
     await renderButton({ onStatus });
 
     expect(onStatus).toHaveBeenCalledWith('error', 'Chrome is unavailable.');
-    expect(getButton().textContent).toContain('Preview unavailable');
+    expect(getButton().textContent).toContain('Chrome is unavailable.');
     expect(getButton().disabled).toBe(true);
+    expect(getButton().classList.contains('primary-button')).toBe(false);
+    expect(getDescription().textContent).toBe('Chrome is unavailable.');
+  });
+
+  it('exposes the localized zero reason in Simplified Chinese', async () => {
+    sendExtensionMessage.mockResolvedValue({ ok: true, data: { eligibleTabCount: 0 } });
+
+    await renderButton({ locale: 'zh-CN' });
+
+    expect(getDescription().textContent).toBe('没有可收起的标签页');
+  });
+
+  it('explains when another app action temporarily disables Stow', async () => {
+    sendExtensionMessage.mockResolvedValue({ ok: true, data: { eligibleTabCount: 3 } });
+
+    await renderButton({ disabled: true });
+
+    expect(getButton().disabled).toBe(true);
+    expect(getButton().classList.contains('secondary-button')).toBe(true);
+    expect(getDescription().textContent).toBe('Wait for the current action to finish.');
   });
 });
 
@@ -106,4 +142,12 @@ function getButton() {
   const button = container.querySelector<HTMLButtonElement>('button');
   if (!button) throw new Error('Missing stow button');
   return button;
+}
+
+function getDescription() {
+  const descriptionId = getButton().getAttribute('aria-describedby');
+  if (!descriptionId) throw new Error('Missing stow button description');
+  const description = document.getElementById(descriptionId);
+  if (!description) throw new Error('Missing stow button description element');
+  return description;
 }

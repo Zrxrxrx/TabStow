@@ -328,17 +328,19 @@ export function StowedSessions({
           <p className="subtle">{t(locale, 'savedSessionsSubtitle')}</p>
         </div>
         <div className="header-actions saved-header-actions">
-          <span
-            className="meta-row"
-            id="saved-count"
-            aria-label={t(locale, 'savedCount', {
-              sessions: sessionCount,
-              tabs: tabCount,
-            })}
-          >
-            <span className="meta-pill">{sessionCount}</span>
-            <span className="meta-pill">{tabCount}</span>
-          </span>
+          {filteredSessions.length > 0 ? (
+            <span
+              className="meta-row"
+              id="saved-count"
+              aria-label={t(locale, 'savedCount', {
+                sessions: sessionCount,
+                tabs: tabCount,
+              })}
+            >
+              <span className="meta-pill">{sessionCount}</span>
+              <span className="meta-pill">{tabCount}</span>
+            </span>
+          ) : null}
           <button
             className="secondary-button saved-history-action"
             onClick={onOpenRecovery}
@@ -352,7 +354,22 @@ export function StowedSessions({
 
       <section className="session-list" aria-label={t(locale, 'savedSessions')}>
         {filteredSessions.length === 0 ? (
-          <div className="empty-state">{t(locale, 'noSavedSessions')}</div>
+          searchActive ? (
+            <div className="empty-state" role="status">
+              {t(locale, 'noMatchingSavedSessions')}
+            </div>
+          ) : (
+            <div
+              className="empty-state empty-state--guidance"
+              data-od-id="saved-empty-guidance"
+              role="status"
+            >
+              <div className="empty-state-copy">
+                <strong>{t(locale, 'noSavedSessions')}</strong>
+                <span>{t(locale, 'savedSessionsEmptyGuidance')}</span>
+              </div>
+            </div>
+          )
         ) : (
           <>
             {filteredSessions.map((session) => (

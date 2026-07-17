@@ -560,6 +560,19 @@ h3 {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
+.active-window-list > .empty-state {
+  grid-column: 1 / -1;
+}
+
+.active-state-note {
+  margin: 0;
+  padding: 9px 11px;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
 .drop-insertion {
   min-height: 8px;
   border-radius: var(--radius-pill);
@@ -763,6 +776,16 @@ h3 {
   background: var(--surface);
   text-align: center;
   padding: 18px;
+}
+
+.empty-state-copy {
+  max-width: 440px;
+  display: grid;
+  gap: 7px;
+}
+
+.empty-state-copy strong {
+  color: var(--fg);
 }
 
 .status-message {
@@ -1342,6 +1365,11 @@ svg {
   gap: 9px;
   justify-content: stretch;
   text-align: left;
+}
+
+.stow-current-button.secondary-button:disabled {
+  color: var(--muted);
+  opacity: 1;
 }
 
 .stow-current-copy {

@@ -1,4 +1,4 @@
-import { act } from 'react';
+import { act, type ComponentProps } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TabSession } from '@tabstow/core';
@@ -380,6 +380,113 @@ describe('App', () => {
     expect(sentMessageTypes()).not.toContain(['chrome-tab-groups', 'import'].join(':'));
   });
 
+  it('waits for the authoritative snapshot before showing first-use guidance', async () => {
+    const pendingSnapshot = deferred<AppResult<ActiveTabsSnapshot>>();
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') return pendingSnapshot.promise;
+      if (message.type === 'tab-lifecycle:list-suggestions') {
+        return { ok: true, data: { afterDays: 14, candidates: [] } };
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderActiveWorkspace();
+
+    expect(screen().getByText('Loading active tabs…')).not.toBeNull();
+    expect(() => screen().getByText('Open a page to get started')).toThrow();
+    expect(container.querySelector('#active-count')).toBeNull();
+    expect(container.querySelector('.window-filter')).toBeNull();
+    expect(() => screen().getByRole('button', { name: 'Sleep eligible tabs' })).toThrow();
+    expect(screen().getByRole('button', { name: 'Tab lifecycle' })).not.toBeNull();
+
+    pendingSnapshot.resolve({ ok: true, data: activeTabsSnapshot([]) });
+    await act(async () => {
+      await pendingSnapshot.promise;
+    });
+
+    expect(screen().getByText('Open a page to get started')).not.toBeNull();
+    expect(
+      screen().getByText(
+        'Open the pages you want to keep, then use Stow window to save them in Saved windows.',
+      ),
+    ).not.toBeNull();
+    expect(() => screen().getByText('Loading active tabs…')).toThrow();
+    expect(container.querySelector('#active-count')).toBeNull();
+    expect(container.querySelector('.window-filter')).toBeNull();
+  });
+
+  it('keeps snapshot failures distinct from a successful empty workspace', async () => {
+    const onStatus = vi.fn();
+    sendExtensionMessage.mockResolvedValue({
+      ok: false,
+      error: { code: 'chrome-tabs-error', message: 'Chrome is unavailable.' },
+    });
+
+    await renderActiveWorkspace({ onStatus });
+
+    expect(onStatus).toHaveBeenCalledWith('error', 'Chrome is unavailable.');
+    expect(screen().getByText('Active tabs are unavailable.')).not.toBeNull();
+    expect(() => screen().getByText('Open a page to get started')).toThrow();
+    expect(container.querySelector('#active-count')).toBeNull();
+    expect(container.querySelector('.window-filter')).toBeNull();
+  });
+
+  it('distinguishes pinned-only and search-no-match states without hiding lifecycle settings', async () => {
+    const pinnedTab = { ...UNIQUE_TAB, id: 20, pinned: true, title: 'Pinned reference' };
+    sendExtensionMessage.mockImplementation(async (message: ExtensionMessage) => {
+      if (message.type === 'active-tabs:snapshot') {
+        return { ok: true, data: activeTabsSnapshot([pinnedTab]) };
+      }
+      if (message.type === 'tab-lifecycle:list-suggestions') {
+        return { ok: true, data: { afterDays: 14, candidates: [] } };
+      }
+      throw new Error(`Unexpected message: ${message.type}`);
+    });
+
+    await renderActiveWorkspace();
+
+    expect(screen().getByText('Only pinned tabs are open.')).not.toBeNull();
+    expect(screen().getByText('Pinned reference')).not.toBeNull();
+    expect(screen().getByText('1 open')).not.toBeNull();
+    expect(() => screen().getByText('Open a page to get started')).toThrow();
+    expect(() => screen().getByRole('button', { name: 'Sleep eligible tabs' })).toThrow();
+
+    await renderActiveWorkspace({ query: 'missing' });
+
+    expect(screen().getByText('No active tabs match this search.')).not.toBeNull();
+    expect(() => screen().getByText('Only pinned tabs are open.')).toThrow();
+    expect(() => screen().getByText('Open a page to get started')).toThrow();
+    expect(container.querySelector('#active-count')).toBeNull();
+    expect(container.querySelector('.window-filter')).toBeNull();
+    expect(screen().getByRole('button', { name: 'Tab lifecycle' })).not.toBeNull();
+  });
+
+  it('explains how an empty Saved windows list is populated and restored', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB], sessions: [] });
+
+    await renderApp();
+
+    expect(screen().getByText('No saved windows yet.')).not.toBeNull();
+    expect(
+      screen().getByText(
+        'Use Stow window to save tabs here, then restore the window when you need it.',
+      ),
+    ).not.toBeNull();
+    expect(container.querySelector('#saved-count')).toBeNull();
+
+    await change(
+      screen().getByLabelText('Search active tabs, saved tabs, or the web'),
+      'missing',
+    );
+
+    expect(screen().getByText('No saved windows match this search.')).not.toBeNull();
+    expect(() =>
+      screen().getByText(
+        'Use Stow window to save tabs here, then restore the window when you need it.',
+      )
+    ).toThrow();
+  });
+
   it('filters real windows and renders only Chrome-reported audible and discarded states', async () => {
     mockMessages({
       activeTabs: [
@@ -601,9 +708,7 @@ describe('App', () => {
     expect(
       screen().getByLabelText('Close GitHub active issue') as HTMLButtonElement,
     ).toHaveProperty('disabled', false);
-    expect(
-      screen().getByRole('button', { name: 'Sleep eligible tabs' }) as HTMLButtonElement,
-    ).toHaveProperty('disabled', true);
+    expect(() => screen().getByRole('button', { name: 'Sleep eligible tabs' })).toThrow();
     const savedDragSurfaces = Array.from(
       container.querySelectorAll<HTMLElement>('.saved-sessions [aria-disabled="true"][draggable="false"]'),
     );
@@ -2395,7 +2500,8 @@ describe('App', () => {
     });
     expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
     expect(sentMessageTypes().filter((type) => type === 'sessions:list')).toHaveLength(2);
-    expect(screen().getByText('0 open')).not.toBeNull();
+    expect(screen().getByText('Open a page to get started')).not.toBeNull();
+    expect(container.querySelector('#active-count')).toBeNull();
     expect(screen().getByText('Spec draft')).not.toBeNull();
   });
 
@@ -2630,7 +2736,7 @@ describe('App', () => {
     await click(screen().getByText('Stow window'));
 
     expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(2);
-    expect(screen().getByText('0 open')).not.toBeNull();
+    expect(screen().getByText('Open a page to get started')).not.toBeNull();
   });
 
   it('disables active workspace stow while another app action is busy', async () => {
@@ -2775,7 +2881,7 @@ describe('App', () => {
     await act(async () => {
       await secondRefresh.promise;
     });
-    expect(screen().getByText('0 open')).not.toBeNull();
+    expect(screen().getByText('Open a page to get started')).not.toBeNull();
 
     firstRefresh.resolve({
       ok: true,
@@ -2785,7 +2891,7 @@ describe('App', () => {
       await firstRefresh.promise;
     });
 
-    expect(screen().getByText('0 open')).not.toBeNull();
+    expect(screen().getByText('Open a page to get started')).not.toBeNull();
     expect(container.textContent).not.toContain('1 open');
   });
 
@@ -3236,6 +3342,26 @@ function mockTwoChromeWindowsWithGroup() {
 async function renderApp(props: AppProps = {}) {
   await act(async () => {
     root.render(<App {...props} />);
+  });
+}
+
+async function renderActiveWorkspace(
+  overrides: Partial<ComponentProps<typeof ActiveWorkspace>> = {},
+) {
+  await act(async () => {
+    root.render(
+      <ActiveWorkspace
+        busy={false}
+        locale="en"
+        onStatus={() => undefined}
+        onStowTab={async () => {}}
+        onSuggestedStow={async () => {}}
+        query=""
+        refreshKey={0}
+        suggestionRefreshKey={0}
+        {...overrides}
+      />,
+    );
   });
 }
 

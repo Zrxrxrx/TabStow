@@ -71,6 +71,98 @@
       ]
     },
     {
+      "id": "FINDING-002-LIGHT",
+      "description": "First-use guidance and unavailable Stow hierarchy in English light mode",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "light",
+      "locale": "en",
+      "setup": [
+        "Open the production New Tab in a disposable empty profile without saved windows or ordinary web tabs."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-002-LIGHT.png",
+      "assertions": [
+        {
+          "metric": "horizontalOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "themeMode",
+          "operator": "equals",
+          "value": "light"
+        },
+        {
+          "metric": "locale",
+          "operator": "equals",
+          "value": "en"
+        },
+        {
+          "metric": "firstUseGuidanceFailures",
+          "operator": "equals",
+          "value": 0
+        },
+        {
+          "metric": "stowUnavailableFailures",
+          "operator": "equals",
+          "value": 0
+        }
+      ]
+    },
+    {
+      "id": "FINDING-002-DARK",
+      "description": "First-use guidance and unavailable Stow hierarchy in Simplified Chinese dark mode",
+      "page": "newtab.html",
+      "viewport": {
+        "width": 1440,
+        "height": 900
+      },
+      "zoom": 1,
+      "theme": "dark",
+      "locale": "zh-CN",
+      "setup": [
+        "Open the production New Tab in a disposable empty profile and switch to Simplified Chinese dark mode through production controls."
+      ],
+      "cleanup": [
+        "Close the generated audit target and discard the disposable profile."
+      ],
+      "screenshot": "FINDING-002-DARK.png",
+      "assertions": [
+        {
+          "metric": "horizontalOverflowPx",
+          "operator": "atMost",
+          "value": 0
+        },
+        {
+          "metric": "themeMode",
+          "operator": "equals",
+          "value": "dark"
+        },
+        {
+          "metric": "locale",
+          "operator": "equals",
+          "value": "zh-CN"
+        },
+        {
+          "metric": "firstUseGuidanceFailures",
+          "operator": "equals",
+          "value": 0
+        },
+        {
+          "metric": "stowUnavailableFailures",
+          "operator": "equals",
+          "value": 0
+        }
+      ]
+    },
+    {
       "id": "FINDING-004-NONE",
       "description": "No action feedback leaves no empty row above the New Tab workspace",
       "page": "newtab.html",
