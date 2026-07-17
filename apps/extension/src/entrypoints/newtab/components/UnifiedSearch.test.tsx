@@ -104,6 +104,30 @@ describe('UnifiedSearch', () => {
     expect(mutationCalls).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps an authoritative refresh error after a saved suggestion opens', async () => {
+    const onStatus = vi.fn<ComponentProps<typeof UnifiedSearch>['onStatus']>();
+    const runSavedDataMutation: ComponentProps<typeof UnifiedSearch>['runSavedDataMutation'] =
+      async (mutation) => {
+        const response = await mutation();
+        onStatus('error', 'Refresh failed');
+        return response;
+      };
+    await renderSearch(
+      { windows: [], tabs: [], chromeGroups: [] },
+      [savedSession],
+      runSavedDataMutation,
+      false,
+      'api',
+      onStatus,
+    );
+    sendExtensionMessage.mockResolvedValue({ ok: true, data: { opened: true, consumed: true } });
+
+    await click(container.querySelector<HTMLButtonElement>('.unified-search-suggestion')!);
+
+    expect(onStatus).toHaveBeenNthCalledWith(1, 'success', 'Opened saved tab.');
+    expect(onStatus).toHaveBeenLastCalledWith('error', 'Refresh failed');
+  });
+
   it('renders represented local sources as labelled button groups plus an independent Web row', async () => {
     await renderSearch(snapshot, [savedSession]);
     await change(container.querySelector<HTMLInputElement>('input')!, 'api');
@@ -215,10 +239,11 @@ async function renderSearch(
     async (mutation) => mutation(),
   disabled = false,
   initialValue = '',
+  onStatus: ComponentProps<typeof UnifiedSearch>['onStatus'] = () => undefined,
 ) {
   function Harness() {
     const [value, setValue] = useState(initialValue);
-    return <UnifiedSearch activeSnapshot={activeSnapshot} disabled={disabled} locale="en" onChange={setValue} onStatus={() => undefined} runSavedDataMutation={runSavedDataMutation} sessions={sessions} value={value} />;
+    return <UnifiedSearch activeSnapshot={activeSnapshot} disabled={disabled} locale="en" onChange={setValue} onStatus={onStatus} runSavedDataMutation={runSavedDataMutation} sessions={sessions} value={value} />;
   }
   await act(async () => root.render(<Harness />));
 }

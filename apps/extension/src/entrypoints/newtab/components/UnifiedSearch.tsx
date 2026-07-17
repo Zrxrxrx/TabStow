@@ -99,20 +99,20 @@ export function UnifiedSearch({
       return;
     }
 
-    const response = await runSavedDataMutation(
-      () => sendExtensionMessage<AppResult<{ opened: true; consumed: boolean }>>({
-        type: 'sessions:open-tab',
-        sessionId: suggestion.sessionId,
-        tabId: suggestion.tabId,
-        consume: true,
-      }),
+    await runSavedDataMutation(
+      async () => {
+        const response = await sendExtensionMessage<AppResult<{ opened: true; consumed: boolean }>>({
+          type: 'sessions:open-tab',
+          sessionId: suggestion.sessionId,
+          tabId: suggestion.tabId,
+          consume: true,
+        });
+        if (response.ok) onStatus('success', t(locale, 'openedSavedTab'));
+        else onStatus('error', response.error.message);
+        return response;
+      },
       (result) => result.ok && result.data.consumed,
     );
-    if (!response.ok) {
-      onStatus('error', response.error.message);
-      return;
-    }
-    onStatus('success', t(locale, 'openedSavedTab'));
   }
 
   function renderSuggestion(suggestion: UnifiedSearchSuggestion) {
