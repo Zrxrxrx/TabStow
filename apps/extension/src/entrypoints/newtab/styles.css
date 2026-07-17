@@ -788,6 +788,10 @@ h3 {
   color: var(--fg);
 }
 
+.quick-links-empty-state .secondary-button {
+  justify-self: center;
+}
+
 .status-message {
   margin: 0;
   padding: 10px 12px;

@@ -80,6 +80,7 @@ describe('HistoryApp', () => {
     expect(getByText('https://example.com/')).not.toBeNull();
     expect(getByRole('button', 'Open Example in background')).not.toBeNull();
     expect(container.querySelector('time')?.getAttribute('datetime')).toBe(ENTRY.movedAt);
+    expect(container.querySelector('.history-empty-state')).toBeNull();
   });
 
   it('renders the reason and source title for every History reason', async () => {
@@ -115,6 +116,9 @@ describe('HistoryApp', () => {
 
     expect(getByRole('heading', '历史记录')).not.toBeNull();
     expect(getByText('历史记录为空。')).not.toBeNull();
+    expect(
+      getByText('从“已保存的窗口”打开、恢复或移除的标签页会保留在此设备上，供你稍后恢复或永久删除。'),
+    ).not.toBeNull();
     expect(document.documentElement.lang).toBe('zh-CN');
   });
 
@@ -124,6 +128,15 @@ describe('HistoryApp', () => {
     await renderHistory();
 
     expect(getByText('History is empty.')).not.toBeNull();
+    expect(
+      getByText(
+        'Tabs opened, restored, or removed from Saved windows stay on this device so you can recover or permanently delete them later.',
+      ),
+    ).not.toBeNull();
+    const emptyState = container.querySelector('.history-empty-state');
+    expect(emptyState?.querySelector('a, button')).toBeNull();
+    const backToWorkspace = getByRole('link', 'Back to workspace');
+    expect(Array.from(container.querySelectorAll('a[href], button'))).toEqual([backToWorkspace]);
   });
 
   it('shows an initial theme read failure without suppressing History content', async () => {

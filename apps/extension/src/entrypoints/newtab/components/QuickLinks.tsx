@@ -141,6 +141,7 @@ function QuickLinkSiteIcon({ link }: { link: QuickLink }) {
 
 export function QuickLinks({ disabled, locale, refreshKey }: Props) {
   const [links, setLinks] = useState<QuickLink[]>([]);
+  const [linksLoaded, setLinksLoaded] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [dialog, setDialog] = useState<QuickLinkDialogState>(null);
   const [editing, setEditing] = useState(false);
@@ -151,7 +152,16 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
   disabledRef.current = disabled;
 
   useEffect(() => {
-    void getQuickLinks().then(setLinks);
+    let cancelled = false;
+    setLinksLoaded(false);
+    void getQuickLinks().then((storedLinks) => {
+      if (cancelled) return;
+      setLinks(storedLinks);
+      setLinksLoaded(true);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [refreshKey]);
 
   async function persistLinks(message: QuickLinkWriteMessage) {
@@ -431,7 +441,7 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
             aria-label={editing ? t(locale, 'showQuickLinksMode') : t(locale, 'editQuickLinksMode')}
             aria-pressed={editing}
             onClick={() => setEditing((value) => !value)}
-            disabled={disabled}
+            disabled={disabled || !linksLoaded}
           >
             <PencilLine size={16} aria-hidden="true" />
           </button>
@@ -459,8 +469,20 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
         </div>
       </div>
 
-      {links.length === 0 ? (
-        <div className="empty-state utility-empty-state">{t(locale, 'noQuickLinks')}</div>
+      {!linksLoaded ? null : links.length === 0 ? (
+        <div className="empty-state utility-empty-state quick-links-empty-state">
+          <div className="empty-state-copy">
+            <strong>{t(locale, 'noQuickLinks')}</strong>
+            <button
+              className="secondary-button"
+              disabled={disabled || !linksLoaded}
+              onClick={openAddByUrlDialog}
+              type="button"
+            >
+              {t(locale, 'addQuickLink')}
+            </button>
+          </div>
+        </div>
       ) : (
         <div className="quick-link-grid" data-od-id="quick-link-grid">
           {links.map((link) => (

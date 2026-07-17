@@ -231,6 +231,9 @@ describe('i18n', () => {
 
     expect(t('en', 'history')).toBe('History');
     expect(t('en', 'historyEmpty')).toBe('History is empty.');
+    expect(t('en', 'historyEmptyDescription')).toBe(
+      'Tabs opened, restored, or removed from Saved windows stay on this device so you can recover or permanently delete them later.',
+    );
     expect(t('en', 'historyOpenedFrom', { sourceTitle: 'Reading' })).toBe(
       'Opened from Reading',
     );
@@ -251,6 +254,9 @@ describe('i18n', () => {
 
     expect(t('zh-CN', 'history')).toBe('历史记录');
     expect(t('zh-CN', 'historyEmpty')).toBe('历史记录为空。');
+    expect(t('zh-CN', 'historyEmptyDescription')).toBe(
+      '从“已保存的窗口”打开、恢复或移除的标签页会保留在此设备上，供你稍后恢复或永久删除。',
+    );
     expect(t('zh-CN', 'historyOpenedFrom', { sourceTitle: '阅读' })).toBe('从阅读打开');
     expect(t('zh-CN', 'historyRestoredFrom', { sourceTitle: '阅读' })).toBe('从阅读恢复');
     expect(t('zh-CN', 'historyRemovedFrom', { sourceTitle: '阅读' })).toBe('从阅读移除');

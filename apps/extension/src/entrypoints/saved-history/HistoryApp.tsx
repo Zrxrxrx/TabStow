@@ -118,7 +118,10 @@ export function HistoryApp({
       <StatusMessage message={status.message} tone={status.tone} />
       {loading ? <p>{t(locale, 'historyLoading')}</p> : null}
       {!loading && status.tone !== 'error' && entries.length === 0 ? (
-        <p>{t(locale, 'historyEmpty')}</p>
+        <div className="history-empty-state" role="status">
+          <strong>{t(locale, 'historyEmpty')}</strong>
+          <p>{t(locale, 'historyEmptyDescription')}</p>
+        </div>
       ) : null}
       <div className="history-list">
         {entries.map((entry) => (
