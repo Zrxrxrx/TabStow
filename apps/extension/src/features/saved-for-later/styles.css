@@ -1,0 +1,196 @@
+.saved-for-later {
+  align-content: start;
+}
+
+.saved-for-later > .section-header {
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.saved-for-later > .section-header > :first-child {
+  flex: 1 1 190px;
+  min-width: 0;
+}
+
+.saved-header-actions {
+  min-width: 0;
+  margin-inline-start: auto;
+}
+
+.saved-history-action {
+  flex: 0 0 auto;
+  min-height: var(--ts-target-size);
+  padding: 0 10px;
+  white-space: nowrap;
+}
+
+.saved-count-summary {
+  white-space: nowrap;
+}
+
+.saved-for-later .session-list {
+  display: grid;
+  align-content: start;
+  gap: 5px;
+}
+
+.saved-for-later .session-card {
+  display: grid;
+  align-content: start;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.saved-for-later .session-card > header {
+  min-height: 52px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 8px 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in oklab, var(--surface-warm), var(--surface) 72%);
+}
+
+.saved-for-later .session-heading {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.saved-for-later .session-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 510;
+}
+
+.saved-for-later .session-preview {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.saved-for-later .session-card > header .row-actions {
+  flex-wrap: nowrap;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.saved-for-later .session-card > header .row-actions button {
+  width: var(--ts-target-size);
+  min-height: var(--ts-target-size);
+  padding: 0;
+  overflow: hidden;
+  font-size: 0;
+}
+
+.saved-for-later .session-card > header .row-actions svg {
+  width: 15px;
+  height: 15px;
+}
+
+.saved-for-later .saved-tab-list {
+  display: grid;
+  gap: 0;
+}
+
+.saved-for-later .saved-tab-row {
+  position: relative;
+  min-width: 0;
+  min-height: var(--ts-target-size);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--border-soft);
+  border-radius: 0;
+}
+
+.saved-for-later .saved-tab-row[draggable="true"],
+.saved-for-later .session-card > header[draggable="true"] {
+  cursor: grab;
+}
+
+.saved-for-later .saved-tab-row[draggable="true"]:active,
+.saved-for-later .session-card > header[draggable="true"]:active {
+  cursor: grabbing;
+}
+
+.saved-for-later .saved-tab-row:hover {
+  background: color-mix(in oklab, var(--accent), transparent 88%);
+}
+
+.saved-for-later .saved-tab-open {
+  min-width: 0;
+  min-height: var(--ts-target-size);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 0;
+  color: inherit;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: var(--radius-sm);
+}
+
+.saved-for-later .saved-tab-open:disabled {
+  color: inherit;
+}
+
+.saved-for-later .saved-tab-open:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.saved-for-later .saved-tab-delete {
+  position: static;
+  width: var(--ts-target-size);
+  min-width: var(--ts-target-size);
+  min-height: var(--ts-target-size);
+  opacity: 1;
+  pointer-events: auto;
+  transform: none;
+}
+
+.saved-tab-favicon {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+}
+
+.recovery-list {
+  display: grid;
+  border-top: 1px solid var(--border);
+}
+
+.recovery-entry {
+  min-width: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.recovery-history-link {
+  width: fit-content;
+  min-height: var(--ts-target-size);
+  display: inline-flex;
+  align-items: center;
+  padding-inline: 10px;
+  text-decoration: none;
+}

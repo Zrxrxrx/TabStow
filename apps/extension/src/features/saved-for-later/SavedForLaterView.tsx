@@ -25,6 +25,7 @@ import {
   type SavedTabsDragSource,
   type SavedTabsDropTarget,
 } from '@/features/saved-for-later/saved-tabs-dnd';
+import './styles.css';
 
 export type SavedForLaterViewProps = {
   busyAction: string | null;
@@ -326,7 +327,7 @@ export function SavedForLaterView({
   }
 
   return (
-    <section className="panel column saved-sessions" aria-labelledby="saved-title" data-od-id="saved-tabs-column">
+    <section className="panel column saved-sessions saved-for-later" aria-labelledby="saved-title" data-od-id="saved-tabs-column">
       <header className="section-header">
         <div>
           <h2 id="saved-title" data-od-id="saved-tabs-title">
