@@ -9,12 +9,37 @@ vi.mock('@/lib/messages', () => ({ sendExtensionMessage }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+function runtimeMessageEvent() {
+  const listeners = new Set<(message: unknown) => unknown>();
+  return {
+    addListener: vi.fn((listener: (message: unknown) => unknown) => listeners.add(listener)),
+    removeListener: vi.fn((listener: (message: unknown) => unknown) => listeners.delete(listener)),
+    emit(message: unknown) {
+      return Array.from(listeners, (listener) => listener(message));
+    },
+  };
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
+}
+
 describe('RecoveryBinDialog', () => {
   it('sorts History newest-first, limits the preview to five, and restores complete entries', async () => {
     sendExtensionMessage.mockReset();
+    const runtimeMessages = runtimeMessageEvent();
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
-      value: { runtime: { getURL: (path: string) => `chrome-extension://test${path}` } },
+      value: {
+        runtime: {
+          getURL: (path: string) => `chrome-extension://test${path}`,
+          onMessage: runtimeMessages,
+        },
+      },
     });
     const entries = Array.from({ length: 6 }, (_, index) => ({
       id: `history-${index}`,
@@ -28,7 +53,10 @@ describe('RecoveryBinDialog', () => {
     }));
     sendExtensionMessage.mockImplementation(async (message: { type: string; historyId?: string }) => {
       if (message.type === 'history:list') return { ok: true, data: entries };
-      if (message.type === 'history:restore') return { ok: true, data: { id: message.historyId } };
+      if (message.type === 'history:restore') {
+        runtimeMessages.emit({ type: 'saved-data:changed' });
+        return { ok: true, data: { id: message.historyId } };
+      }
       throw new Error(`Unexpected message: ${message.type}`);
     });
     const onRestored = vi.fn();
@@ -59,6 +87,9 @@ describe('RecoveryBinDialog', () => {
     await act(async () => restore.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'history:restore', historyId: 'history-5' });
     expect(onRestored).toHaveBeenCalledTimes(1);
+    expect(sendExtensionMessage.mock.calls.filter(
+      ([message]) => message.type === 'history:list',
+    )).toHaveLength(2);
 
     await act(async () => root.unmount());
     container.remove();
@@ -133,6 +164,68 @@ describe('RecoveryBinDialog', () => {
     expect(metadata[2]).toContain('3 个标签页 · 已移除 ·');
     expect(metadata.every((text) => /年|月|日/.test(text))).toBe(true);
     expect(metadata.join(' ')).not.toMatch(/\b(opened|restored|deleted)\b/);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it('refreshes for local changes and ignores an older History response', async () => {
+    const entry: HistoryEntry = {
+      id: 'history-stale',
+      sourceSessionId: 'session-stale',
+      sourceTitle: 'Stale session',
+      tabs: [{
+        id: 'tab-stale',
+        title: 'Stale tab',
+        url: 'https://stale.example/',
+        createdAt: '2026-07-01T00:00:00.000Z',
+      }],
+      originalCreatedAt: '2026-07-01T00:00:00.000Z',
+      movedAt: '2026-07-02T00:00:00.000Z',
+      reason: 'deleted',
+      deviceId: 'device-1',
+    };
+    const older = deferred<{ ok: true; data: HistoryEntry[] }>();
+    const newer = deferred<{ ok: true; data: HistoryEntry[] }>();
+    const runtimeMessages = runtimeMessageEvent();
+    sendExtensionMessage
+      .mockReset()
+      .mockResolvedValueOnce({ ok: true, data: [entry] })
+      .mockReturnValueOnce(older.promise)
+      .mockReturnValueOnce(newer.promise);
+    Object.defineProperty(globalThis, 'chrome', {
+      configurable: true,
+      value: {
+        runtime: {
+          getURL: (path: string) => `chrome-extension://test${path}`,
+          onMessage: runtimeMessages,
+        },
+      },
+    });
+    const container = document.createElement('div');
+    container.id = 'root';
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <RecoveryBinDialog locale="en" onClose={() => undefined} onRestored={() => undefined} />,
+    ));
+    expect(runtimeMessages.emit({ type: 'sync:data-changed' })).toEqual([undefined]);
+    expect(sendExtensionMessage).toHaveBeenCalledTimes(1);
+    runtimeMessages.emit({ type: 'saved-data:changed' });
+    runtimeMessages.emit({ type: 'saved-data:changed' });
+
+    await act(async () => {
+      newer.resolve({ ok: true, data: [] });
+      await newer.promise;
+    });
+    expect(document.body.querySelector('.recovery-entry')).toBeNull();
+
+    await act(async () => {
+      older.resolve({ ok: true, data: [entry] });
+      await older.promise;
+    });
+    expect(document.body.querySelector('.recovery-entry')).toBeNull();
 
     await act(async () => root.unmount());
     container.remove();

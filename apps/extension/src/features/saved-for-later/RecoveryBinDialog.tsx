@@ -1,5 +1,5 @@
 import { ExternalLink, RotateCcw } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { TabFavicon } from '@/components/TabFavicon';
 import type { HistoryEntry } from '@/features/history/types';
@@ -11,6 +11,7 @@ import {
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import { ModalDialog } from '@/components/ModalDialog';
+import { useSavedDataRefreshGate } from './useSavedDataInvalidation';
 
 type Props = {
   locale: Locale;
@@ -34,10 +35,14 @@ export function RecoveryBinDialog({ locale, onClose, onRestored }: Props) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const loadGenerationRef = useRef(0);
   const visibleEntries = useMemo(() => recentEntries(entries ?? []), [entries]);
 
-  async function load() {
+  const load = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     const response = await sendExtensionMessage<AppResult<HistoryEntry[]>>({ type: 'history:list' });
+    if (generation !== loadGenerationRef.current) return;
+
     if (response.ok) {
       setEntries(response.data);
       setError(null);
@@ -45,20 +50,26 @@ export function RecoveryBinDialog({ locale, onClose, onRestored }: Props) {
       setEntries([]);
       setError(response.error.message);
     }
-  }
+  }, []);
 
-  useEffect(() => { void load(); }, []);
+  const refreshGate = useSavedDataRefreshGate(load);
+
+  useEffect(() => {
+    void load();
+    return () => { ++loadGenerationRef.current; };
+  }, [load]);
 
   async function restore(historyId: string) {
     if (busyId) return;
+    refreshGate.beginMutation();
     setBusyId(historyId);
     const response = await sendExtensionMessage<AppResult<TabSession>>({ type: 'history:restore', historyId });
     if (response.ok) {
       await onRestored();
-      await load();
     } else {
       setError(response.error.message);
     }
+    await refreshGate.finishMutation(response.ok);
     setBusyId(null);
   }
 

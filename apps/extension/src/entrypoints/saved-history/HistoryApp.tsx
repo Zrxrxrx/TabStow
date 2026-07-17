@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
 import { StatusMessage } from '@/components/StatusMessage';
 import { UtilityPageShell } from '@/components/UtilityPageShell';
@@ -15,6 +15,7 @@ import {
 } from '@/features/tabs/session-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import { useSavedDataRefreshGate } from '@/features/saved-for-later/useSavedDataInvalidation';
 
 type StatusState = {
   tone: 'info' | 'success' | 'error';
@@ -37,6 +38,7 @@ export function HistoryApp({
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
   const [language, setLanguage] = useState<LanguagePreference>('auto');
+  const loadGenerationRef = useRef(0);
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
   const presentedEntries = useMemo(
     () => entries.map((entry) => ({
@@ -46,21 +48,27 @@ export function HistoryApp({
     [entries, locale],
   );
 
-  async function loadEntries() {
+  const loadEntries = useCallback(async () => {
+    const generation = ++loadGenerationRef.current;
     const response = await sendExtensionMessage<AppResult<HistoryEntry[]>>({
       type: 'history:list',
     });
+    if (generation !== loadGenerationRef.current) return;
+
     if (response.ok) {
       setEntries(response.data);
     } else {
       setStatus({ tone: 'error', message: response.error.message });
     }
     setLoading(false);
-  }
+  }, []);
+
+  const refreshGate = useSavedDataRefreshGate(loadEntries);
 
   useEffect(() => {
     void loadEntries();
-  }, []);
+    return () => { ++loadGenerationRef.current; };
+  }, [loadEntries]);
 
   useEffect(() => {
     void getLanguagePreference().then(setLanguage);
@@ -91,32 +99,34 @@ export function HistoryApp({
   }
 
   async function restoreEntry(historyId: string) {
+    refreshGate.beginMutation();
     setBusyAction(`restore-${historyId}`);
     setStatus({ tone: 'info', message: null });
     const response = await sendExtensionMessage({ type: 'history:restore', historyId });
 
     if (response.ok) {
       setStatus({ tone: 'success', message: t(locale, 'historyRestored') });
-      await loadEntries();
     } else {
       setStatus({ tone: 'error', message: response.error.message });
     }
+    await refreshGate.finishMutation(response.ok);
     setBusyAction(null);
   }
 
   async function deleteEntry(historyId: string) {
     if (!window.confirm(t(locale, 'historyConfirmDelete'))) return;
 
+    refreshGate.beginMutation();
     setBusyAction(`delete-${historyId}`);
     setStatus({ tone: 'info', message: null });
     const response = await sendExtensionMessage({ type: 'history:delete', historyId });
 
     if (response.ok) {
       setStatus({ tone: 'success', message: t(locale, 'historyDeleted') });
-      await loadEntries();
     } else {
       setStatus({ tone: 'error', message: response.error.message });
     }
+    await refreshGate.finishMutation(response.ok);
     setBusyAction(null);
   }
 
