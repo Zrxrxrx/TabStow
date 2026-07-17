@@ -4,7 +4,14 @@ import type { TabSession } from '@tabstow/core';
 import { TabFavicon } from '@/components/TabFavicon';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
-import { buildUnifiedSearchSuggestions } from '@/features/tab-search/tab-search';
+import {
+  buildUnifiedSearchSuggestions,
+  type UnifiedSearchSuggestion,
+} from '@/features/tab-search/tab-search';
+import {
+  presentActiveTabContext,
+  presentSavedTabContext,
+} from '@/features/tab-search/tab-search-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 
@@ -39,6 +46,15 @@ export function UnifiedSearch({
     () => buildUnifiedSearchSuggestions(activeSnapshot, sessions, value),
     [activeSnapshot, sessions, value],
   );
+  const activeSuggestions = suggestions.filter(
+    (suggestion): suggestion is Extract<UnifiedSearchSuggestion, { source: 'active' }> =>
+      suggestion.source === 'active',
+  );
+  const savedSuggestions = suggestions.filter(
+    (suggestion): suggestion is Extract<UnifiedSearchSuggestion, { source: 'saved' }> =>
+      suggestion.source === 'saved',
+  );
+  const query = value.trim();
 
   useEffect(() => {
     function handleKeyDown(event: KeyboardEvent) {
@@ -56,8 +72,7 @@ export function UnifiedSearch({
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [onChange, value]);
 
-  async function submit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  async function searchWeb() {
     const response = await sendExtensionMessage<AppResult<{ searched: true }>>({
       type: 'active-tabs:search',
       query: value,
@@ -66,7 +81,13 @@ export function UnifiedSearch({
     else onStatus('error', response.error.message);
   }
 
+  function submit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    void searchWeb();
+  }
+
   async function openSuggestion(suggestion: (typeof suggestions)[number]) {
+    if (disabled) return;
     if (suggestion.source === 'active') {
       const response = await sendExtensionMessage<AppResult<{ focused: true }>>({
         type: 'active-tabs:focus',
@@ -91,9 +112,37 @@ export function UnifiedSearch({
     onStatus('success', t(locale, 'openedSavedTab'));
   }
 
+  function renderSuggestion(suggestion: UnifiedSearchSuggestion) {
+    const context =
+      suggestion.source === 'active'
+        ? presentActiveTabContext(locale, suggestion.context)
+        : presentSavedTabContext(locale, suggestion.context);
+
+    return (
+      <button
+        className="unified-search-suggestion"
+        disabled={disabled}
+        key={suggestion.key}
+        onClick={() => void openSuggestion(suggestion)}
+        type="button"
+      >
+        <TabFavicon
+          favIconUrl={suggestion.favIconUrl}
+          pageUrl={suggestion.url}
+          title={suggestion.title}
+        />
+        <span className="tab-copy">
+          <strong className="tab-title">{suggestion.title}</strong>
+          {suggestion.url ? <span className="tab-url">{suggestion.url}</span> : null}
+          <span className="suggestion-context">{context}</span>
+        </span>
+      </button>
+    );
+  }
+
   return (
     <div className="unified-search-wrap">
-      <form className="dashboard-search unified-search" onSubmit={(event) => void submit(event)}>
+      <form className="dashboard-search unified-search" onSubmit={submit}>
         <Search aria-hidden="true" size={16} />
         <input
           aria-label={t(locale, 'searchTabsAndWeb')}
@@ -115,30 +164,47 @@ export function UnifiedSearch({
           </button>
         ) : <span className="kbd" aria-hidden="true">/</span>}
       </form>
-      {suggestions.length > 0 ? (
-        <div className="unified-search-suggestions" role="listbox" aria-label={t(locale, 'searchSuggestions')}>
-          {suggestions.map((suggestion) => (
+      {query ? (
+        <div className="unified-search-suggestions" aria-label={t(locale, 'searchSuggestions')}>
+          {activeSuggestions.length > 0 ? (
+            <div
+              aria-label={t(locale, 'activeSource')}
+              className="unified-search-group"
+              role="group"
+            >
+              <p className="unified-search-group-label">{t(locale, 'activeSource')}</p>
+              {activeSuggestions.map(renderSuggestion)}
+            </div>
+          ) : null}
+          {savedSuggestions.length > 0 ? (
+            <div
+              aria-label={t(locale, 'savedSource')}
+              className="unified-search-group"
+              role="group"
+            >
+              <p className="unified-search-group-label">{t(locale, 'savedSource')}</p>
+              {savedSuggestions.map(renderSuggestion)}
+            </div>
+          ) : null}
+          <div
+            aria-label={t(locale, 'searchTheWeb')}
+            className="unified-search-group unified-search-group--web"
+            role="group"
+          >
+            <p className="unified-search-group-label">{t(locale, 'searchTheWeb')}</p>
             <button
-              className="unified-search-suggestion"
-              key={suggestion.key}
-              onClick={() => void openSuggestion(suggestion)}
-              role="option"
+              className="unified-search-suggestion unified-search-web"
+              disabled={disabled}
+              onClick={() => void searchWeb()}
               type="button"
             >
-              <span className="suggestion-source">
-                {t(locale, suggestion.source === 'active' ? 'activeSource' : 'savedSource')}
-              </span>
-              <TabFavicon
-                favIconUrl={suggestion.favIconUrl}
-                pageUrl={suggestion.url}
-                title={suggestion.title}
-              />
+              <Search aria-hidden="true" size={18} />
               <span className="tab-copy">
-                <strong className="tab-title">{suggestion.title}</strong>
-                <span className="tab-url">{suggestion.url}</span>
+                <strong className="tab-title">{query}</strong>
+                <span className="suggestion-context">{t(locale, 'searchWithDefaultEngine')}</span>
               </span>
             </button>
-          ))}
+          </div>
         </div>
       ) : null}
     </div>

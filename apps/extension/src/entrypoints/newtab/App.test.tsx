@@ -1820,10 +1820,15 @@ describe('App', () => {
     await click(screen().getByRole('button', { name: 'Edit quick links' }));
     await click(screen().getByRole('button', { name: 'Add open tab' }));
     expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
-    expect(document.activeElement).toBe(screen().getByRole('button', { name: 'Spec draft' }));
+    expect(document.activeElement).toBe(screen().getByLabelText('Filter open tabs'));
     expect(() => screen().getByRole('button', { name: 'Settings' })).toThrow();
     expect(document.body.querySelector('.open-tab-choice img.favicon')).not.toBeNull();
     expect(document.body.querySelector('.open-tab-choice .favicon-fallback')).toBeNull();
+    expect(screen().getByText('Current window · Ungrouped')).not.toBeNull();
+    expect(document.body.textContent).not.toContain('Window 4');
+
+    await click(screen().getByRole('button', { name: 'Spec draft, Current window · Ungrouped' }));
+    expect(saveQuickLinks).not.toHaveBeenCalled();
     await click(screen().getByRole('button', { name: 'Add' }));
 
     expect(promptSpy).not.toHaveBeenCalled();
@@ -1834,6 +1839,46 @@ describe('App', () => {
       }),
     ]);
     expect(screen().getByText('Spec draft')).not.toBeNull();
+  });
+
+  it('filters one open-tab snapshot locally, caps visible choices, and repairs selection', async () => {
+    const choices = Array.from({ length: 51 }, (_, index): ActiveBrowserTab => ({
+      ...UNIQUE_TAB,
+      id: index + 100,
+      index,
+      title: `Choice ${index}`,
+      url: `https://example.com/${index}`,
+    }));
+    mockMessages({ activeTabs: choices });
+
+    await renderApp();
+    await click(screen().getByRole('button', { name: 'Edit quick links' }));
+    const snapshotsBeforeOpen = sentMessageTypes().filter((type) => type === 'active-tabs:snapshot').length;
+    await click(screen().getByRole('button', { name: 'Add open tab' }));
+
+    expect(screen().getByRole('dialog', { name: 'Choose open tab' })).not.toBeNull();
+    expect(document.body.querySelectorAll('.open-tab-choice')).toHaveLength(50);
+    expect(screen().getByText('Showing the first 50 matches. Narrow your search to see more.')).not.toBeNull();
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(
+      snapshotsBeforeOpen + 1,
+    );
+
+    const filter = screen().getByLabelText('Filter open tabs');
+    await change(filter, 'Choice 50');
+
+    expect(document.body.querySelectorAll('.open-tab-choice')).toHaveLength(1);
+    expect(document.body.querySelector('.open-tab-choice')?.getAttribute('aria-pressed')).toBe('true');
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(
+      snapshotsBeforeOpen + 1,
+    );
+
+    await change(filter, 'missing');
+
+    expect(document.body.querySelectorAll('.open-tab-choice')).toHaveLength(0);
+    expect((screen().getByRole('button', { name: 'Add' }) as HTMLButtonElement).disabled).toBe(true);
+    expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(
+      snapshotsBeforeOpen + 1,
+    );
   });
 
   it('does not use browser prompt for integrated input actions', async () => {

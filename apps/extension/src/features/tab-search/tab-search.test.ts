@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { TabSession } from '@tabstow/core';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import {
+  buildOpenTabChoices,
   buildUnifiedSearchSuggestions,
   filterActiveTabsSnapshot,
   filterSavedSessions,
@@ -121,6 +122,121 @@ describe('tab search', () => {
       'saved:API reference',
     ]);
     expect(buildUnifiedSearchSuggestions(snapshot, [reading, work], 'example', 2)).toHaveLength(2);
+  });
+
+  it('keeps ranking stable with bounded result sets and allows one source to fill the limit', () => {
+    const activeOnly: ActiveTabsSnapshot = {
+      windows: snapshot.windows,
+      chromeGroups: [],
+      tabs: Array.from({ length: 1_000 }, (_, index) => ({
+        active: index === 0,
+        groupId: -1,
+        id: index + 100,
+        index,
+        pinned: false,
+        title:
+          index >= 900
+            ? `Needle prefix ${index}`
+            : index >= 600
+              ? `Contains needle ${index}`
+              : `Unrelated ${index}`,
+        url: index < 600 ? `https://example.com/needle/${index}` : `https://example.com/${index}`,
+        windowId: 8,
+      })),
+    };
+
+    const matchingSaved: TabSession = {
+      ...work,
+      tabs: [
+        {
+          ...work.tabs[0],
+          title: 'Needle saved',
+        },
+      ],
+    };
+    const suggestions = buildUnifiedSearchSuggestions(activeOnly, [matchingSaved], 'needle', 5);
+
+    expect(suggestions).toHaveLength(5);
+    expect(suggestions.every(({ source }) => source === 'active')).toBe(true);
+    expect(suggestions.map(({ title }) => title)).toEqual([
+      'Needle prefix 900',
+      'Needle prefix 901',
+      'Needle prefix 902',
+      'Needle prefix 903',
+      'Needle prefix 904',
+    ]);
+    expect(buildUnifiedSearchSuggestions(activeOnly, [matchingSaved], 'needle', 0)).toEqual([]);
+  });
+
+  it('adds structural window, group, lane, and saved-window context without exposing IDs', () => {
+    const suggestions = buildUnifiedSearchSuggestions(snapshot, [reading, work], 'issue', 5);
+    const active = suggestions.find(({ source }) => source === 'active');
+    const saved = suggestions.find(({ source }) => source === 'saved');
+
+    expect(active).toMatchObject({
+      source: 'active',
+      context: {
+        currentWindow: true,
+        windowNumber: 1,
+        lane: { kind: 'group', title: 'Work' },
+      },
+    });
+    expect(saved).toMatchObject({
+      source: 'saved',
+      context: { sessionTitle: 'Work', tabCount: 2 },
+    });
+    expect(JSON.stringify({ active, saved })).not.toContain('31');
+  });
+
+  it('uses the same focused-first window numbering as the active workspace', () => {
+    const permuted = { ...snapshot, windows: [...snapshot.windows].reverse() };
+    const suggestion = buildUnifiedSearchSuggestions(permuted, [], 'inbox', 5)[0];
+
+    expect(suggestion).toMatchObject({
+      source: 'active',
+      context: { currentWindow: false, windowNumber: 2 },
+    });
+  });
+
+  it('keeps a title match when an active tab has no URL', () => {
+    const noUrl: ActiveTabsSnapshot = {
+      windows: [snapshot.windows[0]],
+      chromeGroups: [],
+      tabs: [{ ...snapshot.tabs[0], id: 99, title: 'API scratchpad', url: undefined }],
+    };
+
+    expect(buildUnifiedSearchSuggestions(noUrl, [], 'api', 5)).toMatchObject([
+      { source: 'active', title: 'API scratchpad', url: '' },
+    ]);
+  });
+
+  it('builds a capped local quick-link chooser with context and overflow state', () => {
+    const largeSnapshot: ActiveTabsSnapshot = {
+      windows: snapshot.windows,
+      chromeGroups: snapshot.chromeGroups,
+      tabs: Array.from({ length: 51 }, (_, index) => ({
+        active: index === 0,
+        groupId: index === 0 ? 31 : -1,
+        id: index + 200,
+        index,
+        pinned: index === 1,
+        title: `Choice ${index}`,
+        url: `https://example.com/${index}`,
+        windowId: 8,
+      })),
+    };
+
+    const all = buildOpenTabChoices(largeSnapshot, '', 50);
+    const filtered = buildOpenTabChoices(largeSnapshot, 'choice 50', 50);
+
+    expect(all.choices).toHaveLength(50);
+    expect(all.overflow).toBe(true);
+    expect(all.choices[0]).toMatchObject({
+      label: 'Choice 0',
+      context: { lane: { kind: 'group', title: 'Work' } },
+    });
+    expect(filtered).toMatchObject({ overflow: false });
+    expect(filtered.choices.map(({ label }) => label)).toEqual(['Choice 50']);
   });
 
   it('returns no unified suggestions for blank queries', () => {
