@@ -14,14 +14,15 @@ import {
 } from '@/features/tab-search/tab-search-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import type { RunSavedDataMutation } from '@/features/saved-for-later';
 
 type Props = {
   activeSnapshot: ActiveTabsSnapshot;
   disabled?: boolean;
   locale: Locale;
   onChange: (value: string) => void;
-  onSavedOpened: () => void | Promise<void>;
   onStatus: (tone: 'success' | 'error', message: string) => void;
+  runSavedDataMutation: RunSavedDataMutation;
   sessions: TabSession[];
   value: string;
 };
@@ -36,8 +37,8 @@ export function UnifiedSearch({
   disabled = false,
   locale,
   onChange,
-  onSavedOpened,
   onStatus,
+  runSavedDataMutation,
   sessions,
   value,
 }: Props) {
@@ -98,18 +99,20 @@ export function UnifiedSearch({
       return;
     }
 
-    const response = await sendExtensionMessage<AppResult<{ opened: true; consumed: boolean }>>({
-      type: 'sessions:open-tab',
-      sessionId: suggestion.sessionId,
-      tabId: suggestion.tabId,
-      consume: true,
-    });
-    if (!response.ok) {
-      onStatus('error', response.error.message);
-      return;
-    }
-    await onSavedOpened();
-    onStatus('success', t(locale, 'openedSavedTab'));
+    await runSavedDataMutation(
+      async () => {
+        const response = await sendExtensionMessage<AppResult<{ opened: true; consumed: boolean }>>({
+          type: 'sessions:open-tab',
+          sessionId: suggestion.sessionId,
+          tabId: suggestion.tabId,
+          consume: true,
+        });
+        if (response.ok) onStatus('success', t(locale, 'openedSavedTab'));
+        else onStatus('error', response.error.message);
+        return response;
+      },
+      (result) => result.ok && result.data.consumed,
+    );
   }
 
   function renderSuggestion(suggestion: UnifiedSearchSuggestion) {

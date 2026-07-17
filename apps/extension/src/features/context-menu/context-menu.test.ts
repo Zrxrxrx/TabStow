@@ -1,6 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const browserMocks = vi.hoisted(() => ({
+  runtime: {
+    sendMessage: vi.fn(),
+  },
   i18n: {
     getUILanguage: vi.fn(() => 'en-US'),
   },
@@ -57,6 +60,7 @@ describe('context menu registration', () => {
 describe('context menu click handler', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    browserMocks.runtime.sendMessage.mockResolvedValue(undefined);
     coordinatorMocks.noteSynchronizedMutation.mockResolvedValue(undefined);
     sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValue({
       ok: true,
@@ -75,6 +79,9 @@ describe('context menu click handler', () => {
 
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(77);
     expect(coordinatorMocks.noteSynchronizedMutation).toHaveBeenCalledTimes(1);
+    expect(browserMocks.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'saved-data:changed',
+    });
   });
 
   it('keeps a successful stow independent from sync scheduling failures', async () => {
@@ -90,5 +97,36 @@ describe('context menu click handler', () => {
         { windowId: 77 } as chrome.tabs.Tab,
       ),
     ).resolves.toBeUndefined();
+  });
+
+  it('keeps a successful stow independent from event delivery failures', async () => {
+    browserMocks.runtime.sendMessage.mockRejectedValueOnce(
+      new Error('Receiving end does not exist'),
+    );
+    registerContextMenuClickHandler();
+
+    const listener = browserMocks.contextMenus.onClicked.addListener.mock.calls[0]?.[0];
+    await expect(
+      listener?.(
+        { menuItemId: 'tabstow-stow-current-window' },
+        { windowId: 77 } as chrome.tabs.Tab,
+      ),
+    ).resolves.toBeUndefined();
+  });
+
+  it('does not broadcast when the context-menu stow fails', async () => {
+    sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'no-eligible-tabs', message: 'No eligible tabs were found.' },
+    });
+    registerContextMenuClickHandler();
+
+    const listener = browserMocks.contextMenus.onClicked.addListener.mock.calls[0]?.[0];
+    await listener?.(
+      { menuItemId: 'tabstow-stow-current-window' },
+      { windowId: 77 } as chrome.tabs.Tab,
+    );
+
+    expect(browserMocks.runtime.sendMessage).not.toHaveBeenCalled();
   });
 });

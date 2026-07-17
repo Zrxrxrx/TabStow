@@ -41,6 +41,18 @@ const ENTRY: HistoryEntry = {
 
 let container: HTMLDivElement;
 let root: Root;
+let runtimeMessages: ReturnType<typeof createRuntimeMessageEvent>;
+
+function createRuntimeMessageEvent() {
+  const listeners = new Set<(message: unknown) => unknown>();
+  return {
+    addListener: vi.fn((listener: (message: unknown) => unknown) => listeners.add(listener)),
+    removeListener: vi.fn((listener: (message: unknown) => unknown) => listeners.delete(listener)),
+    emit(message: unknown) {
+      return Array.from(listeners, (listener) => listener(message));
+    },
+  };
+}
 
 describe('HistoryApp', () => {
   beforeEach(() => {
@@ -49,11 +61,13 @@ describe('HistoryApp', () => {
     root = createRoot(container);
     sendExtensionMessage.mockReset();
     storageGetItem.mockReset().mockResolvedValue('en');
+    runtimeMessages = createRuntimeMessageEvent();
     Object.defineProperty(globalThis, 'chrome', {
       configurable: true,
       value: {
         runtime: {
           getURL: vi.fn((path: string) => `chrome-extension://tabstow-test${path}`),
+          onMessage: runtimeMessages,
         },
       },
     });
@@ -81,6 +95,24 @@ describe('HistoryApp', () => {
     expect(getByRole('button', 'Open Example in background')).not.toBeNull();
     expect(container.querySelector('time')?.getAttribute('datetime')).toBe(ENTRY.movedAt);
     expect(container.querySelector('.history-empty-state')).toBeNull();
+  });
+
+  it('refreshes History for local Saved changes but not sync-only invalidations', async () => {
+    sendExtensionMessage
+      .mockResolvedValueOnce({ ok: true, data: [ENTRY] })
+      .mockResolvedValueOnce({ ok: true, data: [] });
+
+    await renderHistory();
+    expect(runtimeMessages.emit({ type: 'sync:data-changed' })).toEqual([undefined]);
+    expect(sendExtensionMessage).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      runtimeMessages.emit({ type: 'saved-data:changed' });
+      await Promise.resolve();
+    });
+
+    expect(sendExtensionMessage).toHaveBeenCalledTimes(2);
+    expect(getByText('History is empty.')).not.toBeNull();
   });
 
   it('renders the reason and source title for every History reason', async () => {
@@ -197,7 +229,10 @@ describe('HistoryApp', () => {
   it('restores a whole History entry and reloads the list', async () => {
     sendExtensionMessage
       .mockResolvedValueOnce({ ok: true, data: [ENTRY] })
-      .mockResolvedValueOnce({ ok: true, data: { id: 'restored-session' } })
+      .mockImplementationOnce(async () => {
+        runtimeMessages.emit({ type: 'saved-data:changed' });
+        return { ok: true, data: { id: 'restored-session' } };
+      })
       .mockResolvedValueOnce({ ok: true, data: [] });
     await renderHistory();
 

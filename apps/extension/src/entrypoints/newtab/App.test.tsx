@@ -1329,6 +1329,7 @@ describe('App', () => {
           onSuggestedStow={async () => {}}
           query=""
           refreshKey={0}
+          runSavedDataMutation={async (mutation) => mutation()}
           suggestionRefreshKey={0}
         />,
       );
@@ -3216,14 +3217,20 @@ describe('App', () => {
         createdAt: '2026-07-07T00:00:00.000Z',
       },
     ];
-    const listener = chromeRuntimeMocks.onMessage.addListener.mock.calls[0]?.[0];
+    const sessionsListCallsBefore = sendExtensionMessage.mock.calls.filter(
+      ([message]) => message.type === 'sessions:list',
+    ).length;
     await act(async () => {
-      listener?.({ type: 'sync:data-changed' });
+      for (const [listener] of chromeRuntimeMocks.onMessage.addListener.mock.calls) {
+        listener({ type: 'sync:data-changed' });
+      }
       await Promise.resolve();
     });
 
     expect(screen().getByText('Remote')).not.toBeNull();
-    expect(sendExtensionMessage).toHaveBeenCalledWith({ type: 'sessions:list' });
+    expect(sendExtensionMessage.mock.calls.filter(
+      ([message]) => message.type === 'sessions:list',
+    )).toHaveLength(sessionsListCallsBefore + 1);
   });
 });
 
@@ -3528,6 +3535,7 @@ async function renderActiveWorkspace(
         onSuggestedStow={async () => {}}
         query=""
         refreshKey={0}
+        runSavedDataMutation={async (mutation) => mutation()}
         suggestionRefreshKey={0}
         {...overrides}
       />,

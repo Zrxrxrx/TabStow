@@ -156,7 +156,13 @@ describe('TabLifecycleReviewDialog', () => {
     });
     const onClose = vi.fn();
     const onStowed = vi.fn(() => Promise.resolve());
-    await renderDialog({ onClose, onStowed });
+    const mutationCalls = vi.fn();
+    const runSavedDataMutation: ComponentProps<typeof TabLifecycleReviewDialog>['runSavedDataMutation'] =
+      async (mutation) => {
+        mutationCalls();
+        return mutation();
+      };
+    await renderDialog({ onClose, onStowed, runSavedDataMutation });
 
     await act(async () => getButton('Move 3 tabs to Saved windows and close original tabs').click());
     expect(sendExtensionMessage).toHaveBeenLastCalledWith({
@@ -184,6 +190,7 @@ describe('TabLifecycleReviewDialog', () => {
       'Saved 2 tabs in 2 windows; closed 0 original tabs, skipped 1 tab, and 2 original tabs could not be closed.',
     );
     expect(onStowed).toHaveBeenCalledTimes(1);
+    expect(mutationCalls).toHaveBeenCalledTimes(2);
     expect(getCheckboxes()).toHaveLength(0);
   });
 
@@ -237,6 +244,7 @@ async function renderDialog(
         onCandidatesRemoved={() => undefined}
         onClose={() => undefined}
         onStowed={() => Promise.resolve()}
+        runSavedDataMutation={async (mutation) => mutation()}
         {...overrides}
       />,
     );

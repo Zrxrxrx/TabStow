@@ -16,6 +16,7 @@ const browserMocks = vi.hoisted(() => ({
     setTitle: vi.fn(),
   },
   runtime: {
+    sendMessage: vi.fn(),
     onInstalled: {
       addListener: vi.fn(),
     },
@@ -209,6 +210,7 @@ describe('background message routing', () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    browserMocks.runtime.sendMessage.mockResolvedValue(undefined);
     (
       globalThis as typeof globalThis & {
         defineBackground?: (callback: () => void) => void;
@@ -379,6 +381,9 @@ describe('background message routing', () => {
 
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(41);
     expect(actionFeedbackMocks.showActionFeedback).toHaveBeenCalledWith(result);
+    expect(browserMocks.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'saved-data:changed',
+    });
   });
 
   it('falls back to the last focused window when toolbar tab has no window id', async () => {
@@ -396,6 +401,7 @@ describe('background message routing', () => {
     await listener?.({} as chrome.tabs.Tab);
 
     expect(sessionServiceMocks.saveCurrentWindowAsSession).toHaveBeenCalledWith(undefined);
+    expect(browserMocks.runtime.sendMessage).not.toHaveBeenCalled();
   });
 
   it('routes active tab close messages', async () => {
@@ -589,6 +595,128 @@ describe('background message routing', () => {
       observationIds: ['three'],
     });
     expect(coordinatorMocks.noteSynchronizedMutation).toHaveBeenCalledTimes(1);
+  });
+
+  it('broadcasts every successful Saved or History mutation', async () => {
+    const stowResult = {
+      ok: true,
+      data: { session: null, savedTabCount: 1, closedTabCount: 1 },
+    };
+    sessionServiceMocks.saveCurrentWindowAsSession.mockResolvedValue(stowResult);
+    sessionServiceMocks.saveTabsAsSession.mockResolvedValue(stowResult);
+    sessionServiceMocks.openSavedTab.mockResolvedValue({
+      ok: true,
+      data: { opened: true, consumed: true },
+    });
+    sessionServiceMocks.restoreSession.mockResolvedValue({
+      ok: true,
+      data: { restored: true, tabCount: 1 },
+    });
+    dbMocks.moveSavedTabToHistory.mockResolvedValue({ id: 'history-tab' });
+    dbMocks.moveSessionToHistory.mockResolvedValue({ id: 'history-session' });
+    dbMocks.reorderSessions.mockResolvedValue([]);
+    dbMocks.moveSavedTab.mockResolvedValue(undefined);
+    dbMocks.restoreHistoryEntry.mockResolvedValue({ id: 'restored-session' });
+    dbMocks.deleteHistoryEntry.mockResolvedValue(undefined);
+    suggestedStowMocks.stowSuggestedTabs.mockResolvedValue({
+      ok: true,
+      data: {
+        savedTabCount: 1,
+        createdSessionCount: 1,
+        closedTabCount: 1,
+        skipped: [],
+        closeFailures: [],
+      },
+    });
+
+    await import('../entrypoints/background');
+
+    const messages = [
+      { type: 'sessions:stow-current-window' },
+      { type: 'sessions:stow-tab', tabId: 42 },
+      {
+        type: 'sessions:open-tab',
+        sessionId: 'session-1',
+        tabId: 'tab-1',
+        consume: true,
+      },
+      { type: 'sessions:restore', sessionId: 'session-1' },
+      { type: 'sessions:delete-tab', sessionId: 'session-1', tabId: 'tab-1' },
+      { type: 'sessions:delete', sessionId: 'session-1' },
+      { type: 'sessions:reorder', orderedIds: [] },
+      {
+        type: 'sessions:move-tab',
+        request: {
+          sourceSessionId: 'session-1',
+          tabId: 'tab-1',
+          destinationSessionId: 'session-2',
+          destinationIndex: 0,
+        },
+      },
+      { type: 'history:restore', historyId: 'history-1' },
+      { type: 'history:delete', historyId: 'history-1' },
+      {
+        type: 'tab-lifecycle:stow-suggestions',
+        observationIds: ['observation-1'],
+      },
+    ];
+
+    for (const message of messages) await dispatchRuntimeMessage(message);
+
+    expect(browserMocks.runtime.sendMessage).toHaveBeenCalledTimes(messages.length);
+    expect(browserMocks.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'saved-data:changed',
+    });
+  });
+
+  it('does not broadcast Saved data when an operation made no change', async () => {
+    sessionServiceMocks.openSavedTab.mockResolvedValue({
+      ok: true,
+      data: { opened: true, consumed: false },
+    });
+    suggestedStowMocks.stowSuggestedTabs.mockResolvedValue({
+      ok: true,
+      data: {
+        savedTabCount: 0,
+        createdSessionCount: 0,
+        closedTabCount: 0,
+        skipped: [],
+        closeFailures: [],
+      },
+    });
+
+    await import('../entrypoints/background');
+    await dispatchRuntimeMessage({
+      type: 'sessions:open-tab',
+      sessionId: 'session-1',
+      tabId: 'tab-1',
+      consume: false,
+    });
+    await dispatchRuntimeMessage({
+      type: 'tab-lifecycle:stow-suggestions',
+      observationIds: ['observation-1'],
+    });
+
+    expect(browserMocks.runtime.sendMessage).not.toHaveBeenCalled();
+  });
+
+  it('keeps successful mutations independent from Saved event delivery', async () => {
+    const result = {
+      ok: true,
+      data: { session: null, savedTabCount: 1, closedTabCount: 1 },
+    };
+    sessionServiceMocks.saveTabsAsSession.mockResolvedValue(result);
+    browserMocks.runtime.sendMessage.mockRejectedValueOnce(
+      new Error('Receiving end does not exist'),
+    );
+
+    await import('../entrypoints/background');
+    const { response } = await dispatchRuntimeMessage({
+      type: 'sessions:stow-tab',
+      tabId: 42,
+    });
+
+    expect(response).toBe(result);
   });
 
   it('rejects duplicate suggested stow identities before persistence', async () => {

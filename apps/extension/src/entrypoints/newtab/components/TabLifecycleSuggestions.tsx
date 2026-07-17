@@ -7,6 +7,7 @@ import type {
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import type { RunSavedDataMutation } from '@/features/saved-for-later';
 import { TabLifecycleReviewDialog } from './TabLifecycleReviewDialog';
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
   locale: Locale;
   onStowed: () => void | Promise<void>;
   refreshKey: number;
+  runSavedDataMutation: RunSavedDataMutation;
 };
 
 export function TabLifecycleSuggestions({
@@ -21,6 +23,7 @@ export function TabLifecycleSuggestions({
   locale,
   onStowed,
   refreshKey,
+  runSavedDataMutation,
 }: Props) {
   const [suggestions, setSuggestions] = useState<StowSuggestionList | null>(null);
   const [reviewSnapshot, setReviewSnapshot] = useState<StowSuggestionCandidate[] | null>(null);
@@ -126,6 +129,7 @@ export function TabLifecycleSuggestions({
           onCandidatesRemoved={removeCandidates}
           onClose={() => setReviewSnapshot(null)}
           onStowed={onStowed}
+          runSavedDataMutation={runSavedDataMutation}
         />
       ) : null}
     </>

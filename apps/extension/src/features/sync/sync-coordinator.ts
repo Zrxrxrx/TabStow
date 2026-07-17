@@ -4,6 +4,7 @@ import { getQuickLinks } from '@/features/quick-links/quick-links-storage';
 import { getSettings } from '@/features/settings/settings-storage';
 import { browser } from '@/lib/browser';
 import { err, ok, toErrorMessage, type AppResult } from '@/lib/errors';
+import { broadcastExtensionEvent } from '@/lib/extension-events';
 import {
   getConnectionRecord,
   getConnectionView,
@@ -45,16 +46,8 @@ function serialize<T>(operation: () => Promise<T>): Promise<T> {
   return next;
 }
 
-async function safeBroadcast(message: unknown): Promise<void> {
-  try {
-    await browser.runtime.sendMessage(message);
-  } catch {
-    // No extension page may currently be open.
-  }
-}
-
 async function broadcastStatus(status: SyncStatusView): Promise<void> {
-  await safeBroadcast({ type: 'sync:status-changed', status });
+  await broadcastExtensionEvent({ type: 'sync:status-changed', status });
 }
 
 async function setSyncStatus(
@@ -394,7 +387,7 @@ async function reconcileSerialized(
     }
     await broadcastStatus(status);
     if (reconciled.dataChanged) {
-      await safeBroadcast({ type: 'sync:data-changed' });
+      await broadcastExtensionEvent({ type: 'sync:data-changed' });
     }
     await schedulePendingSync();
     return ok({
@@ -459,7 +452,7 @@ async function handleConnectionResult(
   if (connectionResult.shouldReconcile) {
     await manualPush(connectionResult.allowInitialize);
   }
-  await safeBroadcast({ type: 'connection:state-changed' });
+  await broadcastExtensionEvent({ type: 'connection:state-changed' });
 }
 
 export async function handleOAuthAlarm(): Promise<void> {
@@ -615,6 +608,6 @@ export async function disconnectSync(): Promise<ConnectionView> {
   await clearSyncAlarms().catch(() => undefined);
   await serialize(async () => undefined);
   await clearSyncAlarms().catch(() => undefined);
-  await safeBroadcast({ type: 'connection:state-changed' });
+  await broadcastExtensionEvent({ type: 'connection:state-changed' });
   return view;
 }

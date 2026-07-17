@@ -9,6 +9,7 @@ import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
 import { ModalDialog } from '@/components/ModalDialog';
+import type { RunSavedDataMutation } from '@/features/saved-for-later';
 
 type Props = {
   initialCandidates: StowSuggestionCandidate[];
@@ -16,6 +17,7 @@ type Props = {
   onCandidatesRemoved: (observationIds: string[]) => void;
   onClose: () => void;
   onStowed: () => void | Promise<void>;
+  runSavedDataMutation: RunSavedDataMutation;
 };
 
 type CandidateGroup = {
@@ -52,6 +54,7 @@ export function TabLifecycleReviewDialog({
   onCandidatesRemoved,
   onClose,
   onStowed,
+  runSavedDataMutation,
 }: Props) {
   const [candidates, setCandidates] = useState(() => [...initialCandidates]);
   const [selectedIds, setSelectedIds] = useState(
@@ -134,10 +137,13 @@ export function TabLifecycleReviewDialog({
     setStowing(true);
     setError(null);
     setSummary(null);
-    const response = await sendExtensionMessage<AppResult<SuggestedStowResult>>({
-      type: 'tab-lifecycle:stow-suggestions',
-      observationIds,
-    });
+    const response = await runSavedDataMutation(
+      () => sendExtensionMessage<AppResult<SuggestedStowResult>>({
+        type: 'tab-lifecycle:stow-suggestions',
+        observationIds,
+      }),
+      (result) => result.ok && result.data.savedTabCount > 0,
+    );
     if (!response.ok) {
       setStowing(false);
       setError(t(locale, 'lifecycleStowError', { message: response.error.message }));
