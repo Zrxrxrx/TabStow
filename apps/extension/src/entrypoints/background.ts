@@ -27,7 +27,6 @@ import {
   moveActiveTabGroup,
 } from '@/features/active-tabs/active-tab-moves';
 import { collapseChromeTabGroups } from '@/features/chrome-tab-groups/chrome-tab-groups';
-import { showActionFeedback } from '@/features/action-feedback/action-feedback';
 import { getSettings, updateSettings } from '@/features/settings/settings-storage';
 import {
   getTabLifecycleState,
@@ -449,6 +448,9 @@ async function handleMessage(
 
 export default defineBackground(() => {
   registerTabLifecycleEventHandlers();
+  void runBestEffort(() => browser.sidePanel.setPanelBehavior({
+    openPanelOnActionClick: true,
+  }));
 
   browser.runtime.onInstalled.addListener(() => {
     void registerContextMenu();
@@ -473,17 +475,6 @@ export default defineBackground(() => {
       await handleOAuthAlarm();
     } else if (alarm.name === TAB_LIFECYCLE_ALARM_NAME) {
       await handleTabLifecycleAlarm();
-    }
-  });
-
-  browser.action.onClicked.addListener(async (tab) => {
-    const result = await saveCurrentWindowAsSession(tab.windowId);
-    showActionFeedback(result);
-    if (result.ok) {
-      noteSynchronizedMutationBestEffort();
-      if (result.data.savedTabCount > 0) {
-        await broadcastExtensionEvent({ type: 'saved-data:changed' });
-      }
     }
   });
 

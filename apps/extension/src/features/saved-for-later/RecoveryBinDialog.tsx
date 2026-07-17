@@ -15,6 +15,7 @@ import { useSavedDataRefreshGate } from './useSavedDataInvalidation';
 import type { RunSavedDataMutation } from './useSavedForLaterController';
 
 type Props = {
+  historyLinkTarget?: '_blank';
   locale: Locale;
   onClose: () => void;
   runSavedDataMutation: RunSavedDataMutation;
@@ -32,7 +33,12 @@ const RECOVERY_REASON_KEYS = {
   restored: 'historyReasonRestored',
 } satisfies Record<HistoryEntry['reason'], MessageKey>;
 
-export function RecoveryBinDialog({ locale, onClose, runSavedDataMutation }: Props) {
+export function RecoveryBinDialog({
+  historyLinkTarget,
+  locale,
+  onClose,
+  runSavedDataMutation,
+}: Props) {
   const [entries, setEntries] = useState<HistoryEntry[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -110,7 +116,11 @@ export function RecoveryBinDialog({ locale, onClose, runSavedDataMutation }: Pro
           );
         })}
       </div>
-      <a className="secondary-button recovery-history-link" href={chrome.runtime.getURL('/saved-history.html')}>
+      <a
+        className="secondary-button recovery-history-link"
+        href={chrome.runtime.getURL('/saved-history.html')}
+        target={historyLinkTarget}
+      >
         <ExternalLink aria-hidden="true" size={14} />
         {t(locale, 'viewFullHistory')}
       </a>

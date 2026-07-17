@@ -6,11 +6,17 @@ import type { SavedForLaterController } from './useSavedForLaterController';
 
 export type SavedForLaterProps = {
   controller: SavedForLaterController;
+  historyLinkTarget?: '_blank';
   locale: Locale;
   query: string;
 };
 
-export function SavedForLater({ controller, locale, query }: SavedForLaterProps) {
+export function SavedForLater({
+  controller,
+  historyLinkTarget,
+  locale,
+  query,
+}: SavedForLaterProps) {
   const [recoveryOpen, setRecoveryOpen] = useState(false);
 
   return (
@@ -25,6 +31,7 @@ export function SavedForLater({ controller, locale, query }: SavedForLaterProps)
       />
       {recoveryOpen ? (
         <RecoveryBinDialog
+          historyLinkTarget={historyLinkTarget}
           locale={locale}
           onClose={() => setRecoveryOpen(false)}
           runSavedDataMutation={controller.runSavedDataMutation}
