@@ -95,6 +95,7 @@ import {
   type AppResult,
 } from '@/lib/errors';
 import { browser } from '@/lib/browser';
+import { broadcastExtensionEvent } from '@/lib/extension-events';
 import type { ExtensionMessage } from '@/lib/messages';
 import type { MoveSavedTabRequest } from '@/features/history/types';
 
@@ -134,7 +135,7 @@ function hasUniqueObservationIds(value: unknown): value is string[] {
   );
 }
 
-function savedSuggestedTabs(response: AppResult<unknown>): boolean {
+function savedAtLeastOneTab(response: AppResult<unknown>): boolean {
   if (!response.ok || !response.data || typeof response.data !== 'object') return false;
   if (!('savedTabCount' in response.data)) return false;
   return (
@@ -380,25 +381,68 @@ const SYNC_MUTATION_MESSAGES = new Set<ExtensionMessage['type']>([
   'settings:update',
 ]);
 
+const SAVED_DATA_MUTATION_MESSAGES = new Set<ExtensionMessage['type']>([
+  'sessions:restore',
+  'sessions:delete-tab',
+  'sessions:delete',
+  'sessions:reorder',
+  'sessions:move-tab',
+  'history:restore',
+  'history:delete',
+]);
+
+function consumedSavedTab(response: AppResult<unknown>): boolean {
+  return response.ok
+    && Boolean(
+      response.data
+      && typeof response.data === 'object'
+      && 'consumed' in response.data
+      && response.data.consumed === true,
+    );
+}
+
+function changedSavedData(
+  message: ExtensionMessage,
+  response: AppResult<unknown>,
+): boolean {
+  if (!response.ok) return false;
+  if (
+    message.type === 'sessions:stow-current-window'
+    || message.type === 'sessions:stow-tab'
+    || message.type === 'tab-lifecycle:stow-suggestions'
+  ) {
+    return savedAtLeastOneTab(response);
+  }
+  if (message.type === 'sessions:open-tab') return consumedSavedTab(response);
+  return SAVED_DATA_MUTATION_MESSAGES.has(message.type);
+}
+
 async function handleMessage(
   rawMessage: unknown,
   sender?: chrome.runtime.MessageSender,
 ): Promise<AppResult<unknown>> {
   const response = await routeMessage(rawMessage, sender);
   if (
-    response.ok &&
-    rawMessage &&
-    typeof rawMessage === 'object' &&
-    'type' in rawMessage &&
-    typeof rawMessage.type === 'string' &&
-    (SYNC_MUTATION_MESSAGES.has(rawMessage.type as ExtensionMessage['type']) ||
-      (rawMessage.type === 'sessions:open-tab' &&
-        'consume' in rawMessage &&
-        rawMessage.consume === true) ||
-      (rawMessage.type === 'tab-lifecycle:stow-suggestions'
-        && savedSuggestedTabs(response)))
+    !rawMessage
+    || typeof rawMessage !== 'object'
+    || !('type' in rawMessage)
+    || typeof rawMessage.type !== 'string'
+  ) {
+    return response;
+  }
+
+  const message = rawMessage as ExtensionMessage;
+  if (
+    response.ok
+    && (SYNC_MUTATION_MESSAGES.has(message.type)
+      || (message.type === 'sessions:open-tab' && message.consume === true)
+      || (message.type === 'tab-lifecycle:stow-suggestions'
+        && savedAtLeastOneTab(response)))
   ) {
     noteSynchronizedMutationBestEffort();
+  }
+  if (changedSavedData(message, response)) {
+    await broadcastExtensionEvent({ type: 'saved-data:changed' });
   }
   return response;
 }
@@ -435,7 +479,12 @@ export default defineBackground(() => {
   browser.action.onClicked.addListener(async (tab) => {
     const result = await saveCurrentWindowAsSession(tab.windowId);
     showActionFeedback(result);
-    if (result.ok) noteSynchronizedMutationBestEffort();
+    if (result.ok) {
+      noteSynchronizedMutationBestEffort();
+      if (result.data.savedTabCount > 0) {
+        await broadcastExtensionEvent({ type: 'saved-data:changed' });
+      }
+    }
   });
 
   browser.runtime.onMessage.addListener((message: unknown, sender, sendResponse) => {
