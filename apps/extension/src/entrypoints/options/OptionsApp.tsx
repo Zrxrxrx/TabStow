@@ -24,6 +24,13 @@ type StatusState = {
   message: string | null;
 };
 
+type SettingsFormState = {
+  persisted: ExtensionSettings;
+  draft: ExtensionSettings;
+};
+
+const EDITABLE_SETTINGS_KEYS = ['includePinnedTabs', 'closePinnedTabs'] as const;
+
 const EMPTY_FORM: ExtensionSettings = {
   deviceId: '',
   includePinnedTabs: false,
@@ -34,6 +41,27 @@ const DISCONNECTED: ConnectionView = {
   phase: 'disconnected',
   sync: { state: 'disconnected' },
 };
+
+function deriveSettingsPatch({
+  persisted,
+  draft,
+}: SettingsFormState): Partial<ExtensionSettings> {
+  const patch: Partial<ExtensionSettings> = {};
+  for (const key of EDITABLE_SETTINGS_KEYS) {
+    if (draft[key] !== persisted[key]) patch[key] = draft[key];
+  }
+  return patch;
+}
+
+function rebaseSettingsForm(
+  current: SettingsFormState,
+  incoming: ExtensionSettings,
+): SettingsFormState {
+  return {
+    persisted: incoming,
+    draft: { ...incoming, ...deriveSettingsPatch(current) },
+  };
+}
 
 function openExternal(url: string): void {
   window.open(url, '_blank', 'noopener,noreferrer');
@@ -52,25 +80,45 @@ export function OptionsApp({
 }: {
   initialThemeError?: string | null;
 } = {}) {
-  const [settings, setSettings] = useState<ExtensionSettings>(EMPTY_FORM);
-  const [settingsPatch, setSettingsPatch] = useState<Partial<ExtensionSettings>>({});
-  const settingsPatchRef = useRef<Partial<ExtensionSettings>>({});
+  const [settingsForm, setSettingsForm] = useState<SettingsFormState | null>(null);
+  const [settingsLoadFailed, setSettingsLoadFailed] = useState(false);
+  const settingsLoadGenerationRef = useRef(0);
+  const settingsSettledGenerationRef = useRef(0);
+  const savePendingRef = useRef(false);
   const [connection, setConnection] = useState<ConnectionView>(DISCONNECTED);
   const [gistId, setGistId] = useState('');
   const [fileName, setFileName] = useState('tabstow.sync.json');
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>({ tone: 'info', message: null });
 
+  const settingsDraft = settingsForm?.draft ?? EMPTY_FORM;
+  const settingsPatch = settingsForm ? deriveSettingsPatch(settingsForm) : {};
+  const settingsDirty = Object.keys(settingsPatch).length > 0;
+  const settingsSaveState = !settingsForm
+    ? settingsLoadFailed
+      ? 'Preferences are unavailable.'
+      : 'Loading preferences…'
+    : settingsDirty
+      ? 'Unsaved preference changes.'
+      : 'Preferences are up to date.';
+
   async function loadSettings(preserveUnsavedChanges = false) {
+    const generation = ++settingsLoadGenerationRef.current;
     const response = await sendExtensionMessage<AppResult<ExtensionSettings>>({ type: 'settings:get' });
+    if (generation !== settingsLoadGenerationRef.current) return;
+    settingsSettledGenerationRef.current = generation;
     if (response.ok) {
-      setSettings(
-        preserveUnsavedChanges
-          ? { ...response.data, ...settingsPatchRef.current }
-          : response.data,
+      setSettingsLoadFailed(false);
+      setSettingsForm((current) =>
+        preserveUnsavedChanges && current
+          ? rebaseSettingsForm(current, response.data)
+          : { persisted: response.data, draft: response.data },
       );
     }
-    else setStatus({ tone: 'error', message: response.error.message });
+    else {
+      setSettingsLoadFailed(true);
+      setStatus({ tone: 'error', message: response.error.message });
+    }
   }
 
   async function loadConnection() {
@@ -115,27 +163,38 @@ export function OptionsApp({
   }, [connection.phase, connection.deviceFlow?.intervalSeconds]);
 
   function updateField<K extends keyof ExtensionSettings>(key: K, value: ExtensionSettings[K]) {
-    setSettings((current) => ({ ...current, [key]: value }));
-    const nextPatch = { ...settingsPatchRef.current, [key]: value };
-    settingsPatchRef.current = nextPatch;
-    setSettingsPatch(nextPatch);
+    setSettingsForm((current) =>
+      current
+        ? { ...current, draft: { ...current.draft, [key]: value } }
+        : current,
+    );
   }
 
   async function saveSettings() {
+    if (!settingsForm || !settingsDirty || savePendingRef.current) return;
+    const settingsLoadGenerationAtStart = settingsLoadGenerationRef.current;
+    const settingsLoadWasPending =
+      settingsSettledGenerationRef.current !== settingsLoadGenerationAtStart;
+    savePendingRef.current = true;
     setBusyAction('save');
     const response = await sendExtensionMessage<AppResult<ExtensionSettings>>({
       type: 'settings:update',
       settings: settingsPatch,
     });
-    setBusyAction(null);
     if (response.ok) {
-      setSettings(response.data);
-      settingsPatchRef.current = {};
-      setSettingsPatch({});
-      setStatus({ tone: 'success', message: 'Settings saved.' });
+      setSettingsForm({ persisted: response.data, draft: response.data });
+      setStatus({ tone: 'success', message: 'Preferences saved.' });
+      if (
+        settingsLoadWasPending ||
+        settingsLoadGenerationRef.current !== settingsLoadGenerationAtStart
+      ) {
+        await loadSettings();
+      }
     } else {
       setStatus({ tone: 'error', message: response.error.message });
     }
+    savePendingRef.current = false;
+    setBusyAction(null);
   }
 
   async function runConnectionAction(
@@ -190,9 +249,38 @@ export function OptionsApp({
     }
   }
 
+  async function copyDeviceId() {
+    const deviceId = settingsForm?.draft.deviceId;
+    if (!deviceId) return;
+    try {
+      await navigator.clipboard.writeText(deviceId);
+      setStatus({ tone: 'success', message: 'Device ID copied.' });
+    } catch {
+      setStatus({ tone: 'error', message: 'Could not copy the Device ID.' });
+    }
+  }
+
   const disabled = busyAction !== null;
   const confirmedBinding = connection.binding;
   const visibleBinding = confirmedBinding ?? connection.pendingBinding;
+  const canDisconnect =
+    connection.phase === 'needs-target' ||
+    connection.phase === 'needs-confirmation' ||
+    connection.phase === 'connected';
+  const showManualSyncActions =
+    connection.phase === 'connected' &&
+    (connection.sync.state === 'synced' || connection.sync.state === 'pending');
+  const showRetryAction =
+    connection.phase === 'connected' &&
+    (connection.sync.state === 'retrying' || connection.sync.action === 'inspect-file');
+  const showOpenGistAction =
+    connection.phase === 'connected' && connection.sync.action !== 'rebind';
+  const showChooseAnotherAction =
+    connection.phase === 'connected' &&
+    (connection.sync.state === 'synced' ||
+      connection.sync.state === 'pending' ||
+      connection.sync.action === 'rebind' ||
+      connection.sync.action === 'inspect-file');
 
   return (
     <UtilityPageShell
@@ -200,18 +288,22 @@ export function OptionsApp({
       pageLabel="Settings"
     >
       <p className="options-intro">
-        Connect GitHub once, then let Tabstow synchronize automatically.
+        Tabstow works locally first. GitHub sync is optional.
+      </p>
+      <p className="options-intro-detail">
+        Connect an existing Gist to synchronize Saved windows, Quick Links, and pinned-tab preferences across devices.
       </p>
 
       <StatusMessage message={initialThemeError} tone="error" />
       <StatusMessage message={status.message} tone={status.tone} />
 
       <section className="settings-section" aria-labelledby="gist-heading">
-        <h2 id="gist-heading">GitHub Gist Sync</h2>
+        <h2 id="gist-heading">Optional GitHub sync</h2>
 
         {connection.phase === 'disconnected' ? (
           <div className="connection-card">
-            <p>Use GitHub Device Flow to connect. Tabstow requests only the <code>gist</code> scope.</p>
+            <p>Stow and restore work without GitHub. Connect only for cross-device synchronization.</p>
+            <p className="help-text">Tabstow uses GitHub Device Flow and requests only the <code>gist</code> scope.</p>
             <button
               type="button"
               className="primary-button"
@@ -380,6 +472,11 @@ export function OptionsApp({
             </div>
             {connection.sync.message ? <p>{connection.sync.message}</p> : null}
             <p className="help-text">Last successful sync: {formatTime(connection.sync.lastSuccessAt)}</p>
+            {showManualSyncActions ? (
+              <p className="help-text">
+                Pull and Push safely merge synchronized data instead of replacing local data.
+              </p>
+            ) : null}
             <div className="inline-actions">
               {connection.sync.action === 'reconnect' ? (
                 <button
@@ -391,26 +488,48 @@ export function OptionsApp({
                   <GitBranch size={16} aria-hidden="true" /> Reconnect GitHub
                 </button>
               ) : null}
-              <button type="button" className="secondary-button" disabled={disabled} onClick={() => void runSync('sync:pull')}>
-                <DownloadCloud size={16} aria-hidden="true" /> Pull
-              </button>
-              <button type="button" className="secondary-button" disabled={disabled} onClick={() => void runSync('sync:push')}>
-                <UploadCloud size={16} aria-hidden="true" /> Push
-              </button>
-              <button type="button" className="secondary-button" disabled={disabled} onClick={() => void runSync('sync:retry')}>
-                <RefreshCcw size={16} aria-hidden="true" /> Retry now
-              </button>
-              <button type="button" className="secondary-button" onClick={() => openExternal(confirmedBinding.htmlUrl)}>
-                <ExternalLink size={16} aria-hidden="true" /> Open Gist
-              </button>
-              <button
-                type="button"
-                className="secondary-button"
-                disabled={disabled}
-                onClick={() => void runConnectionAction('choose-another', { type: 'gist:choose-another' })}
-              >
-                Choose another Gist
-              </button>
+              {showManualSyncActions ? (
+                <>
+                  <button type="button" className="secondary-button" disabled={disabled} onClick={() => void runSync('sync:pull')}>
+                    <DownloadCloud size={16} aria-hidden="true" /> Pull
+                  </button>
+                  <button type="button" className="secondary-button" disabled={disabled} onClick={() => void runSync('sync:push')}>
+                    <UploadCloud size={16} aria-hidden="true" /> Push
+                  </button>
+                </>
+              ) : null}
+              {showRetryAction ? (
+                <button type="button" className="secondary-button" disabled={disabled} onClick={() => void runSync('sync:retry')}>
+                  <RefreshCcw size={16} aria-hidden="true" /> Retry now
+                </button>
+              ) : null}
+              {showOpenGistAction ? (
+                <button type="button" className="secondary-button" onClick={() => openExternal(confirmedBinding.htmlUrl)}>
+                  <ExternalLink size={16} aria-hidden="true" /> Open Gist
+                </button>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
+
+        {visibleBinding?.public && connection.phase !== 'needs-confirmation' ? (
+          <p className="danger-text">The selected Gist is public.</p>
+        ) : null}
+
+        {canDisconnect ? (
+          <div className="connection-card connection-management">
+            <strong>Connection management</strong>
+            <div className="inline-actions">
+              {showChooseAnotherAction ? (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  disabled={disabled}
+                  onClick={() => void runConnectionAction('choose-another', { type: 'gist:choose-another' })}
+                >
+                  Choose another Gist
+                </button>
+              ) : null}
               <button
                 type="button"
                 className="secondary-button danger-button"
@@ -426,53 +545,81 @@ export function OptionsApp({
                 <Unplug size={16} aria-hidden="true" /> Disconnect
               </button>
             </div>
+            <p className="help-text">
+              Disconnect removes access from this device only.{' '}
+              <a href="https://github.com/settings/applications" target="_blank" rel="noreferrer">
+                Manage or revoke this OAuth App on GitHub
+              </a>
+              .
+            </p>
           </div>
         ) : null}
 
-        {visibleBinding?.public && connection.phase !== 'needs-confirmation' ? (
-          <p className="danger-text">The selected Gist is public.</p>
-        ) : null}
-
-        <p className="help-text">
-          Disconnect removes access from this device only.{' '}
-          <a href="https://github.com/settings/applications" target="_blank" rel="noreferrer">
-            Manage or revoke this OAuth App on GitHub
-          </a>
-          .
-        </p>
       </section>
 
       <section className="settings-section" aria-labelledby="behavior-heading">
-        <h2 id="behavior-heading">Tab Behavior</h2>
+        <h2 id="behavior-heading">Stow preferences</h2>
+        <p className="help-text settings-section-copy">
+          These preferences are saved only when you choose Save preferences. When GitHub sync is connected, they also synchronize across devices.
+        </p>
         <label className="checkbox-row">
           <input
             type="checkbox"
-            checked={settings.includePinnedTabs}
+            checked={settingsDraft.includePinnedTabs}
             onChange={(event) => updateField('includePinnedTabs', event.target.checked)}
+            disabled={!settingsForm || busyAction === 'save'}
           />
           Save pinned tabs when stowing
         </label>
         <label className="checkbox-row">
           <input
             type="checkbox"
-            checked={settings.closePinnedTabs}
+            checked={settingsDraft.closePinnedTabs}
             onChange={(event) => updateField('closePinnedTabs', event.target.checked)}
-            disabled={!settings.includePinnedTabs}
+            disabled={!settingsForm || busyAction === 'save' || !settingsDraft.includePinnedTabs}
           />
           Close pinned tabs after saving
         </label>
+        <div className="settings-save-row">
+          <p className="settings-save-state" id="settings-save-state" aria-live="polite">
+            {settingsSaveState}
+          </p>
+          <button
+            type="button"
+            className="primary-button"
+            aria-describedby="settings-save-state"
+            onClick={() => void saveSettings()}
+            disabled={disabled || !settingsDirty}
+          >
+            <Save size={16} aria-hidden="true" /> Save preferences
+          </button>
+        </div>
       </section>
 
-      <section className="settings-section" aria-labelledby="device-heading">
-        <h2 id="device-heading">Replica</h2>
-        <p className="device-id">{settings.deviceId || 'Replica ID will be created automatically.'}</p>
+      <section className="settings-section" aria-labelledby="advanced-heading">
+        <h2 id="advanced-heading">Advanced / diagnostics</h2>
+        <details className="diagnostics-disclosure">
+          <summary>Device diagnostics</summary>
+          <div className="diagnostics-content">
+            <div>
+              <strong>Device ID</strong>
+              <p className="device-id">{settingsDraft.deviceId || 'Device ID will be created automatically.'}</p>
+            </div>
+            <button
+              type="button"
+              className="secondary-button"
+              disabled={!settingsDraft.deviceId}
+              onClick={() => void copyDeviceId()}
+            >
+              <Copy size={16} aria-hidden="true" /> Copy Device ID
+            </button>
+          </div>
+          <p className="help-text diagnostics-note">
+            This identifier is owned by this device and is never imported or replaced by synchronization.
+          </p>
+        </details>
       </section>
 
-      <footer className="options-actions">
-        <button type="button" className="primary-button" onClick={() => void saveSettings()} disabled={disabled}>
-          <Save size={16} aria-hidden="true" /> Save settings
-        </button>
-      </footer>
     </UtilityPageShell>
   );
 }
