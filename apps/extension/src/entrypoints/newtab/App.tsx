@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import { Languages, Moon, Settings, SlidersHorizontal, Sun } from 'lucide-react';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
+import { RecoveryBinDialog } from '@/features/saved-for-later/RecoveryBinDialog';
+import { SavedForLaterView } from '@/features/saved-for-later/SavedForLaterView';
 import {
   getLanguagePreference,
   resolveLocale,
@@ -25,10 +27,8 @@ import {
 } from '@/features/sync/sync-incident-acknowledgement';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
 import { QuickLinks } from './components/QuickLinks';
-import { RecoveryBinDialog } from './components/RecoveryBinDialog';
 import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
-import { StowedSessions } from './components/StowedSessions';
 import { StowCurrentWindowButton } from './components/StowCurrentWindowButton';
 import { SyncStatusDialog } from './components/SyncStatusDialog';
 import { TodosPanel } from './components/TodosPanel';
@@ -391,7 +391,7 @@ export function App({
                 />
               </div>
               <div className="saved-region">
-                <StowedSessions
+                <SavedForLaterView
                   busyAction={busyAction}
                   locale={locale}
                   onRunAction={runAction}

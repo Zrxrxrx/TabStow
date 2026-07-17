@@ -26,7 +26,7 @@ import {
   type SavedTabsDropTarget,
 } from '@/features/saved-for-later/saved-tabs-dnd';
 
-type Props = {
+export type SavedForLaterViewProps = {
   busyAction: string | null;
   locale: Locale;
   query: string;
@@ -158,14 +158,14 @@ function SavedTabRow({
   );
 }
 
-export function StowedSessions({
+export function SavedForLaterView({
   busyAction,
   locale,
   onOpenRecovery,
   onRunAction,
   query,
   sessions,
-}: Props) {
+}: SavedForLaterViewProps) {
   const [activeDropTargetKey, setActiveDropTargetKey] = useState<string | null>(null);
   const dragSourceRef = useRef<SavedTabsDragSource | null>(null);
   const dropPendingRef = useRef(false);
