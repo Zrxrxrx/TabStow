@@ -49,9 +49,10 @@ body {
   box-shadow: none;
 }
 
-@media (max-width: 380px) {
+@media (max-width: 480px) {
   .saved-for-later > .section-header {
     display: grid;
+    gap: 8px;
   }
 
   .saved-header-actions {
