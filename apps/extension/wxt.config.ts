@@ -9,7 +9,16 @@ export default defineConfig({
   manifest: {
     name: 'Tabstow',
     description: 'Stow, organize, and restore your browser tabs.',
-    permissions: ['tabs', 'storage', 'contextMenus', 'tabGroups', 'search', 'favicon', 'alarms'],
+    permissions: [
+      'tabs',
+      'storage',
+      'contextMenus',
+      'tabGroups',
+      'search',
+      'favicon',
+      'alarms',
+      'sidePanel',
+    ],
     host_permissions: [
       'https://api.github.com/*',
       'https://gist.githubusercontent.com/*',

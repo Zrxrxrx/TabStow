@@ -79,6 +79,7 @@ describe('RecoveryBinDialog', () => {
     const fullHistory = dialog.querySelector<HTMLAnchorElement>('.recovery-history-link')!;
     expect(fullHistory.textContent).toContain('View full History');
     expect(fullHistory.href).toBe('chrome-extension://test/saved-history.html');
+    expect(fullHistory.getAttribute('target')).toBeNull();
     expect(document.body.querySelectorAll('.recovery-entry')).toHaveLength(5);
     expect(document.body.querySelector('.recovery-entry strong')?.textContent).toBe('Session 5');
     expect(document.body.querySelector<HTMLImageElement>('.recovery-entry img.saved-tab-favicon')?.src).toContain(
@@ -95,6 +96,30 @@ describe('RecoveryBinDialog', () => {
     expect(sendExtensionMessage.mock.calls.filter(
       ([message]) => message.type === 'history:list',
     )).toHaveLength(2);
+
+    await act(async () => root.unmount());
+    container.remove();
+  });
+
+  it('can open full History outside an embedding surface', async () => {
+    sendExtensionMessage.mockResolvedValueOnce({ ok: true, data: [] });
+    const container = document.createElement('div');
+    container.id = 'root';
+    document.body.appendChild(container);
+    const root = createRoot(container);
+
+    await act(async () => root.render(
+      <RecoveryBinDialog
+        historyLinkTarget="_blank"
+        locale="en"
+        onClose={() => undefined}
+        runSavedDataMutation={async (mutation) => mutation()}
+      />,
+    ));
+
+    expect(
+      document.body.querySelector<HTMLAnchorElement>('.recovery-history-link')?.target,
+    ).toBe('_blank');
 
     await act(async () => root.unmount());
     container.remove();

@@ -16,6 +16,9 @@ const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as {
   content_scripts?: unknown[];
   permissions?: string[];
   host_permissions?: string[];
+  side_panel?: {
+    default_path?: string;
+  };
 };
 
 assert.deepEqual(manifest.permissions, [
@@ -26,6 +29,7 @@ assert.deepEqual(manifest.permissions, [
   'search',
   'favicon',
   'alarms',
+  'sidePanel',
 ]);
 assert.deepEqual(manifest.host_permissions, [
   'https://api.github.com/*',
@@ -35,6 +39,11 @@ assert.deepEqual(manifest.host_permissions, [
 assert.ok(!manifest.permissions?.includes('identity'), 'Built manifest must not request identity');
 assert.ok(!('content_scripts' in manifest), 'Built manifest must not register content scripts');
 assert.deepEqual(manifest.chrome_url_overrides, { newtab: 'newtab.html' });
+assert.deepEqual(manifest.side_panel, { default_path: 'sidepanel.html' });
+assert.ok(
+  existsSync(resolve(outputDirectory, 'sidepanel.html')),
+  'Build must emit sidepanel.html',
+);
 assert.ok(
   existsSync(resolve(outputDirectory, 'saved-history.html')),
   'Build must emit saved-history.html',
@@ -44,4 +53,4 @@ assert.ok(
   'Build must not emit the reserved history.html entrypoint',
 );
 
-console.log('Verified built Chrome manifest and saved-history entrypoint.');
+console.log('Verified built Chrome manifest, Side Panel, and saved-history entrypoint.');

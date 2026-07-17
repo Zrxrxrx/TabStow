@@ -16,7 +16,7 @@ const manifest = config.manifest as
   | undefined;
 
 describe('extension manifest', () => {
-  it('keeps toolbar action click as the default action', () => {
+  it('keeps the toolbar action available for the Side Panel', () => {
     expect(manifest?.action).toMatchObject({
       default_title: 'Tabstow',
     });
@@ -32,6 +32,7 @@ describe('extension manifest', () => {
       'search',
       'favicon',
       'alarms',
+      'sidePanel',
     ]);
   });
 
@@ -49,6 +50,16 @@ describe('extension manifest', () => {
     expect(entrypointDirectories).toContain('saved-history');
     expect(entrypointDirectories).not.toContain('history');
     expect(manifest).not.toHaveProperty('chrome_url_overrides.history');
+  });
+
+  it('provides a dedicated Side Panel entrypoint', () => {
+    const entrypointDirectories = readdirSync(resolve(process.cwd(), 'src/entrypoints'), {
+      withFileTypes: true,
+    })
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name);
+
+    expect(entrypointDirectories).toContain('sidepanel');
   });
 
   it('keeps host permissions narrow while enabling Chrome favicon resolution', () => {
