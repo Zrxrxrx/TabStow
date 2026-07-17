@@ -115,6 +115,10 @@
   min-height: 8px;
 }
 
+.saved-for-later .drag-surface-label {
+  display: none;
+}
+
 .saved-for-later .saved-tab-row {
   position: relative;
   min-width: 0;
