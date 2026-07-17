@@ -3,12 +3,17 @@
   --ts-font-body:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --ts-font-display: "Arial Narrow", "Aptos Narrow", Arial, sans-serif;
+  --ts-type-body: 14px;
+  --ts-type-meta: 12px;
+  --ts-type-section: 18px;
+  --ts-type-page: 28px;
+  --ts-target-size: 44px;
   --ts-bg: #f2f5f2;
   --ts-surface: #fbfdfb;
   --ts-surface-muted: #f0f4f0;
   --ts-text: #172019;
   --ts-text-secondary: #344238;
-  --ts-text-muted: #617064;
+  --ts-text-muted: #5d6c60;
   --ts-meta: #2f6840;
   --ts-border: #c9d2ca;
   --ts-border-soft: #dde4de;
@@ -16,8 +21,9 @@
   --ts-on-accent: #132000;
   --ts-success: #2f6840;
   --ts-warning: #a66b00;
-  --ts-danger: #b93626;
-  --ts-focus-ring: 0 0 0 4px rgba(96, 165, 250, 0.28);
+  --ts-danger: #b12f23;
+  --ts-focus-color: #005fcc;
+  --ts-focus-ring: 0 0 0 3px var(--ts-focus-color);
   --ts-status-info-bg: color-mix(in oklab, var(--ts-accent), transparent 84%);
   --ts-status-info-text: var(--ts-text);
   --ts-status-success-bg: color-mix(in oklab, var(--ts-success), transparent 84%);
@@ -40,7 +46,7 @@
   --ts-text: #edf4ed;
   --ts-text-secondary: #c8d2c9;
   --ts-text-muted: #8a998c;
-  --ts-meta: #43704b;
+  --ts-meta: #5d8d66;
   --ts-border: #29332b;
   --ts-border-soft: #1d251f;
   --ts-accent: #c8ff2c;
@@ -48,6 +54,7 @@
   --ts-success: #72c880;
   --ts-warning: #ffc44d;
   --ts-danger: #ff684f;
+  --ts-focus-color: #8cc8ff;
   --ts-status-info-bg: color-mix(in oklab, var(--ts-accent), transparent 84%);
   --ts-status-info-text: var(--ts-text);
   --ts-status-success-bg: color-mix(in oklab, var(--ts-success), transparent 84%);

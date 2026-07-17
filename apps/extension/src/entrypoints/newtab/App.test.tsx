@@ -711,7 +711,9 @@ describe('App', () => {
       container.querySelectorAll<HTMLElement>('.saved-sessions [aria-disabled="true"][draggable="false"]'),
     );
     expect(savedDragSurfaces.length).toBeGreaterThanOrEqual(2);
-    expect(screen().getByLabelText('Open GitHub saved issue').closest('.saved-tab-row')?.getAttribute('role')).toBe('button');
+    const filteredSavedButton = screen().getByLabelText('Open GitHub saved issue');
+    expect(filteredSavedButton.tagName).toBe('BUTTON');
+    expect(filteredSavedButton.closest('.saved-tab-row')?.getAttribute('role')).toBeNull();
     expect(screen().getByLabelText('Move GitHub saved issue to History')).toHaveProperty(
       'disabled',
       false,
@@ -724,6 +726,8 @@ describe('App', () => {
     await renderApp();
 
     const row = screen().getByLabelText('Open Saved One');
+    expect(row.tagName).toBe('BUTTON');
+    expect(row.closest('.saved-tab-row')?.getAttribute('role')).toBeNull();
     const initialUrl = window.location.href;
     const primary = await dispatchMouseEvent(row, 'click', { button: 0 });
 
@@ -1779,15 +1783,21 @@ describe('App', () => {
     await renderApp();
 
     expect(screen().getByText('Example')).not.toBeNull();
+    const quickLink = container.querySelector<HTMLAnchorElement>('.quick-link-card')!;
+    expect(quickLink.getAttribute('href')).toBe('https://example.com/');
     expect(container.querySelector('.quick-link-card-actions')).toBeNull();
     expect(() => screen().getByLabelText('Add quick link')).toThrow();
 
     await click(screen().getByRole('button', { name: 'Edit quick links' }));
 
+    const reorderShell = screen().getByLabelText('Reorder Example with Alt and arrow keys');
+    expect(reorderShell.getAttribute('tabindex')).toBe('0');
+    expect(quickLink.getAttribute('href')).toBeNull();
     expect(screen().getByLabelText('Add quick link')).not.toBeNull();
     expect(screen().getByRole('button', { name: 'Add open tab' })).not.toBeNull();
     expect(container.querySelector('.quick-link-card-actions')).not.toBeNull();
-    expect(screen().getByRole('button', { name: 'Show quick links' })).not.toBeNull();
+    await click(screen().getByRole('button', { name: 'Show quick links' }));
+    expect(quickLink.getAttribute('href')).toBe('https://example.com/');
   });
 
   it('adds a quick link from a bare domain through the utility panel', async () => {
@@ -1875,7 +1885,13 @@ describe('App', () => {
     await change(filter, 'missing');
 
     expect(document.body.querySelectorAll('.open-tab-choice')).toHaveLength(0);
-    expect((screen().getByRole('button', { name: 'Add' }) as HTMLButtonElement).disabled).toBe(true);
+    const addButton = screen().getByRole('button', { name: 'Add' }) as HTMLButtonElement;
+    expect(addButton.disabled).toBe(true);
+    const descriptionId = addButton.getAttribute('aria-describedby');
+    expect(descriptionId).not.toBeNull();
+    expect(document.getElementById(descriptionId!)?.textContent).toBe(
+      'No open tabs match this search.',
+    );
     expect(sentMessageTypes().filter((type) => type === 'active-tabs:snapshot')).toHaveLength(
       snapshotsBeforeOpen + 1,
     );
@@ -2539,8 +2555,10 @@ describe('App', () => {
     mockMessages({ activeTabs: [DUPLICATE_TABS[0]] });
 
     await renderApp();
-    const focusButton = screen().getByText('Inbox - Gmail').closest<HTMLElement>('.tab-row')!;
-    expect(focusButton.getAttribute('role')).toBe('button');
+    const row = screen().getByText('Inbox - Gmail').closest<HTMLElement>('.tab-row')!;
+    const focusButton = row.querySelector<HTMLButtonElement>('.tab-open-button')!;
+    expect(row.getAttribute('role')).toBeNull();
+    expect(focusButton.tagName).toBe('BUTTON');
 
     await click(focusButton);
 
@@ -2662,7 +2680,7 @@ describe('App', () => {
       }),
     ).not.toBeNull();
     const savedTabButton = screen().getByLabelText('Open Example Docs');
-    expect(savedTabButton.tagName).toBe('DIV');
+    expect(savedTabButton.tagName).toBe('BUTTON');
     expect(savedTabButton.getAttribute('href')).toBeNull();
     expect(savedTabButton.querySelector('img.saved-tab-favicon')).not.toBeNull();
 
@@ -2750,7 +2768,7 @@ describe('App', () => {
     expect(safeRow?.tagName).toBe('DIV');
     expect(safeRow?.getAttribute('href')).toBeNull();
     expect(() => screen().getByLabelText('Open Unsafe Import')).toThrow();
-    expect(screen().getByLabelText('Open Safe Docs').tagName).toBe('DIV');
+    expect(screen().getByLabelText('Open Safe Docs').tagName).toBe('BUTTON');
   });
 
   it('omits manual Chrome controls while the active tab snapshot is loading', async () => {
@@ -2845,7 +2863,13 @@ describe('App', () => {
     await renderApp();
 
     for (const label of protectedTabs.map((tab) => `Sleep ${tab.title}`)) {
-      expect((screen().getByLabelText(label) as HTMLButtonElement).disabled).toBe(true);
+      const button = screen().getByLabelText(label) as HTMLButtonElement;
+      expect(button.disabled).toBe(true);
+      const descriptionId = button.getAttribute('aria-describedby');
+      expect(descriptionId).not.toBeNull();
+      expect(document.getElementById(descriptionId!)?.textContent).toBe(
+        'Active, pinned, audible, incognito, and sleeping tabs are protected.',
+      );
     }
   });
 

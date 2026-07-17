@@ -4,11 +4,17 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 import {
+  compositeUiAuditColor,
   evaluateUiAuditCase,
+  getUiAuditContrastRatio,
   getUiAuditBrowserArgumentErrors,
+  getUiAuditMinimumFontSize,
   getUiAuditRuntimeIdentityErrors,
+  getUiAuditTargetOverlapArea,
   hashUiAuditEntries,
+  meetsUiAuditTargetSize,
   normalizeCdpRuntimeError,
+  parseUiAuditCssColor,
   parseUiAuditArguments,
   selectUiAuditCase,
   validateUiAuditManifest,
@@ -122,6 +128,33 @@ const appearanceManifestInput = {
   }],
 };
 
+const accessibilityManifestInput = {
+  ...manifestInput,
+  cases: [{
+    ...manifestInput.cases[0],
+    id: 'FINDING-005-NEWTAB-LIGHT-1440',
+    description: 'New Tab readability and effective targets pass in light desktop mode',
+    accessibilityFixture: 'finding-005',
+    screenshot: 'FINDING-005-NEWTAB-LIGHT-1440.png',
+    assertions: [
+      { metric: 'accessibilityThemeStateCount', operator: 'equals', value: 2 },
+      { metric: 'controlInventoryFailures', operator: 'equals', value: 0 },
+      { metric: 'textReadabilityFailures', operator: 'equals', value: 0 },
+      { metric: 'textNodesChecked', operator: 'atLeast', value: 1 },
+      { metric: 'contrastFailures', operator: 'equals', value: 0 },
+      { metric: 'contrastPairsChecked', operator: 'atLeast', value: 1 },
+      { metric: 'contrastUnresolvedFailures', operator: 'equals', value: 0 },
+      { metric: 'targetSizeFailures', operator: 'equals', value: 0 },
+      { metric: 'targetsChecked', operator: 'atLeast', value: 1 },
+      { metric: 'targetOverlapFailures', operator: 'equals', value: 0 },
+      { metric: 'focusVisibilityFailures', operator: 'equals', value: 0 },
+      { metric: 'focusTargetsChecked', operator: 'atLeast', value: 1 },
+      { metric: 'unavailableDescriptionFailures', operator: 'equals', value: 0 },
+      { metric: 'unavailableControlsChecked', operator: 'atLeast', value: 1 },
+    ],
+  }],
+};
+
 describe('UI audit command', () => {
   it('parses a named case and deterministic output settings', () => {
     expect(parseUiAuditArguments([
@@ -199,6 +232,10 @@ describe('UI audit manifest', () => {
     expect(validateUiAuditManifest(appearanceManifestInput)).toEqual(appearanceManifestInput);
   });
 
+  it('accepts the focused FINDING-005 accessibility fixture', () => {
+    expect(validateUiAuditManifest(accessibilityManifestInput)).toEqual(accessibilityManifestInput);
+  });
+
   it('keeps the checked-in case manifest valid', () => {
     const checkedInManifest = JSON.parse(readFileSync(
       new URL('../../scripts/ui-audit-cases.json', import.meta.url),
@@ -225,7 +262,60 @@ describe('UI audit manifest', () => {
       'FINDING-003-SETTINGS-NARROW',
       'FINDING-003-HISTORY-DESKTOP',
       'FINDING-003-HISTORY-NARROW',
+      'FINDING-005-NEWTAB-1440',
+      'FINDING-005-NEWTAB-768',
+      'FINDING-005-NEWTAB-390',
+      'FINDING-005-NEWTAB-ZOOM',
+      'FINDING-005-SETTINGS-1440',
+      'FINDING-005-SETTINGS-768',
+      'FINDING-005-SETTINGS-390',
+      'FINDING-005-SETTINGS-ZOOM',
+      'FINDING-005-HISTORY-1440',
+      'FINDING-005-HISTORY-768',
+      'FINDING-005-HISTORY-390',
+      'FINDING-005-HISTORY-ZOOM',
     ]);
+  });
+
+  it('covers FINDING-005 across every page and required viewport profile', () => {
+    const checkedInManifest = validateUiAuditManifest(JSON.parse(readFileSync(
+      new URL('../../scripts/ui-audit-cases.json', import.meta.url),
+      'utf8',
+    )));
+    const cases = checkedInManifest.cases.filter(({ accessibilityFixture }) =>
+      accessibilityFixture === 'finding-005');
+
+    expect(cases.map(({ page, viewport, zoom }) => ({
+      page,
+      width: viewport.width,
+      height: viewport.height,
+      zoom,
+    }))).toEqual([
+      { page: 'newtab.html', width: 1440, height: 900, zoom: 1 },
+      { page: 'newtab.html', width: 768, height: 900, zoom: 1 },
+      { page: 'newtab.html', width: 390, height: 844, zoom: 1 },
+      { page: 'newtab.html', width: 1024, height: 900, zoom: 2 },
+      { page: 'options.html', width: 1440, height: 900, zoom: 1 },
+      { page: 'options.html', width: 768, height: 900, zoom: 1 },
+      { page: 'options.html', width: 390, height: 844, zoom: 1 },
+      { page: 'options.html', width: 1024, height: 900, zoom: 2 },
+      { page: 'saved-history.html', width: 1440, height: 900, zoom: 1 },
+      { page: 'saved-history.html', width: 768, height: 900, zoom: 1 },
+      { page: 'saved-history.html', width: 390, height: 844, zoom: 1 },
+      { page: 'saved-history.html', width: 1024, height: 900, zoom: 2 },
+    ]);
+    for (const auditCase of cases) {
+      expect(auditCase.assertions).toEqual(expect.arrayContaining([
+        { metric: 'accessibilityThemeStateCount', operator: 'equals', value: 2 },
+        { metric: 'controlInventoryFailures', operator: 'equals', value: 0 },
+        { metric: 'textReadabilityFailures', operator: 'equals', value: 0 },
+        { metric: 'contrastFailures', operator: 'equals', value: 0 },
+        { metric: 'targetSizeFailures', operator: 'equals', value: 0 },
+        { metric: 'targetOverlapFailures', operator: 'equals', value: 0 },
+        { metric: 'focusVisibilityFailures', operator: 'equals', value: 0 },
+        { metric: 'unavailableDescriptionFailures', operator: 'equals', value: 0 },
+      ]));
+    }
   });
 
   it('covers first-use guidance in both themes and locales', () => {
@@ -302,6 +392,48 @@ describe('UI audit manifest', () => {
     );
   });
 
+  it('rejects an unknown accessibility fixture', () => {
+    const invalidManifest = structuredClone(accessibilityManifestInput);
+    invalidManifest.cases[0]!.accessibilityFixture = 'custom-accessibility';
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'accessibilityFixture is unsupported',
+    );
+  });
+
+  it('requires the complete FINDING-005 assertion bundle', () => {
+    const invalidManifest = structuredClone(accessibilityManifestInput);
+    invalidManifest.cases[0]!.assertions = invalidManifest.cases[0]!.assertions.filter(
+      ({ metric }) => metric !== 'targetOverlapFailures',
+    );
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'assertions must cover targetOverlapFailures',
+    );
+  });
+
+  it('requires zero-failure assertions to use exact zero thresholds', () => {
+    const invalidManifest = structuredClone(accessibilityManifestInput);
+    const targetSizeAssertion = invalidManifest.cases[0]!.assertions.find(
+      ({ metric }) => metric === 'targetSizeFailures',
+    )!;
+    targetSizeAssertion.operator = 'atMost';
+
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'targetSizeFailures must use equals 0',
+    );
+  });
+
+  it('rejects vacuous FINDING-005 coverage thresholds', () => {
+    const invalidManifest = structuredClone(accessibilityManifestInput);
+    const targetsCheckedAssertion = invalidManifest.cases[0]!.assertions.find(
+      ({ metric }) => metric === 'targetsChecked',
+    )!;
+    targetsCheckedAssertion.value = 0;
+
+    expect(() => validateUiAuditManifest(invalidManifest)).toThrow(
+      'targetsChecked must use atLeast 1 or greater',
+    );
+  });
+
   it('rejects range operators for string-valued metrics', () => {
     const invalidManifest = structuredClone(manifestInput);
     invalidManifest.cases[0]!.assertions[0] = {
@@ -360,6 +492,20 @@ describe('UI audit assertions', () => {
       utilityBackRouteFailures: 0,
       backControlHeightPx: 0,
       backViewportOverflowPx: 0,
+      accessibilityThemeStateCount: 0,
+      controlInventoryFailures: 0,
+      textReadabilityFailures: 0,
+      textNodesChecked: 0,
+      contrastFailures: 0,
+      contrastPairsChecked: 0,
+      contrastUnresolvedFailures: 0,
+      targetSizeFailures: 0,
+      targetsChecked: 0,
+      targetOverlapFailures: 0,
+      focusVisibilityFailures: 0,
+      focusTargetsChecked: 0,
+      unavailableDescriptionFailures: 0,
+      unavailableControlsChecked: 0,
     }, []);
 
     expect(result.passed).toBe(false);
@@ -415,10 +561,65 @@ describe('UI audit assertions', () => {
       utilityBackRouteFailures: 0,
       backControlHeightPx: 0,
       backViewportOverflowPx: 0,
+      accessibilityThemeStateCount: 0,
+      controlInventoryFailures: 0,
+      textReadabilityFailures: 0,
+      textNodesChecked: 0,
+      contrastFailures: 0,
+      contrastPairsChecked: 0,
+      contrastUnresolvedFailures: 0,
+      targetSizeFailures: 0,
+      targetsChecked: 0,
+      targetOverlapFailures: 0,
+      focusVisibilityFailures: 0,
+      focusTargetsChecked: 0,
+      unavailableDescriptionFailures: 0,
+      unavailableControlsChecked: 0,
     }, ['Unhandled exception']);
 
     expect(result.assertions.every((assertion) => assertion.passed)).toBe(true);
     expect(result.passed).toBe(false);
+  });
+});
+
+describe('UI accessibility thresholds', () => {
+  it('uses the reviewed type scale for every text role', () => {
+    expect(getUiAuditMinimumFontSize('page-title')).toBe(28);
+    expect(getUiAuditMinimumFontSize('section-title')).toBe(18);
+    expect(getUiAuditMinimumFontSize('body')).toBe(14);
+    expect(getUiAuditMinimumFontSize('metadata')).toBe(12);
+    expect(getUiAuditMinimumFontSize('functional')).toBe(12);
+  });
+
+  it('calculates opaque and composited contrast deterministically', () => {
+    const black = parseUiAuditCssColor('#000000')!;
+    const white = parseUiAuditCssColor('rgb(255, 255, 255)')!;
+    const gray = parseUiAuditCssColor('#777777')!;
+    const translucentBlack = parseUiAuditCssColor('rgba(0, 0, 0, 0.5)')!;
+
+    expect(getUiAuditContrastRatio(black, white)).toBeCloseTo(21, 5);
+    expect(getUiAuditContrastRatio(gray, white)).toBeLessThan(4.5);
+    expect(compositeUiAuditColor(translucentBlack, white)).toMatchObject({
+      red: 127.5,
+      green: 127.5,
+      blue: 127.5,
+      alpha: 1,
+    });
+    expect(parseUiAuditCssColor('linear-gradient(red, blue)')).toBeNull();
+  });
+
+  it('enforces 44px targets and treats edge-touching rectangles as non-overlapping', () => {
+    const target = { left: 0, top: 0, right: 44, bottom: 44 };
+    expect(meetsUiAuditTargetSize(target)).toBe(true);
+    expect(meetsUiAuditTargetSize({ ...target, right: 43.99 })).toBe(false);
+    expect(getUiAuditTargetOverlapArea(
+      target,
+      { left: 44, top: 0, right: 88, bottom: 44 },
+    )).toBe(0);
+    expect(getUiAuditTargetOverlapArea(
+      target,
+      { left: 40, top: 0, right: 84, bottom: 44 },
+    )).toBe(176);
   });
 });
 
@@ -530,7 +731,7 @@ describe('UI audit browser isolation', () => {
     const buildDirectory = '/repo/apps/extension/.output/chrome-mv3';
     expect(getUiAuditBrowserArgumentErrors([
       '/path/to/chrome',
-      '--user-data-dir=/Users/example/Library/Application Support/Google/Chrome',
+      '--user-data-dir=fixtures/daily-use-profile',
       `--disable-extensions-except=${buildDirectory}`,
       `--load-extension=${buildDirectory}`,
     ], buildDirectory, {

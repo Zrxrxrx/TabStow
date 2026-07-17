@@ -1,5 +1,5 @@
 import { ImageUp, Pencil, PencilLine, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useRef, useState, type DragEvent } from 'react';
+import { useEffect, useId, useRef, useState, type DragEvent } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
 import { t, type Locale } from '@/features/i18n/i18n';
@@ -131,6 +131,7 @@ function QuickLinkSiteIcon({ link }: { link: QuickLink }) {
 }
 
 export function QuickLinks({ disabled, locale, refreshKey }: Props) {
+  const noMatchingOpenTabsId = useId();
   const [links, setLinks] = useState<QuickLink[]>([]);
   const [linksLoaded, setLinksLoaded] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -529,11 +530,10 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
               tabIndex={editing ? 0 : undefined}
             >
               <a
-                href={link.url}
+                href={editing ? undefined : link.url}
                 target="_blank"
                 rel="noreferrer"
                 className="quick-link-card"
-                onClick={(event) => { if (editing) event.preventDefault(); }}
               >
                 {link.icon?.kind === 'image' ? (
                   <QuickLinkImageIcon token={link.icon.value} link={link} />
@@ -746,6 +746,9 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
           initialFocusRef={openTabFilterRef}
           onCancel={() => setDialog(null)}
           onSubmit={submitSelectedOpenTab}
+          submitAriaDescribedBy={
+            openTabChoices.choices.length === 0 ? noMatchingOpenTabsId : undefined
+          }
           submitLabel={t(locale, 'add')}
           submitDisabled={disabled || openTabChoices.choices.length === 0}
           submitting={dialog.submittingKey !== null}
@@ -790,7 +793,9 @@ export function QuickLinks({ disabled, locale, refreshKey }: Props) {
               );
             })}
             {openTabChoices.choices.length === 0 ? (
-              <p className="empty-copy">{t(locale, 'noMatchingOpenTabsForQuickLink')}</p>
+              <p className="empty-copy" id={noMatchingOpenTabsId}>
+                {t(locale, 'noMatchingOpenTabsForQuickLink')}
+              </p>
             ) : null}
           </div>
           {openTabChoices.overflow ? (

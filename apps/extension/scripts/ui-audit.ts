@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import {
   evaluateUiAuditCase,
   getUiAuditBrowserArgumentErrors,
+  getUiAuditMinimumFontSize,
   getUiAuditRuntimeIdentityErrors,
   hashUiAuditEntries,
   normalizeCdpRuntimeError,
@@ -105,6 +106,34 @@ type Finding003Appearance = {
 
 type Finding003ThemeMode = 'none' | 'light' | 'dark';
 
+type Finding005Accessibility = {
+  accessibilityThemeStateCount: number;
+  controlInventoryFailures: number;
+  textReadabilityFailures: number;
+  textNodesChecked: number;
+  contrastFailures: number;
+  contrastPairsChecked: number;
+  contrastUnresolvedFailures: number;
+  targetSizeFailures: number;
+  targetsChecked: number;
+  targetOverlapFailures: number;
+  focusVisibilityFailures: number;
+  focusTargetsChecked: number;
+  unavailableDescriptionFailures: number;
+  unavailableControlsChecked: number;
+  trace: Array<Record<string, unknown>>;
+};
+
+type Finding005StaticAccessibility = Omit<
+  Finding005Accessibility,
+  'accessibilityThemeStateCount' | 'focusVisibilityFailures' | 'focusTargetsChecked'
+>;
+
+type Finding005Focus = Pick<
+  Finding005Accessibility,
+  'focusVisibilityFailures' | 'focusTargetsChecked'
+> & { trace: Array<Record<string, unknown>> };
+
 type Finding003AppearanceState = {
   mode: Finding003ThemeMode;
   appearanceRuntimeFailures: number;
@@ -121,6 +150,13 @@ const extensionRoot = resolve(scriptDirectory, '..');
 const repositoryRoot = resolve(extensionRoot, '../..');
 const buildDirectory = resolve(extensionRoot, '.output/chrome-mv3');
 const casesPath = resolve(scriptDirectory, 'ui-audit-cases.json');
+const finding005MinimumFontSizes = {
+  'page-title': getUiAuditMinimumFontSize('page-title'),
+  'section-title': getUiAuditMinimumFontSize('section-title'),
+  body: getUiAuditMinimumFontSize('body'),
+  metadata: getUiAuditMinimumFontSize('metadata'),
+  functional: getUiAuditMinimumFontSize('functional'),
+};
 
 const feedbackFixtures: Record<Exclude<UiAuditFeedbackFixture, 'none'>, {
   tone: 'success' | 'error';
@@ -1019,6 +1055,11 @@ async function auditFinding003AppearanceState(
     const tokenNames = [
       '--ts-font-body',
       '--ts-font-display',
+      '--ts-type-body',
+      '--ts-type-meta',
+      '--ts-type-section',
+      '--ts-type-page',
+      '--ts-target-size',
       '--ts-bg',
       '--ts-surface',
       '--ts-surface-muted',
@@ -1033,6 +1074,7 @@ async function auditFinding003AppearanceState(
       '--ts-success',
       '--ts-warning',
       '--ts-danger',
+      '--ts-focus-color',
       '--ts-focus-ring',
       '--ts-status-info-bg',
       '--ts-status-info-text',
@@ -1286,6 +1328,643 @@ async function runFinding003AppearanceMatrix(
   };
 }
 
+async function auditFinding005Static(
+  cdp: CdpConnection,
+  sessionId: string,
+  page: string,
+  theme: 'light' | 'dark',
+): Promise<Finding005StaticAccessibility> {
+  return evaluate<Finding005StaticAccessibility>(cdp, sessionId, String.raw`(() => {
+    const page = ${JSON.stringify(page)};
+    const theme = ${JSON.stringify(theme)};
+    const minimumFontSizes = ${JSON.stringify(finding005MinimumFontSizes)};
+    const round = (value) => Math.round(value * 100) / 100;
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number(style.opacity) > 0
+        && style.clipPath !== 'inset(50%)'
+        && !element.closest('[inert],[aria-hidden="true"]')
+        && rect.width > 0
+        && rect.height > 0;
+    };
+    const clamp = (value, minimum, maximum) => Math.min(maximum, Math.max(minimum, value));
+    const parseAlpha = (value) => value?.endsWith('%')
+      ? Number.parseFloat(value) / 100
+      : Number.parseFloat(value ?? '1');
+    const parseColor = (value) => {
+      const input = String(value ?? '').trim().toLowerCase();
+      if (input === 'transparent') {
+        return { red: 0, green: 0, blue: 0, alpha: 0 };
+      }
+      const hex = /^#([a-f0-9]{6})([a-f0-9]{2})?$/.exec(input);
+      if (hex) {
+        return {
+          red: Number.parseInt(hex[1].slice(0, 2), 16),
+          green: Number.parseInt(hex[1].slice(2, 4), 16),
+          blue: Number.parseInt(hex[1].slice(4, 6), 16),
+          alpha: hex[2] ? Number.parseInt(hex[2], 16) / 255 : 1,
+        };
+      }
+      const rgb = /^rgba?\(\s*([\d.]+)[, ]+\s*([\d.]+)[, ]+\s*([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/.exec(input);
+      if (rgb) {
+        return {
+          red: clamp(Number.parseFloat(rgb[1]), 0, 255),
+          green: clamp(Number.parseFloat(rgb[2]), 0, 255),
+          blue: clamp(Number.parseFloat(rgb[3]), 0, 255),
+          alpha: clamp(parseAlpha(rgb[4]), 0, 1),
+        };
+      }
+      const srgb = /^color\(srgb\s+([\d.-]+)\s+([\d.-]+)\s+([\d.-]+)(?:\s*\/\s*([\d.]+%?))?\)$/.exec(input);
+      if (srgb) {
+        return {
+          red: clamp(Number.parseFloat(srgb[1]) * 255, 0, 255),
+          green: clamp(Number.parseFloat(srgb[2]) * 255, 0, 255),
+          blue: clamp(Number.parseFloat(srgb[3]) * 255, 0, 255),
+          alpha: clamp(parseAlpha(srgb[4]), 0, 1),
+        };
+      }
+      const oklab = /^oklab\(\s*([\d.-]+%?)\s+([\d.-]+)\s+([\d.-]+)(?:\s*\/\s*([\d.]+%?))?\s*\)$/.exec(input);
+      if (!oklab) return null;
+      const lightness = oklab[1].endsWith('%')
+        ? Number.parseFloat(oklab[1]) / 100
+        : Number.parseFloat(oklab[1]);
+      const a = Number.parseFloat(oklab[2]);
+      const b = Number.parseFloat(oklab[3]);
+      const lRoot = lightness + 0.3963377774 * a + 0.2158037573 * b;
+      const mRoot = lightness - 0.1055613458 * a - 0.0638541728 * b;
+      const sRoot = lightness - 0.0894841775 * a - 1.291485548 * b;
+      const l = lRoot ** 3;
+      const m = mRoot ** 3;
+      const s = sRoot ** 3;
+      const linear = [
+        4.0767416621 * l - 3.3077115913 * m + 0.2309699292 * s,
+        -1.2684380046 * l + 2.6097574011 * m - 0.3413193965 * s,
+        -0.0041960863 * l - 0.7034186147 * m + 1.707614701 * s,
+      ];
+      const gamma = (channel) => channel <= 0.0031308
+        ? 12.92 * channel
+        : 1.055 * channel ** (1 / 2.4) - 0.055;
+      return {
+        red: clamp(gamma(linear[0]) * 255, 0, 255),
+        green: clamp(gamma(linear[1]) * 255, 0, 255),
+        blue: clamp(gamma(linear[2]) * 255, 0, 255),
+        alpha: clamp(parseAlpha(oklab[4]), 0, 1),
+      };
+    };
+    const composite = (foreground, background) => {
+      const alpha = foreground.alpha + background.alpha * (1 - foreground.alpha);
+      if (alpha === 0) return { red: 0, green: 0, blue: 0, alpha: 0 };
+      const channel = (foregroundChannel, backgroundChannel) =>
+        (foregroundChannel * foreground.alpha
+          + backgroundChannel * background.alpha * (1 - foreground.alpha)) / alpha;
+      return {
+        red: channel(foreground.red, background.red),
+        green: channel(foreground.green, background.green),
+        blue: channel(foreground.blue, background.blue),
+        alpha,
+      };
+    };
+    const luminance = (color) => {
+      const linear = (channel) => {
+        const normalized = channel / 255;
+        return normalized <= 0.04045
+          ? normalized / 12.92
+          : ((normalized + 0.055) / 1.055) ** 2.4;
+      };
+      return 0.2126 * linear(color.red)
+        + 0.7152 * linear(color.green)
+        + 0.0722 * linear(color.blue);
+    };
+    const contrastRatio = (foreground, background) => {
+      const foregroundLuminance = luminance(foreground);
+      const backgroundLuminance = luminance(background);
+      return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+        / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+    };
+    const backgroundCandidates = (element) => {
+      const chain = [];
+      for (let current = element; current instanceof HTMLElement; current = current.parentElement) {
+        chain.push(current);
+      }
+      let candidates = [{ red: 255, green: 255, blue: 255, alpha: 1 }];
+      let unresolved = false;
+      for (const current of chain.reverse()) {
+        const style = getComputedStyle(current);
+        const color = parseColor(style.backgroundColor);
+        if (!color) {
+          unresolved = true;
+          continue;
+        }
+        candidates = candidates.map((background) => composite(color, background));
+        if (style.backgroundImage === 'none') continue;
+        const serializedColors = style.backgroundImage.match(
+          /(?:rgba?\([^)]*\)|color\(srgb[^)]*\)|oklab\([^)]*\)|#[a-f0-9]{6}(?:[a-f0-9]{2})?)/gi,
+        ) ?? [];
+        const imageColors = serializedColors.map(parseColor).filter(Boolean);
+        if (imageColors.length === 0) {
+          unresolved = true;
+          continue;
+        }
+        candidates = [
+          ...candidates,
+          ...candidates.flatMap((background) =>
+            imageColors.map((imageColor) => composite(imageColor, background))),
+        ];
+        const uniqueCandidates = new Map(candidates.map((candidate) => [
+          [candidate.red, candidate.green, candidate.blue, candidate.alpha]
+            .map((channel) => round(channel))
+            .join(':'),
+          candidate,
+        ]));
+        candidates = [...uniqueCandidates.values()].slice(0, 48);
+      }
+      return { candidates, unresolved };
+    };
+    const elementName = (element) => element.getAttribute('aria-label')
+      || element.getAttribute('title')
+      || element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 120)
+      || element.tagName.toLowerCase();
+    const textRole = (element) => {
+      if (element.closest('h1')) return 'page-title';
+      if (element.closest('h2')) return 'section-title';
+      if (element.closest([
+        '.subtle',
+        '.tab-url',
+        '.session-preview',
+        '.meta-pill',
+        '.status-pill',
+        '.suggestion-context',
+        '.unified-search-group-label',
+        '.utility-page-wordmark',
+        '.rail-brand p',
+        '.kbd',
+        '.history-tab-url',
+        '.help-text',
+        '.device-id',
+        '.settings-save-state',
+        '.options-intro-detail',
+        '.sync-state',
+        '.chooser-limit-hint',
+        '.state-tag',
+        '.newtab-sync-status',
+        '.active-workspace h4',
+        '.lifecycle-review-group h3',
+        'time',
+        'small',
+        'dt',
+      ].join(','))) return 'metadata';
+      if (element.closest('button,a,summary,label')) return 'functional';
+      return 'body';
+    };
+
+    const textTrace = [];
+    const contrastTrace = [];
+    let textReadabilityFailures = 0;
+    let contrastFailures = 0;
+    let contrastUnresolvedFailures = 0;
+    const auditTextSample = (element, name, style) => {
+      const role = textRole(element);
+      const fontSize = Number.parseFloat(style.fontSize);
+      const minimumFontSize = minimumFontSizes[role];
+      const textPassed = Number.isFinite(fontSize) && fontSize >= minimumFontSize - 0.01;
+      if (!textPassed) textReadabilityFailures += 1;
+      textTrace.push({
+        name,
+        role,
+        fontSize: round(fontSize),
+        minimumFontSize,
+        passed: textPassed,
+      });
+
+      const foreground = parseColor(style.color);
+      const background = backgroundCandidates(element);
+      if (!foreground || background.unresolved || background.candidates.length === 0) {
+        contrastUnresolvedFailures += 1;
+        contrastTrace.push({ name, resolved: false });
+        return;
+      }
+      let opacity = 1;
+      for (let current = element; current instanceof HTMLElement; current = current.parentElement) {
+        opacity *= Number.parseFloat(getComputedStyle(current).opacity || '1');
+      }
+      foreground.alpha *= opacity;
+      const ratios = background.candidates.map((candidate) =>
+        contrastRatio(composite(foreground, candidate), candidate));
+      const ratio = Math.min(...ratios);
+      const contrastPassed = ratio >= 4.5;
+      if (!contrastPassed) contrastFailures += 1;
+      contrastTrace.push({
+        name,
+        ratio: round(ratio),
+        candidateCount: ratios.length,
+        passed: contrastPassed,
+      });
+    };
+    const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT, {
+      acceptNode(node) {
+        const element = node.parentElement;
+        if (!element || !node.textContent?.trim()) return NodeFilter.FILTER_REJECT;
+        if (element.closest('script,style,[aria-hidden="true"],.visually-hidden')) {
+          return NodeFilter.FILTER_REJECT;
+        }
+        return visible(element) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_REJECT;
+      },
+    });
+    const textNodes = [];
+    while (walker.nextNode()) textNodes.push(walker.currentNode);
+    for (const node of textNodes) {
+      const element = node.parentElement;
+      auditTextSample(element, elementName(element), getComputedStyle(element));
+    }
+    const renderedControls = [...document.querySelectorAll('input,textarea,select')]
+      .filter((element) => visible(element));
+    for (const control of renderedControls) {
+      let renderedText = '';
+      let pseudoElement = null;
+      if (control instanceof HTMLSelectElement) {
+        renderedText = control.selectedOptions[0]?.textContent?.trim() ?? '';
+      } else if (control instanceof HTMLTextAreaElement) {
+        renderedText = control.value || control.placeholder;
+        if (!control.value && control.placeholder) pseudoElement = '::placeholder';
+      } else if (control instanceof HTMLInputElement
+        && ['email', 'number', 'password', 'search', 'tel', 'text', 'url'].includes(control.type)) {
+        renderedText = control.value || control.placeholder;
+        if (!control.value && control.placeholder) pseudoElement = '::placeholder';
+      }
+      if (!renderedText.trim()) continue;
+      const suffix = pseudoElement ? ' placeholder' : ' value';
+      auditTextSample(
+        control,
+        elementName(control) + suffix,
+        getComputedStyle(control, pseudoElement),
+      );
+    }
+
+    const isInlineProseLink = (element) => {
+      if (!(element instanceof HTMLAnchorElement)) return false;
+      if (getComputedStyle(element).display !== 'inline') return false;
+      const prose = element.closest('p,li');
+      return Boolean(prose && prose.textContent?.trim() !== element.textContent?.trim());
+    };
+    const rawTargets = [...document.querySelectorAll([
+      'button',
+      'a[href]',
+      'input:not([type="hidden"])',
+      'select',
+      'textarea',
+      'summary',
+      '[role="button"]',
+      '[tabindex]',
+      '[contenteditable="true"]',
+    ].join(','))].filter((element) => {
+      const customSequentialTarget = element.matches('[tabindex],[contenteditable="true"]')
+        && !element.matches('button,a[href],input,select,textarea,summary,[role="button"]');
+      return visible(element)
+        && (!customSequentialTarget || element.tabIndex >= 0)
+        && !isInlineProseLink(element);
+    });
+    const targetElements = [];
+    const targetSet = new Set();
+    for (const target of rawTargets) {
+      let effectiveTarget = target;
+      if (target instanceof HTMLInputElement
+        && (target.type === 'checkbox' || target.type === 'radio')) {
+        effectiveTarget = target.closest('label') ?? target;
+      }
+      if (!(effectiveTarget instanceof HTMLElement) || targetSet.has(effectiveTarget)) continue;
+      targetSet.add(effectiveTarget);
+      targetElements.push(effectiveTarget);
+    }
+    const targetTrace = targetElements.map((element) => {
+      const rect = element.getBoundingClientRect();
+      const passed = rect.width >= 44 - 0.01 && rect.height >= 44 - 0.01;
+      return {
+        element,
+        name: elementName(element),
+        rect: {
+          left: round(rect.left),
+          top: round(rect.top),
+          right: round(rect.right),
+          bottom: round(rect.bottom),
+          width: round(rect.width),
+          height: round(rect.height),
+        },
+        passed,
+      };
+    });
+    const overlapTrace = [];
+    for (let leftIndex = 0; leftIndex < targetTrace.length; leftIndex += 1) {
+      for (let rightIndex = leftIndex + 1; rightIndex < targetTrace.length; rightIndex += 1) {
+        const left = targetTrace[leftIndex];
+        const right = targetTrace[rightIndex];
+        const width = Math.max(0, Math.min(left.rect.right, right.rect.right)
+          - Math.max(left.rect.left, right.rect.left));
+        const height = Math.max(0, Math.min(left.rect.bottom, right.rect.bottom)
+          - Math.max(left.rect.top, right.rect.top));
+        const area = width * height;
+        if (area > 0.5) overlapTrace.push({ left: left.name, right: right.name, area: round(area) });
+      }
+    }
+
+    const unavailable = [...document.querySelectorAll([
+      'button:disabled',
+      'input:disabled',
+      'select:disabled',
+      'textarea:disabled',
+      '[role="button"][aria-disabled="true"]',
+    ].join(','))].filter((element) => visible(element));
+    const unavailableTrace = unavailable.map((element) => {
+      const ids = (element.getAttribute('aria-describedby') ?? '').split(/\s+/).filter(Boolean);
+      const description = ids
+        .map((id) => document.getElementById(id)?.textContent?.replace(/\s+/g, ' ').trim() ?? '')
+        .filter(Boolean)
+        .join(' ');
+      return { name: elementName(element), description, passed: description.length > 0 };
+    });
+
+    const inventory = page === 'newtab.html'
+      ? [
+          '[data-od-id="page-title"]',
+          '.dashboard-search input',
+          '[data-od-id="stow-current-action"]',
+          '.rail-utility-button',
+          '.quick-links-panel',
+        ]
+      : page === 'options.html'
+        ? [
+            '.utility-page-shell h1',
+            '.utility-page-back',
+            '.checkbox-row input',
+            '.diagnostics-disclosure summary',
+          ]
+        : [
+            '.utility-page-shell h1',
+            '.utility-page-back',
+            '.history-list',
+          ];
+    const inventoryTrace = [
+      ...inventory.map((selector) => ({
+        selector,
+        passed: Boolean(document.querySelector(selector)),
+      })),
+      {
+        selector: 'document-theme-mode',
+        passed: document.documentElement.dataset.themeMode === theme,
+      },
+      {
+        selector: 'document-color-scheme',
+        passed: getComputedStyle(document.documentElement).colorScheme === theme,
+      },
+    ];
+
+    return {
+      controlInventoryFailures: inventoryTrace.filter((check) => !check.passed).length,
+      textReadabilityFailures,
+      textNodesChecked: textTrace.length,
+      contrastFailures,
+      contrastPairsChecked: contrastTrace.filter((sample) => sample.resolved !== false).length,
+      contrastUnresolvedFailures,
+      targetSizeFailures: targetTrace.filter((target) => !target.passed).length,
+      targetsChecked: targetTrace.length,
+      targetOverlapFailures: overlapTrace.length,
+      unavailableDescriptionFailures: unavailableTrace.filter((control) => !control.passed).length,
+      unavailableControlsChecked: unavailableTrace.length,
+      trace: [{
+        step: 'finding-005-static',
+        page,
+        theme,
+        inventory: inventoryTrace,
+        text: textTrace,
+        contrast: contrastTrace,
+        targets: targetTrace.map(({ element: _element, ...target }) => target),
+        overlaps: overlapTrace,
+        unavailable: unavailableTrace,
+      }],
+    };
+  })()`);
+}
+
+async function auditFinding005Focus(
+  cdp: CdpConnection,
+  sessionId: string,
+  page: string,
+  theme: 'light' | 'dark',
+): Promise<Finding005Focus> {
+  const setup = await evaluate<{
+    expectedTargets: Array<{ key: string; name: string }>;
+  }>(cdp, sessionId, String.raw`(() => {
+    const visible = (element) => {
+      if (!(element instanceof HTMLElement)) return false;
+      const style = getComputedStyle(element);
+      const rect = element.getBoundingClientRect();
+      return style.display !== 'none'
+        && style.visibility !== 'hidden'
+        && Number(style.opacity) > 0
+        && style.clipPath !== 'inset(50%)'
+        && !element.closest('[inert],[aria-hidden="true"]')
+        && rect.width > 0
+        && rect.height > 0;
+    };
+    const keyFor = (element) => {
+      const path = [];
+      for (let current = element; current && current !== document.body; current = current.parentElement) {
+        const parent = current.parentElement;
+        const position = parent ? [...parent.children].indexOf(current) : 0;
+        path.push(current.tagName.toLowerCase() + ':' + position);
+      }
+      return path.reverse().join('/');
+    };
+    const nameFor = (element) => element.getAttribute('aria-label')
+      || element.getAttribute('title')
+      || element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 120)
+      || element.tagName.toLowerCase();
+    const targets = [...document.querySelectorAll([
+      'a[href]',
+      'button:not(:disabled)',
+      'input:not(:disabled):not([type="hidden"])',
+      'select:not(:disabled)',
+      'textarea:not(:disabled)',
+      'summary',
+      '[tabindex]',
+      '[contenteditable="true"]',
+    ].join(','))].filter((element) => visible(element) && element.tabIndex >= 0);
+    const baselines = Object.fromEntries(targets.map((element) => {
+      const style = getComputedStyle(element);
+      return [keyFor(element), {
+        outline: style.outline,
+        boxShadow: style.boxShadow,
+      }];
+    }));
+    window.__tabstowUiAuditFocusBaselines = baselines;
+    const body = document.body;
+    body.dataset.uiAuditTemporaryFocus = 'true';
+    body.tabIndex = -1;
+    body.focus();
+    return {
+      expectedTargets: targets.map((element) => ({
+        key: keyFor(element),
+        name: nameFor(element),
+      })),
+    };
+  })()`);
+
+  const trace: Array<Record<string, unknown>> = [];
+  const seen = new Set<string>();
+  let focusVisibilityFailures = 0;
+  try {
+    const maximumTargets = Math.min(320, setup.expectedTargets.length + 2);
+    for (let index = 0; index < maximumTargets; index += 1) {
+      await dispatchKey(cdp, sessionId, 'Tab');
+      const sample = await evaluate<{
+        key: string;
+        name: string;
+        passed: boolean;
+        focusVisible: boolean;
+        changed: boolean;
+        outline: string;
+        boxShadow: string;
+      } | null>(cdp, sessionId, String.raw`(() => {
+        const element = document.activeElement;
+        if (!(element instanceof HTMLElement) || element === document.body) return null;
+        const style = getComputedStyle(element);
+        const rect = element.getBoundingClientRect();
+        const visible = style.display !== 'none'
+          && style.visibility !== 'hidden'
+          && rect.width > 0
+          && rect.height > 0;
+        if (!visible) return null;
+        const path = [];
+        for (let current = element; current && current !== document.body; current = current.parentElement) {
+          const parent = current.parentElement;
+          const position = parent ? [...parent.children].indexOf(current) : 0;
+          path.push(current.tagName.toLowerCase() + ':' + position);
+        }
+        const key = path.reverse().join('/');
+        const baseline = window.__tabstowUiAuditFocusBaselines?.[key];
+        const outlineWidth = Number.parseFloat(style.outlineWidth || '0');
+        const hasOutline = style.outlineStyle !== 'none'
+          && outlineWidth >= 2
+          && style.outlineColor !== 'rgba(0, 0, 0, 0)';
+        const hasShadow = style.boxShadow !== 'none';
+        const focusVisible = element.matches(':focus-visible');
+        const changed = Boolean(baseline)
+          && (style.outline !== baseline.outline || style.boxShadow !== baseline.boxShadow);
+        const name = element.getAttribute('aria-label')
+          || element.textContent?.replace(/\s+/g, ' ').trim().slice(0, 120)
+          || element.tagName.toLowerCase();
+        return {
+          key,
+          name,
+          passed: focusVisible && changed && (hasOutline || hasShadow),
+          focusVisible,
+          changed,
+          outline: style.outline,
+          boxShadow: style.boxShadow,
+        };
+      })()`);
+      if (!sample) break;
+      if (seen.has(sample.key)) break;
+      seen.add(sample.key);
+      if (!sample.passed) focusVisibilityFailures += 1;
+      trace.push({ ...sample, page, theme });
+    }
+  } finally {
+    await evaluate(cdp, sessionId, String.raw`(() => {
+      const body = document.body;
+      if (body.dataset.uiAuditTemporaryFocus === 'true') {
+        body.removeAttribute('tabindex');
+        delete body.dataset.uiAuditTemporaryFocus;
+      }
+      delete window.__tabstowUiAuditFocusBaselines;
+      return true;
+    })()`);
+  }
+
+  const missingTargets = setup.expectedTargets.filter(({ key }) => !seen.has(key));
+  focusVisibilityFailures += missingTargets.length;
+
+  return {
+    focusVisibilityFailures,
+    focusTargetsChecked: trace.length,
+    trace: [{
+      step: 'finding-005-focus',
+      page,
+      theme,
+      expectedTargetCount: setup.expectedTargets.length,
+      targets: trace,
+      missingTargets,
+    }],
+  };
+}
+
+async function runFinding005AccessibilityMatrix(
+  cdp: CdpConnection,
+  sessionId: string,
+  page: string,
+  finalTheme: 'light' | 'dark',
+): Promise<Finding005Accessibility> {
+  const states: Array<{
+    theme: 'light' | 'dark';
+    staticAudit: Finding005StaticAccessibility;
+    focusAudit: Finding005Focus;
+  }> = [];
+  for (const theme of ['light', 'dark'] as const) {
+    await evaluate(cdp, sessionId, String.raw`(() => {
+      document.documentElement.dataset.themeMode = ${JSON.stringify(theme)};
+      return new Promise((resolvePromise) => {
+        requestAnimationFrame(() => requestAnimationFrame(() => resolvePromise(true)));
+      });
+    })()`);
+    const staticAudit = await auditFinding005Static(cdp, sessionId, page, theme);
+    const focusAudit = await auditFinding005Focus(cdp, sessionId, page, theme);
+    states.push({ theme, staticAudit, focusAudit });
+  }
+  await evaluate(cdp, sessionId, String.raw`(() => {
+    document.documentElement.dataset.themeMode = ${JSON.stringify(finalTheme)};
+    return true;
+  })()`);
+
+  const sumStatic = (metric: keyof Finding005StaticAccessibility) => states.reduce(
+    (total, state) => total + Number(state.staticAudit[metric]),
+    0,
+  );
+  return {
+    accessibilityThemeStateCount: states.length,
+    controlInventoryFailures: sumStatic('controlInventoryFailures'),
+    textReadabilityFailures: sumStatic('textReadabilityFailures'),
+    textNodesChecked: sumStatic('textNodesChecked'),
+    contrastFailures: sumStatic('contrastFailures'),
+    contrastPairsChecked: sumStatic('contrastPairsChecked'),
+    contrastUnresolvedFailures: sumStatic('contrastUnresolvedFailures'),
+    targetSizeFailures: sumStatic('targetSizeFailures'),
+    targetsChecked: sumStatic('targetsChecked'),
+    targetOverlapFailures: sumStatic('targetOverlapFailures'),
+    focusVisibilityFailures: states.reduce(
+      (total, state) => total + state.focusAudit.focusVisibilityFailures,
+      0,
+    ),
+    focusTargetsChecked: states.reduce(
+      (total, state) => total + state.focusAudit.focusTargetsChecked,
+      0,
+    ),
+    unavailableDescriptionFailures: sumStatic('unavailableDescriptionFailures'),
+    unavailableControlsChecked: sumStatic('unavailableControlsChecked'),
+    trace: [{
+      step: 'finding-005-matrix',
+      page,
+      states: states.map((state) => ({
+        theme: state.theme,
+        static: state.staticAudit.trace,
+        focus: state.focusAudit.trace,
+      })),
+    }],
+  };
+}
+
 async function probeFinding003BackRoute(
   cdp: CdpConnection,
   sessionId: string,
@@ -1497,7 +2176,8 @@ async function runUiAudit(): Promise<number> {
     await waitForPage(cdp, sessionId);
     await waitForDomQuiet(cdp, sessionId);
     const appearanceFixtureId = auditCase.appearanceFixture ?? 'none';
-    if (appearanceFixtureId === 'finding-003') {
+    const accessibilityFixtureId = auditCase.accessibilityFixture ?? 'none';
+    if (appearanceFixtureId === 'finding-003' || accessibilityFixtureId === 'finding-005') {
       await applyRequestedZoom(cdp, sessionId, auditCase.zoom);
     } else {
       await applyRequestedEnvironment(cdp, sessionId, {
@@ -1585,6 +2265,31 @@ async function runUiAudit(): Promise<number> {
           trace: [],
         };
 
+    const accessibility: Finding005Accessibility = accessibilityFixtureId === 'finding-005'
+      ? await runFinding005AccessibilityMatrix(
+          cdp,
+          sessionId,
+          auditCase.page,
+          auditCase.theme,
+        )
+      : {
+          accessibilityThemeStateCount: 0,
+          controlInventoryFailures: 0,
+          textReadabilityFailures: 0,
+          textNodesChecked: 0,
+          contrastFailures: 0,
+          contrastPairsChecked: 0,
+          contrastUnresolvedFailures: 0,
+          targetSizeFailures: 0,
+          targetsChecked: 0,
+          targetOverlapFailures: 0,
+          focusVisibilityFailures: 0,
+          focusTargetsChecked: 0,
+          unavailableDescriptionFailures: 0,
+          unavailableControlsChecked: 0,
+          trace: [],
+        };
+
     const observation = await evaluate<RuntimeObservation>(cdp, sessionId, String.raw`(async () => {
       const auditPage = ${JSON.stringify(auditCase.page)};
       const auditsFirstUse = ${JSON.stringify(auditCase.assertions.some(
@@ -1594,6 +2299,7 @@ async function runUiAudit(): Promise<number> {
       const interaction = ${JSON.stringify(interaction)};
       const layout = ${JSON.stringify(layout)};
       const appearance = ${JSON.stringify(appearance)};
+      const accessibility = ${JSON.stringify(accessibility)};
       const sha256 = async (path) => {
         const response = await fetch(chrome.runtime.getURL(path), { cache: 'no-store' });
         if (!response.ok) throw new Error('Could not read runtime resource: ' + path);
@@ -1737,8 +2443,27 @@ async function runUiAudit(): Promise<number> {
           utilityBackRouteFailures: appearance.utilityBackRouteFailures,
           backControlHeightPx: appearance.backControlHeightPx,
           backViewportOverflowPx: appearance.backViewportOverflowPx,
+          accessibilityThemeStateCount: accessibility.accessibilityThemeStateCount,
+          controlInventoryFailures: accessibility.controlInventoryFailures,
+          textReadabilityFailures: accessibility.textReadabilityFailures,
+          textNodesChecked: accessibility.textNodesChecked,
+          contrastFailures: accessibility.contrastFailures,
+          contrastPairsChecked: accessibility.contrastPairsChecked,
+          contrastUnresolvedFailures: accessibility.contrastUnresolvedFailures,
+          targetSizeFailures: accessibility.targetSizeFailures,
+          targetsChecked: accessibility.targetsChecked,
+          targetOverlapFailures: accessibility.targetOverlapFailures,
+          focusVisibilityFailures: accessibility.focusVisibilityFailures,
+          focusTargetsChecked: accessibility.focusTargetsChecked,
+          unavailableDescriptionFailures: accessibility.unavailableDescriptionFailures,
+          unavailableControlsChecked: accessibility.unavailableControlsChecked,
         },
-        interactionTrace: [...interaction.trace, ...layout.trace, ...appearance.trace],
+        interactionTrace: [
+          ...interaction.trace,
+          ...layout.trace,
+          ...appearance.trace,
+          ...accessibility.trace,
+        ],
         runtimeId: chrome.runtime.id,
         manifest: chrome.runtime.getManifest(),
         resourceHashes: {
@@ -1817,6 +2542,7 @@ async function runUiAudit(): Promise<number> {
           interactionFixture: interactionFixtureId,
           layoutFixture: layoutFixtureId,
           appearanceFixture: appearanceFixtureId,
+          accessibilityFixture: accessibilityFixtureId,
         },
         setup: auditCase.setup,
         cleanup: auditCase.cleanup,

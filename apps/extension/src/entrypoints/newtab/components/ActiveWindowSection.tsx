@@ -1,5 +1,5 @@
 import { Archive, MoonStar, Trash2, Volume2, X } from 'lucide-react';
-import { Fragment, useRef, type DragEvent, type MouseEvent } from 'react';
+import { Fragment, useId, useRef, type DragEvent } from 'react';
 import { TabFavicon } from '@/components/TabFavicon';
 import { getTabLabel } from '@/features/active-tabs/tab-labels';
 import type {
@@ -171,6 +171,7 @@ function itemLabel(item: ActiveWindowItem, locale: Locale): string {
 
 export function ActiveWindowSection(props: Props) {
   const suppressClickRef = useRef(false);
+  const sleepUnavailableId = useId();
   const windowLabel = props.window.focused
     ? t(props.locale, 'currentWindow')
     : t(props.locale, 'windowNumber', { number: props.displayIndex + 1 });
@@ -203,34 +204,17 @@ export function ActiveWindowSection(props: Props) {
       incognito: props.window.incognito,
     };
 
-    function stopAction(event: MouseEvent) {
-      event.stopPropagation();
-    }
-
     return (
       <div
         aria-disabled={props.dragDisabled}
         className={`tab-row${tab.discarded === true ? ' sleeping' : ''}${tab.audible === true ? ' audible' : ''}`}
         draggable={!props.dragDisabled}
-        onClick={() => {
-          if (suppressClickRef.current || props.disabled) return;
-          props.onFocusTab(tab);
-        }}
         onDragEnd={(event) => {
           props.onDragEnd(event);
           suppressClickRef.current = true;
           window.setTimeout(() => { suppressClickRef.current = false; }, 0);
         }}
         onDragStart={(event) => props.onDragStart(event, source)}
-        onKeyDown={(event) => {
-          if (event.target !== event.currentTarget) return;
-          if ((event.key === 'Enter' || event.key === ' ') && !props.disabled) {
-            event.preventDefault();
-            props.onFocusTab(tab);
-          }
-        }}
-        role="button"
-        tabIndex={0}
       >
         <span
           aria-disabled={props.dragDisabled}
@@ -238,7 +222,14 @@ export function ActiveWindowSection(props: Props) {
           className="drag-surface-label"
           draggable={!props.dragDisabled}
         />
-        <div className="tab-open-button"
+        <button
+          className="tab-open-button"
+          disabled={props.disabled}
+          onClick={() => {
+            if (suppressClickRef.current || props.disabled) return;
+            props.onFocusTab(tab);
+          }}
+          type="button"
         >
           <TabFavicon
             className="active-tab-favicon"
@@ -252,23 +243,23 @@ export function ActiveWindowSection(props: Props) {
             {tab.audible === true ? <span className="state-tag"><Volume2 aria-hidden="true" size={11} /> {t(props.locale, 'audible')}</span> : null}
             {tab.discarded === true ? <span className="state-tag sleep">{t(props.locale, 'sleeping')}</span> : null}
           </span>
-        </div>
+        </button>
         <div className="row-actions">
           <button
             type="button"
             className="icon-button"
             aria-label={t(props.locale, 'saveTabForLater', { label })}
-            onClick={(event) => { stopAction(event); props.onStowTab(tab); }}
+            onClick={() => props.onStowTab(tab)}
             disabled={props.disabled}
           >
             <Archive size={14} aria-hidden="true" />
           </button>
           <button
             aria-label={t(props.locale, 'sleepTab', { label })}
+            aria-describedby={sleepEligible ? undefined : sleepUnavailableId}
             className="icon-button"
             disabled={props.disabled || !sleepEligible}
-            onClick={(event) => {
-              stopAction(event);
+            onClick={() => {
               if (sleepEligible && typeof tab.id === 'number') props.onSleepTabs([tab.id]);
             }}
             title={sleepEligible ? undefined : t(props.locale, 'sleepProtectedReason')}
@@ -280,7 +271,7 @@ export function ActiveWindowSection(props: Props) {
             type="button"
             className="icon-button"
             aria-label={t(props.locale, 'closeTab', { label })}
-            onClick={(event) => { stopAction(event); if (typeof tab.id === 'number') props.onCloseTabs([tab.id]); }}
+            onClick={() => { if (typeof tab.id === 'number') props.onCloseTabs([tab.id]); }}
             disabled={props.disabled}
           >
             <Trash2 size={14} aria-hidden="true" />
@@ -419,6 +410,9 @@ export function ActiveWindowSection(props: Props) {
         <h3>{windowLabel}</h3>
         <span className="meta-pill">{t(props.locale, 'openCount', { count: props.window.visibleTabCount })}</span>
       </header>
+      <span className="visually-hidden" id={sleepUnavailableId}>
+        {t(props.locale, 'sleepProtectedReason')}
+      </span>
       {showPinnedLane && (
         <section className="pinned-lane">
           <header className="pinned-lane-header">

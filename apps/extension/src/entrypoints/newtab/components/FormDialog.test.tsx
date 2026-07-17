@@ -84,6 +84,26 @@ describe('FormDialog', () => {
     expect(queryByRole('dialog')).toBeNull();
     expect(document.activeElement).toBe(getByText('Open dialog'));
   });
+
+  it('describes an unavailable submit action with existing dialog copy', async () => {
+    await act(async () => {
+      root.render(
+        <FormDialog
+          cancelLabel="Cancel"
+          onCancel={() => undefined}
+          onSubmit={() => undefined}
+          submitAriaDescribedBy="no-match"
+          submitDisabled
+          submitLabel="Add"
+          title="Choose item"
+        >
+          <p id="no-match">No matching items.</p>
+        </FormDialog>,
+      );
+    });
+
+    expect(getByText('Add').getAttribute('aria-describedby')).toBe('no-match');
+  });
 });
 
 async function click(element: HTMLElement) {

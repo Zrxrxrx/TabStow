@@ -51,6 +51,20 @@ const UI_AUDIT_METRICS = [
   'utilityBackRouteFailures',
   'backControlHeightPx',
   'backViewportOverflowPx',
+  'accessibilityThemeStateCount',
+  'controlInventoryFailures',
+  'textReadabilityFailures',
+  'textNodesChecked',
+  'contrastFailures',
+  'contrastPairsChecked',
+  'contrastUnresolvedFailures',
+  'targetSizeFailures',
+  'targetsChecked',
+  'targetOverlapFailures',
+  'focusVisibilityFailures',
+  'focusTargetsChecked',
+  'unavailableDescriptionFailures',
+  'unavailableControlsChecked',
 ] as const;
 
 const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
@@ -87,6 +101,20 @@ const NUMERIC_UI_AUDIT_METRICS = new Set<UiAuditMetric>([
   'utilityBackRouteFailures',
   'backControlHeightPx',
   'backViewportOverflowPx',
+  'accessibilityThemeStateCount',
+  'controlInventoryFailures',
+  'textReadabilityFailures',
+  'textNodesChecked',
+  'contrastFailures',
+  'contrastPairsChecked',
+  'contrastUnresolvedFailures',
+  'targetSizeFailures',
+  'targetsChecked',
+  'targetOverlapFailures',
+  'focusVisibilityFailures',
+  'focusTargetsChecked',
+  'unavailableDescriptionFailures',
+  'unavailableControlsChecked',
 ]);
 
 const UI_AUDIT_FEEDBACK_FIXTURES = [
@@ -105,6 +133,7 @@ const UI_AUDIT_LAYOUT_FIXTURES = [
 ] as const;
 
 const UI_AUDIT_APPEARANCE_FIXTURES = ['finding-003'] as const;
+const UI_AUDIT_ACCESSIBILITY_FIXTURES = ['finding-005'] as const;
 
 export type UiAuditMetric = typeof UI_AUDIT_METRICS[number];
 export type UiAuditOperator = 'atMost' | 'atLeast' | 'equals';
@@ -112,6 +141,7 @@ export type UiAuditFeedbackFixture = typeof UI_AUDIT_FEEDBACK_FIXTURES[number];
 export type UiAuditInteractionFixture = typeof UI_AUDIT_INTERACTION_FIXTURES[number];
 export type UiAuditLayoutFixture = typeof UI_AUDIT_LAYOUT_FIXTURES[number];
 export type UiAuditAppearanceFixture = typeof UI_AUDIT_APPEARANCE_FIXTURES[number];
+export type UiAuditAccessibilityFixture = typeof UI_AUDIT_ACCESSIBILITY_FIXTURES[number];
 
 export type UiAuditAssertion = {
   metric: UiAuditMetric;
@@ -131,6 +161,7 @@ export type UiAuditCase = {
   interactionFixture?: UiAuditInteractionFixture;
   layoutFixture?: UiAuditLayoutFixture;
   appearanceFixture?: UiAuditAppearanceFixture;
+  accessibilityFixture?: UiAuditAccessibilityFixture;
   setup: string[];
   cleanup: string[];
   screenshot: string;
@@ -272,6 +303,20 @@ export function validateUiAuditManifest(input: unknown): UiAuditManifest {
       )) {
       throw new Error(`${field}.appearanceFixture is unsupported`);
     }
+    if (candidate.accessibilityFixture !== undefined
+      && !UI_AUDIT_ACCESSIBILITY_FIXTURES.includes(
+        candidate.accessibilityFixture as UiAuditAccessibilityFixture,
+      )) {
+      throw new Error(`${field}.accessibilityFixture is unsupported`);
+    }
+    const fixtureCount = [
+      candidate.feedbackFixture,
+      candidate.interactionFixture,
+      candidate.layoutFixture,
+      candidate.appearanceFixture,
+      candidate.accessibilityFixture,
+    ].filter((fixture) => fixture !== undefined && fixture !== 'none').length;
+    if (fixtureCount > 1) throw new Error(`${field} must not combine focused fixtures`);
     validateInstructions(candidate.setup, `${field}.setup`);
     validateInstructions(candidate.cleanup, `${field}.cleanup`);
     if (typeof candidate.screenshot !== 'string'
@@ -300,9 +345,191 @@ export function validateUiAuditManifest(input: unknown): UiAuditManifest {
         throw new Error(`${assertionField}.value must be a non-empty string`);
       }
     }
+    if (candidate.accessibilityFixture === 'finding-005') {
+      const assertionsByMetric = new Map(
+        candidate.assertions.map((assertion) => [assertion.metric, assertion]),
+      );
+      const zeroFailureMetrics: UiAuditMetric[] = [
+        'controlInventoryFailures',
+        'textReadabilityFailures',
+        'contrastFailures',
+        'contrastUnresolvedFailures',
+        'targetSizeFailures',
+        'targetOverlapFailures',
+        'focusVisibilityFailures',
+        'unavailableDescriptionFailures',
+      ];
+      const positiveCoverageMetrics: UiAuditMetric[] = [
+        'textNodesChecked',
+        'contrastPairsChecked',
+        'targetsChecked',
+        'focusTargetsChecked',
+      ];
+      const requiredMetrics: UiAuditMetric[] = [
+        'accessibilityThemeStateCount',
+        ...zeroFailureMetrics,
+        ...positiveCoverageMetrics,
+        'unavailableControlsChecked',
+      ];
+      const missingMetrics = requiredMetrics.filter((metric) => !assertionsByMetric.has(metric));
+      if (missingMetrics.length > 0) {
+        throw new Error(`${field}.assertions must cover ${missingMetrics.join(', ')}`);
+      }
+      const themeCountAssertion = assertionsByMetric.get('accessibilityThemeStateCount')!;
+      if (themeCountAssertion.operator !== 'equals' || themeCountAssertion.value !== 2) {
+        throw new Error(`${field}.accessibilityThemeStateCount must use equals 2`);
+      }
+      for (const metric of zeroFailureMetrics) {
+        const assertion = assertionsByMetric.get(metric)!;
+        if (assertion.operator !== 'equals' || assertion.value !== 0) {
+          throw new Error(`${field}.${metric} must use equals 0`);
+        }
+      }
+      for (const metric of positiveCoverageMetrics) {
+        const assertion = assertionsByMetric.get(metric)!;
+        if (assertion.operator !== 'atLeast'
+          || typeof assertion.value !== 'number'
+          || assertion.value < 1) {
+          throw new Error(`${field}.${metric} must use atLeast 1 or greater`);
+        }
+      }
+      const unavailableCoverage = assertionsByMetric.get('unavailableControlsChecked')!;
+      const unavailableCoverageIsExplicitlyEmpty = unavailableCoverage.operator === 'equals'
+        && unavailableCoverage.value === 0;
+      const unavailableCoverageIsPositive = unavailableCoverage.operator === 'atLeast'
+        && typeof unavailableCoverage.value === 'number'
+        && unavailableCoverage.value >= 1;
+      if (!unavailableCoverageIsExplicitlyEmpty && !unavailableCoverageIsPositive) {
+        throw new Error(
+          `${field}.unavailableControlsChecked must use equals 0 or atLeast 1 or greater`,
+        );
+      }
+    }
   }
 
   return input as UiAuditManifest;
+}
+
+export type UiAuditTextRole =
+  | 'page-title'
+  | 'section-title'
+  | 'body'
+  | 'metadata'
+  | 'functional';
+
+const UI_AUDIT_MINIMUM_FONT_SIZES: Record<UiAuditTextRole, number> = {
+  'page-title': 28,
+  'section-title': 18,
+  body: 14,
+  metadata: 12,
+  functional: 12,
+};
+
+export type UiAuditRgba = {
+  red: number;
+  green: number;
+  blue: number;
+  alpha: number;
+};
+
+export type UiAuditRect = {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+};
+
+export function getUiAuditMinimumFontSize(role: UiAuditTextRole): number {
+  return UI_AUDIT_MINIMUM_FONT_SIZES[role];
+}
+
+export function parseUiAuditCssColor(value: string): UiAuditRgba | null {
+  const input = value.trim().toLowerCase();
+  const hex = /^#([a-f0-9]{6})([a-f0-9]{2})?$/.exec(input);
+  if (hex) {
+    const channels = hex[1]!;
+    return {
+      red: Number.parseInt(channels.slice(0, 2), 16),
+      green: Number.parseInt(channels.slice(2, 4), 16),
+      blue: Number.parseInt(channels.slice(4, 6), 16),
+      alpha: hex[2] ? Number.parseInt(hex[2], 16) / 255 : 1,
+    };
+  }
+
+  const rgb = /^rgba?\(\s*([\d.]+)[, ]+\s*([\d.]+)[, ]+\s*([\d.]+)(?:\s*[,/]\s*([\d.]+%?))?\s*\)$/.exec(input);
+  if (!rgb) return null;
+  const alpha = rgb[4]?.endsWith('%')
+    ? Number.parseFloat(rgb[4]) / 100
+    : Number.parseFloat(rgb[4] ?? '1');
+  const channels = rgb.slice(1, 4).map((channel) => Number.parseFloat(channel!));
+  if ([...channels, alpha].some((channel) => !Number.isFinite(channel))) return null;
+  return {
+    red: Math.min(255, Math.max(0, channels[0]!)),
+    green: Math.min(255, Math.max(0, channels[1]!)),
+    blue: Math.min(255, Math.max(0, channels[2]!)),
+    alpha: Math.min(1, Math.max(0, alpha)),
+  };
+}
+
+export function compositeUiAuditColor(
+  foreground: UiAuditRgba,
+  background: UiAuditRgba,
+): UiAuditRgba {
+  const alpha = foreground.alpha + background.alpha * (1 - foreground.alpha);
+  if (alpha === 0) return { red: 0, green: 0, blue: 0, alpha: 0 };
+  const channel = (foregroundChannel: number, backgroundChannel: number) =>
+    (foregroundChannel * foreground.alpha
+      + backgroundChannel * background.alpha * (1 - foreground.alpha)) / alpha;
+  return {
+    red: channel(foreground.red, background.red),
+    green: channel(foreground.green, background.green),
+    blue: channel(foreground.blue, background.blue),
+    alpha,
+  };
+}
+
+function uiAuditRelativeLuminance(color: UiAuditRgba): number {
+  const linear = (channel: number) => {
+    const normalized = channel / 255;
+    return normalized <= 0.04045
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  };
+  return 0.2126 * linear(color.red)
+    + 0.7152 * linear(color.green)
+    + 0.0722 * linear(color.blue);
+}
+
+export function getUiAuditContrastRatio(
+  foreground: UiAuditRgba,
+  background: UiAuditRgba,
+): number {
+  const opaqueBackground = background.alpha < 1
+    ? compositeUiAuditColor(background, { red: 255, green: 255, blue: 255, alpha: 1 })
+    : background;
+  const opaqueForeground = foreground.alpha < 1
+    ? compositeUiAuditColor(foreground, opaqueBackground)
+    : foreground;
+  const foregroundLuminance = uiAuditRelativeLuminance(opaqueForeground);
+  const backgroundLuminance = uiAuditRelativeLuminance(opaqueBackground);
+  return (Math.max(foregroundLuminance, backgroundLuminance) + 0.05)
+    / (Math.min(foregroundLuminance, backgroundLuminance) + 0.05);
+}
+
+export function meetsUiAuditTargetSize(
+  rect: UiAuditRect,
+  minimum = 44,
+): boolean {
+  return rect.right - rect.left >= minimum && rect.bottom - rect.top >= minimum;
+}
+
+export function getUiAuditTargetOverlapArea(
+  left: UiAuditRect,
+  right: UiAuditRect,
+): number {
+  const width = Math.max(0, Math.min(left.right, right.right) - Math.max(left.left, right.left));
+  const height = Math.max(0, Math.min(left.bottom, right.bottom) - Math.max(left.top, right.top));
+  return width * height;
 }
 
 export function selectUiAuditCase(manifest: UiAuditManifest, caseId: string): UiAuditCase {
