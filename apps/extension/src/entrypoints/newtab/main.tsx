@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { bootstrapThemePreferences } from '@/features/theme/theme-bootstrap';
 import { App } from './App';
 import '@/styles/tabstow-tokens.css';
+import '@/styles/tabstow-foundation.css';
 import './styles.css';
 
 async function mount() {
