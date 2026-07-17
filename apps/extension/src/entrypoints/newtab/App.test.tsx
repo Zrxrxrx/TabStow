@@ -1511,6 +1511,7 @@ describe('App', () => {
 
     expect(screen().getByRole('heading', { name: '打开的标签页' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '快捷链接' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: '添加快捷链接' })).not.toBeNull();
     expect(screen().getByRole('heading', { name: '已保存的窗口' })).not.toBeNull();
     expect(screen().getByText('1 个窗口')).not.toBeNull();
     expect(screen().getByText('1 个标签页')).not.toBeNull();
@@ -1695,6 +1696,76 @@ describe('App', () => {
     await click(screen().getByLabelText('Remove Example'));
 
     expect(saveQuickLinks).toHaveBeenLastCalledWith([]);
+  });
+
+  it('waits for Quick Links to load before showing an actionable empty state', async () => {
+    const pendingQuickLinks = deferred<QuickLink[]>();
+    getQuickLinks.mockReturnValue(pendingQuickLinks.promise);
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+
+    expect(container.querySelector('.quick-links-empty-state')).toBeNull();
+    expect(() => screen().getByRole('button', { name: 'Add quick link' })).toThrow();
+    expect(screen().getByRole('button', { name: 'Edit quick links' }).hasAttribute('disabled')).toBe(true);
+
+    await act(async () => {
+      pendingQuickLinks.resolve([
+        {
+          id: 'link-1',
+          url: 'https://example.com/',
+          label: 'Example',
+          icon: null,
+          createdAt: '2026-07-07T00:00:00.000Z',
+        },
+      ]);
+      await pendingQuickLinks.promise;
+    });
+
+    expect(screen().getByText('Example')).not.toBeNull();
+    expect(container.querySelector('.quick-links-empty-state')).toBeNull();
+    expect(screen().getByRole('button', { name: 'Edit quick links' }).hasAttribute('disabled')).toBe(false);
+  });
+
+  it('offers the existing add-by-URL flow from an empty Quick Links state', async () => {
+    mockMessages({ activeTabs: [UNIQUE_TAB] });
+
+    await renderApp();
+
+    const emptyState = container.querySelector('.quick-links-empty-state');
+    expect(emptyState?.textContent).toContain('No quick links yet.');
+    expect(screen().getByRole('button', { name: 'Add quick link' })).not.toBeNull();
+    expect(screen().getByRole('button', { name: 'Edit quick links' }).getAttribute('aria-pressed')).toBe('false');
+    expect(() => screen().getByRole('button', { name: 'Add open tab' })).toThrow();
+
+    await click(screen().getByRole('button', { name: 'Add quick link' }));
+    await change(screen().getByLabelText('Quick link URL'), 'notaurl');
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(screen().getByRole('alert').textContent).toBe('Quick link URL is invalid.');
+    expect(screen().getByLabelText('Quick link URL')).not.toBeNull();
+
+    await change(screen().getByLabelText('Quick link URL'), 'example.com');
+    sendExtensionMessage.mockResolvedValueOnce({
+      ok: false,
+      error: { code: 'unknown-error', message: 'Could not save quick link.' },
+    });
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(screen().getByRole('alert').textContent).toBe('Could not save quick link.');
+    expect(screen().getByLabelText('Quick link URL')).not.toBeNull();
+
+    await click(screen().getByRole('button', { name: 'Add' }));
+
+    expect(saveQuickLinks).toHaveBeenCalledWith([
+      expect.objectContaining({
+        url: 'https://example.com/',
+        label: 'example.com',
+      }),
+    ]);
+    expect(screen().getByText('example.com')).not.toBeNull();
+    expect(container.querySelector('.quick-links-empty-state')).toBeNull();
+    expect(screen().getByRole('button', { name: 'Edit quick links' }).getAttribute('aria-pressed')).toBe('false');
   });
 
   it('keeps quick-link editing controls hidden until edit mode is enabled', async () => {

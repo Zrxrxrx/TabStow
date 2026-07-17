@@ -65,6 +65,24 @@ button:focus-visible {
   gap: 14px;
 }
 
+.history-empty-state {
+  display: grid;
+  gap: 8px;
+  padding: 24px;
+  color: var(--ts-text-secondary);
+  border: 1px dashed var(--ts-border);
+  background: var(--ts-surface);
+}
+
+.history-empty-state strong {
+  color: var(--ts-text);
+}
+
+.history-empty-state p {
+  max-width: 600px;
+  margin: 0;
+}
+
 .history-entry {
   padding: 16px;
   border: 1px solid var(--ts-border);
