@@ -1,0 +1,42 @@
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+  background: color-mix(in oklab, var(--bg), transparent 18%);
+  backdrop-filter: blur(3px);
+}
+
+.modal-dialog {
+  width: min(100%, 520px);
+  max-height: min(760px, calc(100dvh - 60px));
+  overflow: auto;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  color: var(--fg);
+  border: 1px solid var(--border);
+  background: var(--surface);
+  box-shadow: var(--elev-raised);
+}
+
+.dialog-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: start;
+}
+
+.dialog-body {
+  display: grid;
+  gap: 12px;
+}
+
+.dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+}

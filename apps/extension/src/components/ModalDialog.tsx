@@ -8,6 +8,7 @@ import {
   useRef,
 } from 'react';
 import { createPortal } from 'react-dom';
+import './ModalDialog.css';
 
 type ModalDialogProps = {
   actions?: ReactNode;

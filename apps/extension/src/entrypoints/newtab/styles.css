@@ -854,17 +854,6 @@ h3 {
   text-transform: uppercase;
 }
 
-.dialog-backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 30;
-  display: grid;
-  place-items: center;
-  padding: 16px;
-  background: color-mix(in oklab, var(--bg), transparent 18%);
-  backdrop-filter: blur(3px);
-}
-
 .form-dialog {
   width: min(100%, 430px);
   max-height: min(720px, calc(100dvh - 32px));
@@ -879,14 +868,6 @@ h3 {
   box-shadow: var(--elev-raised);
 }
 
-.dialog-header {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 12px;
-  align-items: start;
-}
-
-.dialog-body,
 .field-stack {
   display: grid;
   gap: 12px;
@@ -920,13 +901,6 @@ h3 {
   min-height: 86px;
   padding-block: 9px;
   resize: vertical;
-}
-
-.dialog-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
 }
 
 .open-tab-chooser {
@@ -1573,19 +1547,6 @@ svg {
   margin: 10px 18px 0;
   overflow-wrap: anywhere;
   border: 1px solid currentColor;
-  box-shadow: var(--elev-raised);
-}
-
-.modal-dialog {
-  width: min(100%, 520px);
-  max-height: min(760px, calc(100dvh - 60px));
-  overflow: auto;
-  display: grid;
-  gap: 14px;
-  padding: 16px;
-  color: var(--fg);
-  border: 1px solid var(--border);
-  background: var(--surface);
   box-shadow: var(--elev-raised);
 }
 
