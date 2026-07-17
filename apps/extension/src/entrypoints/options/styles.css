@@ -85,6 +85,12 @@ select {
 
 .options-intro {
   margin: 0;
+  color: var(--ts-text-secondary);
+  font-weight: 700;
+}
+
+.options-intro-detail {
+  margin: 8px 0 0;
   color: var(--ts-text-muted);
 }
 
@@ -122,9 +128,42 @@ select {
 }
 
 .device-id {
-  margin: 0;
+  margin: 6px 0 0;
   overflow-wrap: anywhere;
   color: var(--ts-text-muted);
+}
+
+.diagnostics-disclosure {
+  border: 1px solid var(--ts-border);
+  background: var(--ts-surface);
+}
+
+.diagnostics-disclosure summary {
+  padding: 12px 14px;
+  color: var(--ts-text-secondary);
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.diagnostics-disclosure[open] summary {
+  border-bottom: 1px solid var(--ts-border-soft);
+}
+
+.diagnostics-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+}
+
+.diagnostics-content > div {
+  min-width: 0;
+}
+
+.diagnostics-note {
+  margin: 0;
+  padding: 0 14px 14px;
 }
 
 .connection-card {
@@ -220,6 +259,24 @@ select {
   color: var(--ts-text-muted);
 }
 
+.settings-section-copy {
+  margin: 0;
+}
+
+.settings-save-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-top: 4px;
+}
+
+.settings-save-state {
+  margin: 0;
+  color: var(--ts-text-muted);
+}
+
 .danger-text,
 .danger-button {
   color: var(--ts-danger);
@@ -236,14 +293,6 @@ select {
 
 code {
   overflow-wrap: anywhere;
-}
-
-.options-actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px;
-  padding-top: 22px;
 }
 
 .primary-button {
@@ -293,6 +342,11 @@ code {
   }
 
   .connection-summary {
+    flex-direction: column;
+  }
+
+  .diagnostics-content {
+    align-items: stretch;
     flex-direction: column;
   }
 }
