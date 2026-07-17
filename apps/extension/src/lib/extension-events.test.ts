@@ -10,6 +10,7 @@ vi.mock('@/lib/browser', () => ({ browser: browserMocks }));
 
 import {
   broadcastExtensionEvent,
+  isSavedDataChangeEvent,
   isSavedDataInvalidationEvent,
 } from './extension-events';
 
@@ -19,6 +20,8 @@ describe('extension events', () => {
   });
 
   it('recognizes local and synchronized Saved data invalidations', () => {
+    expect(isSavedDataChangeEvent({ type: 'saved-data:changed' })).toBe(true);
+    expect(isSavedDataChangeEvent({ type: 'sync:data-changed' })).toBe(false);
     expect(isSavedDataInvalidationEvent({ type: 'saved-data:changed' })).toBe(true);
     expect(isSavedDataInvalidationEvent({ type: 'sync:data-changed' })).toBe(true);
     expect(isSavedDataInvalidationEvent({ type: 'sync:status-changed' })).toBe(false);

@@ -155,7 +155,6 @@ export function App({
       if (!message || typeof message !== 'object' || !('type' in message)) return;
       const event = message as { type?: unknown; status?: SyncStatusView };
       if (event.type === 'sync:data-changed') {
-        void loadSessions();
         setQuickLinksRefreshKey((value) => value + 1);
       } else if (event.type === 'sync:status-changed' && event.status) {
         setConnection((current) => ({ ...current, sync: event.status! }));

@@ -9,9 +9,15 @@ export async function broadcastExtensionEvent(event: ExtensionEvent): Promise<vo
   }
 }
 
-export function isSavedDataInvalidationEvent(message: unknown): boolean {
+export function isSavedDataChangeEvent(message: unknown): boolean {
   if (!message || typeof message !== 'object' || !('type' in message)) return false;
 
+  return (message as { type?: unknown }).type === 'saved-data:changed';
+}
+
+export function isSavedDataInvalidationEvent(message: unknown): boolean {
+  if (isSavedDataChangeEvent(message)) return true;
+  if (!message || typeof message !== 'object' || !('type' in message)) return false;
   const type = (message as { type?: unknown }).type;
-  return type === 'saved-data:changed' || type === 'sync:data-changed';
+  return type === 'sync:data-changed';
 }

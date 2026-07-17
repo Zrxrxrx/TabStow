@@ -1,7 +1,8 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { TabSession } from '@tabstow/core';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
+import { useSavedDataRefreshGate } from './useSavedDataInvalidation';
 
 export type SavedForLaterStatus = {
   tone: 'info' | 'success' | 'error';
@@ -34,53 +35,79 @@ export function useSavedForLaterController({
   const [sessions, setSessions] = useState<TabSession[]>([]);
   const [busyAction, setBusyAction] = useState<string | null>(null);
   const busyActionRef = useRef<string | null>(null);
+  const loadGenerationRef = useRef(0);
+  const mountedRef = useRef(false);
+  const onActionSucceededRef = useRef(onActionSucceeded);
+  const onStatusRef = useRef(onStatus);
+  onActionSucceededRef.current = onActionSucceeded;
+  onStatusRef.current = onStatus;
 
-  async function loadSessions() {
+  const loadSessions = useCallback(async () => {
+    if (!mountedRef.current) return;
+    const generation = ++loadGenerationRef.current;
     const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
+    if (!mountedRef.current || generation !== loadGenerationRef.current) return;
+
     if (response.ok) {
       setSessions(response.data);
       return;
     }
-    onStatus({ tone: 'error', message: response.error.message });
-  }
-
-  useEffect(() => {
-    void loadSessions();
+    onStatusRef.current({ tone: 'error', message: response.error.message });
   }, []);
 
-  async function runAction<T>(
+  const { beginMutation, finishMutation } = useSavedDataRefreshGate(
+    loadSessions,
+    { includeSynchronizedChanges: true },
+  );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    void loadSessions();
+    return () => {
+      mountedRef.current = false;
+      ++loadGenerationRef.current;
+    };
+  }, [loadSessions]);
+
+  const runAction = useCallback(async function runAction<T>(
     actionId: string,
     action: () => Promise<AppResult<T>>,
     success: (data: T) => string,
     options: { reloadOnFailure?: boolean } = {},
   ) {
-    if (busyActionRef.current !== null) return;
+    if (!mountedRef.current || busyActionRef.current !== null) return;
     busyActionRef.current = actionId;
+    beginMutation();
     setBusyAction(actionId);
-    onStatus({ tone: 'info', message: null });
+    onStatusRef.current({ tone: 'info', message: null });
     let reloadSessions = options.reloadOnFailure ?? false;
     let actionSucceeded = false;
 
     try {
       const response = await action();
+      if (!mountedRef.current) return;
 
       if (response.ok) {
-        onStatus({ tone: 'success', message: success(response.data) });
+        onStatusRef.current({ tone: 'success', message: success(response.data) });
         reloadSessions = true;
         actionSucceeded = true;
       } else {
-        onStatus({ tone: 'error', message: response.error.message });
+        onStatusRef.current({ tone: 'error', message: response.error.message });
       }
     } finally {
+      if (!mountedRef.current) {
+        busyActionRef.current = null;
+        return;
+      }
       try {
-        if (reloadSessions) await loadSessions();
-        if (actionSucceeded) onActionSucceeded?.();
+        await finishMutation(reloadSessions);
+        if (mountedRef.current && actionSucceeded) onActionSucceededRef.current?.();
       } finally {
         busyActionRef.current = null;
-        setBusyAction(null);
+        if (mountedRef.current) setBusyAction(null);
       }
     }
-  }
+  }, [beginMutation, finishMutation]);
 
   return { busyAction, loadSessions, runAction, sessions };
 }
