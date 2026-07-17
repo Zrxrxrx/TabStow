@@ -4,7 +4,7 @@ import {
   type RefObject,
   useId,
 } from 'react';
-import { ModalDialog } from './ModalDialog';
+import { ModalDialog } from '@/components/ModalDialog';
 
 export type FormDialogProps = {
   cancelLabel: string;

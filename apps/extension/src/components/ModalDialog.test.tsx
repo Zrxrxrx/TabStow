@@ -1,7 +1,7 @@
 import { act, StrictMode, type ReactNode, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { ModalDialog } from './ModalDialog';
+import { ModalDialog } from '@/components/ModalDialog';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT =
   true;

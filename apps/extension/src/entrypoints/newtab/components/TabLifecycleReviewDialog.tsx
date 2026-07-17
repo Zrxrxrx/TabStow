@@ -8,7 +8,7 @@ import type {
 import { t, type Locale } from '@/features/i18n/i18n';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
-import { ModalDialog } from './ModalDialog';
+import { ModalDialog } from '@/components/ModalDialog';
 
 type Props = {
   initialCandidates: StowSuggestionCandidate[];
@@ -299,7 +299,7 @@ export function TabLifecycleReviewDialog({
                           type="checkbox"
                         />
                         <TabFavicon
-                          className="saved-tab-favicon"
+                          className="lifecycle-tab-favicon"
                           favIconUrl={candidate.favIconUrl}
                           pageUrl={candidate.url}
                           title={candidate.title}

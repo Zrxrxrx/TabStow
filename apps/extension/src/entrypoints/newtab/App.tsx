@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import type { TabSession } from '@tabstow/core';
 import { Languages, Moon, Settings, SlidersHorizontal, Sun } from 'lucide-react';
 import type { ActiveTabsSnapshot } from '@/features/active-tabs/types';
+import {
+  SavedForLater,
+  useSavedForLaterController,
+} from '@/features/saved-for-later';
 import {
   getLanguagePreference,
   resolveLocale,
@@ -16,6 +19,7 @@ import {
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
+import { ModalDialog } from '@/components/ModalDialog';
 import {
   acknowledgeIncident,
   clearAcknowledgement,
@@ -23,12 +27,9 @@ import {
   getAcknowledgedIncidentKey,
 } from '@/features/sync/sync-incident-acknowledgement';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
-import { ModalDialog } from './components/ModalDialog';
 import { QuickLinks } from './components/QuickLinks';
-import { RecoveryBinDialog } from './components/RecoveryBinDialog';
 import { NewTabFeedback } from './components/NewTabFeedback';
 import { NewTabSyncStatus } from './components/NewTabSyncStatus';
-import { StowedSessions } from './components/StowedSessions';
 import { StowCurrentWindowButton } from './components/StowCurrentWindowButton';
 import { SyncStatusDialog } from './components/SyncStatusDialog';
 import { TodosPanel } from './components/TodosPanel';
@@ -59,9 +60,7 @@ export function App({
   initialThemeMode = 'light',
   subscribeToThemeChanges,
 }: AppProps = {}) {
-  const [sessions, setSessions] = useState<TabSession[]>([]);
   const [activeSnapshot, setActiveSnapshot] = useState<ActiveTabsSnapshot>(EMPTY_ACTIVE_SNAPSHOT);
-  const [busyAction, setBusyAction] = useState<string | null>(null);
   const [status, setStatus] = useState<StatusState>(
     initialThemeError
       ? { tone: 'error', message: initialThemeError }
@@ -77,26 +76,17 @@ export function App({
   const [duplicateTabstowCount, setDuplicateTabstowCount] = useState(0);
   const [duplicateTabstowClosePending, setDuplicateTabstowClosePending] = useState(false);
   const [extraOpen, setExtraOpen] = useState(false);
-  const [recoveryOpen, setRecoveryOpen] = useState(false);
   const [syncDetailsOpen, setSyncDetailsOpen] = useState(false);
   const [tabQuery, setTabQuery] = useState('');
-  const busyActionRef = useRef<string | null>(null);
   const incidentAckWriteRef = useRef<Promise<void>>(Promise.resolve());
   const locale = useMemo(() => resolveLocale(language, navigator.language), [language]);
-
-  async function loadSessions() {
-    const response = await sendExtensionMessage<AppResult<TabSession[]>>({ type: 'sessions:list' });
-    if (response.ok) {
-      setSessions(response.data);
-      return;
-    }
-    if (!response.ok) {
-      setStatus({ tone: 'error', message: response.error.message });
-    }
-  }
+  const savedForLater = useSavedForLaterController({
+    onActionSucceeded: () => setActiveWorkspaceRefreshKey((value) => value + 1),
+    onStatus: setStatus,
+  });
+  const { busyAction, loadSessions, runAction, sessions } = savedForLater;
 
   useEffect(() => {
-    void loadSessions();
     void observeSync('open');
   }, []);
 
@@ -195,42 +185,6 @@ export function App({
   useEffect(() => {
     document.documentElement.lang = locale;
   }, [locale]);
-
-  async function runAction<T>(
-    actionId: string,
-    action: () => Promise<AppResult<T>>,
-    success: (data: T) => string,
-    options: { reloadOnFailure?: boolean } = {},
-  ) {
-    if (busyActionRef.current !== null) return;
-    busyActionRef.current = actionId;
-    setBusyAction(actionId);
-    setStatus({ tone: 'info', message: null });
-    let reloadSessions = options.reloadOnFailure ?? false;
-    let refreshActiveWorkspace = false;
-
-    try {
-      const response = await action();
-
-      if (response.ok) {
-        setStatus({ tone: 'success', message: success(response.data) });
-        reloadSessions = true;
-        refreshActiveWorkspace = true;
-      } else {
-        setStatus({ tone: 'error', message: response.error.message });
-      }
-    } finally {
-      try {
-        if (reloadSessions) await loadSessions();
-        if (refreshActiveWorkspace) {
-          setActiveWorkspaceRefreshKey((value) => value + 1);
-        }
-      } finally {
-        busyActionRef.current = null;
-        setBusyAction(null);
-      }
-    }
-  }
 
   function openOptions() {
     chrome.runtime.openOptionsPage();
@@ -391,13 +345,10 @@ export function App({
                 />
               </div>
               <div className="saved-region">
-                <StowedSessions
-                  busyAction={busyAction}
+                <SavedForLater
+                  controller={savedForLater}
                   locale={locale}
-                  onRunAction={runAction}
-                  onOpenRecovery={() => setRecoveryOpen(true)}
                   query={tabQuery}
-                  sessions={sessions}
                 />
               </div>
             </div>
@@ -470,13 +421,6 @@ export function App({
         >
           <TodosPanel locale={locale} />
         </ModalDialog>
-      ) : null}
-      {recoveryOpen ? (
-        <RecoveryBinDialog
-          locale={locale}
-          onClose={() => setRecoveryOpen(false)}
-          onRestored={loadSessions}
-        />
       ) : null}
       {syncDetailsOpen && duplicateTabstowCount === 0 ? (
         <SyncStatusDialog

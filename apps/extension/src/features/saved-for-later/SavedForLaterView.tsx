@@ -24,19 +24,16 @@ import {
   writeSavedTabsDragSource,
   type SavedTabsDragSource,
   type SavedTabsDropTarget,
-} from './saved-tabs-dnd';
+} from '@/features/saved-for-later/saved-tabs-dnd';
+import type { RunSavedForLaterAction } from './useSavedForLaterController';
+import './styles.css';
 
-type Props = {
+export type SavedForLaterViewProps = {
   busyAction: string | null;
   locale: Locale;
   query: string;
   sessions: TabSession[];
-  onRunAction: <T>(
-    actionId: string,
-    action: () => Promise<AppResult<T>>,
-    success: (data: T) => string,
-    options?: { reloadOnFailure?: boolean },
-  ) => Promise<void>;
+  onRunAction: RunSavedForLaterAction;
   onOpenRecovery: () => void;
 };
 
@@ -158,14 +155,14 @@ function SavedTabRow({
   );
 }
 
-export function StowedSessions({
+export function SavedForLaterView({
   busyAction,
   locale,
   onOpenRecovery,
   onRunAction,
   query,
   sessions,
-}: Props) {
+}: SavedForLaterViewProps) {
   const [activeDropTargetKey, setActiveDropTargetKey] = useState<string | null>(null);
   const dragSourceRef = useRef<SavedTabsDragSource | null>(null);
   const dropPendingRef = useRef(false);
@@ -326,7 +323,7 @@ export function StowedSessions({
   }
 
   return (
-    <section className="panel column saved-sessions" aria-labelledby="saved-title" data-od-id="saved-tabs-column">
+    <section className="panel column saved-sessions saved-for-later" aria-labelledby="saved-title" data-od-id="saved-tabs-column">
       <header className="section-header">
         <div>
           <h2 id="saved-title" data-od-id="saved-tabs-title">

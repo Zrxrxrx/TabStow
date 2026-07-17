@@ -1,6 +1,6 @@
 import type { ConnectionView } from '@/features/sync/sync-types';
 import { t, type Locale } from '@/features/i18n/i18n';
-import { ModalDialog } from './ModalDialog';
+import { ModalDialog } from '@/components/ModalDialog';
 
 type Props = {
   connection: ConnectionView;
