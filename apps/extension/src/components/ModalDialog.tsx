@@ -9,7 +9,7 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 
-type Props = {
+type ModalDialogProps = {
   actions?: ReactNode;
   backdropClassName?: string;
   busy?: boolean;
@@ -119,7 +119,7 @@ export function ModalDialog({
   onClose,
   surfaceClassName,
   title,
-}: Props) {
+}: ModalDialogProps) {
   const titleId = useId();
   const descriptionId = useId();
   const modalId = useRef(Symbol('modal-dialog'));

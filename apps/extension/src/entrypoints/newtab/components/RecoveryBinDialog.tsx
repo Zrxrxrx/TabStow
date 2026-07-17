@@ -10,7 +10,7 @@ import {
 } from '@/features/tabs/session-presentation';
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage } from '@/lib/messages';
-import { ModalDialog } from './ModalDialog';
+import { ModalDialog } from '@/components/ModalDialog';
 
 type Props = {
   locale: Locale;

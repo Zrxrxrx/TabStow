@@ -16,6 +16,7 @@ import {
 import type { AppResult } from '@/lib/errors';
 import { sendExtensionMessage, type StowResult } from '@/lib/messages';
 import type { ConnectionView, SyncStatusView } from '@/features/sync/sync-types';
+import { ModalDialog } from '@/components/ModalDialog';
 import {
   acknowledgeIncident,
   clearAcknowledgement,
@@ -23,7 +24,6 @@ import {
   getAcknowledgedIncidentKey,
 } from '@/features/sync/sync-incident-acknowledgement';
 import { ActiveWorkspace } from './components/ActiveWorkspace';
-import { ModalDialog } from './components/ModalDialog';
 import { QuickLinks } from './components/QuickLinks';
 import { RecoveryBinDialog } from './components/RecoveryBinDialog';
 import { NewTabFeedback } from './components/NewTabFeedback';
