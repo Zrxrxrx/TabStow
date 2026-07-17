@@ -11,5 +11,6 @@ apps/extension/dist/
 packages/core/dist/
 coverage/
 .artifacts/
+graphify-out/
 .superpowers/
 .worktrees/
