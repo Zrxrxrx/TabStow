@@ -41,15 +41,18 @@ body {
 
 .sidepanel-shell > .saved-for-later {
   min-height: 0;
+  gap: 10px;
+  padding: 0 10px;
   border: 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
 }
 
-@media (max-width: 380px) {
+@media (max-width: 480px) {
   .saved-for-later > .section-header {
     display: grid;
+    gap: 8px;
   }
 
   .saved-header-actions {
